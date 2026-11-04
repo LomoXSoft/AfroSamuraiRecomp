@@ -54,7 +54,8 @@ Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
    (right-click, *Save link as*) into an empty folder, or clone/download this repository
    and use the `install.bat` at its root.
 3. Double-click `install.bat`. It asks for an install folder and for your ISO,
-   then does everything else.
+   then does everything else. Started from a clone, it builds that checkout and
+   proposes `AfroSamuraiRecomp-install` next to it as the install folder.
 4. When it says `INSTALL OK`, play with the desktop shortcut or
    `<root>\afrorecomp\tools\run_win.bat`.
 

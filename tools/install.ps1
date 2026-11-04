@@ -129,7 +129,8 @@ Write-Host ''
 $here = $PSScriptRoot
 $inRepo = Test-Path -LiteralPath (Join-Path $here 'build_win.bat')
 if (-not $Root) {
-  $def = if ($inRepo) { Split-Path (Split-Path $here -Parent) -Parent } else { Join-Path $here 'AfroSamuraiRecomp' }
+  # From a clone: a sibling folder (keeps toolchain and game files out of the checkout); standalone: next to the script.
+  $def = if ($inRepo) { Join-Path (Split-Path (Split-Path $here -Parent) -Parent) 'AfroSamuraiRecomp-install' } else { Join-Path $here 'AfroSamuraiRecomp' }
   $Root = Ask 'Install folder (needs about 20 GB free; avoid paths with spaces or non-ASCII characters if possible)' $def
 }
 $Root = [IO.Path]::GetFullPath($Root)
@@ -138,6 +139,8 @@ $LOG = Join-Path $Root 'install.log'; $script:LOG = $LOG
 $TOOLS = Join-Path $Root 'tools'; $DLDIR = Join-Path $Root 'downloads'; $STAMPS = Join-Path $Root '.install'
 $REPO = Join-Path $Root 'afrorecomp'
 $here2 = Split-Path $here -Parent
+# Started from a clone of this repo: build that checkout (no GitHub access needed for the source).
+if ($inRepo -and -not $PSBoundParameters.ContainsKey('RepoUrl')) { $RepoUrl = $here2 }
 if ($inRepo -and ((Split-Path $here2 -Parent) -eq $Root)) { $REPO = $here2 }   # run from an existing clone
 New-Item -ItemType Directory -Force -Path $TOOLS, $DLDIR, $STAMPS | Out-Null
 $t0 = Get-Date
