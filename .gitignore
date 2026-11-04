@@ -1,0 +1,14 @@
+# Game-derived files: never commit
+*.xex
+*.pe
+*.iso
+*.zip
+*.bik
+*.ico
+assets/
+app/generated/default/
+app/afro_switch_tables.toml
+shaderdump/
+*.log
+*.cfg
+out/

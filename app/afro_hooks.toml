@@ -1,0 +1,5 @@
+# Mid-asm hooks (src/frame_pacing.cpp). Addresses only, no game data.
+# Before the D3D Swap's call to VdSwap: count guest frames and optionally pace them.
+[[midasm_hook]]
+address = 0x8236D74C
+name = "AfroSwapHook"

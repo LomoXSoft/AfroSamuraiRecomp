@@ -1,0 +1,18 @@
+# Manual function boundaries (targets only reached via plain `b`), from rexglue codegen UnresolvedCall
+[functions]
+0x824CDE18 = {}
+0x824CA9B0 = {}
+0x823CBD90 = {}  # code pointer in data after bctr (not detected)
+0x824C4CA0 = {}  # code pointer in data after bctr (not detected)
+0x824C4CE8 = {}  # code pointer in data after bctr (not detected)
+0x8251D850 = {}  # code pointer in data after bctr (not detected)
+0x8251DDC0 = {}  # code pointer in data after bctr (not detected)
+0x8256C690 = {}  # code pointer in data after bctr (not detected)
+0x825B2010 = {}  # code pointer in data after bctr (not detected)
+0x826392C0 = {}  # code pointer in data after bctr (not detected)
+0x826392D8 = {}  # code pointer in data after bctr (not detected)
+0x824EAA58 = {}  # code pointer built with lis/addi (find_code_ptrs.py)
+0x824EAA68 = {}  # code pointer built with lis/addi (find_code_ptrs.py)
+0x8264DE30 = {}  # code pointer built with lis/addi (find_code_ptrs.py)
+0x826B8378 = {}  # code pointer built with lis/addi (find_code_ptrs.py)
+0x827F2EC0 = {}  # code pointer built with lis/addi (find_code_ptrs.py)
