@@ -57,7 +57,10 @@ Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
    created inside the folder you choose) and a file picker for your ISO,
    then does everything else. Started from a clone, it builds that checkout and
    proposes `AfroSamuraiRecomp-install` next to it as the install folder.
-4. All questions (install folder, ISO, Microsoft license, shortcuts) come first;
+4. It first asks the language (English, Espanol, Francais, Italiano; your Windows
+   language is preselected). The installer messages are shown in it, and the launcher
+   and the game start in it too (you can still change it in the launcher).
+   All other questions (install folder, ISO, Microsoft license, shortcuts) come next;
    then it runs to the end without stopping. When it says `INSTALL OK`, play with the
    desktop shortcut or `<root>\game\Play.bat`.
 5. Finally it offers (default No) to delete what is only needed for building
@@ -90,7 +93,7 @@ The log is `<root>\install.log`. To uninstall, delete the install folder (and
 the shortcuts; saves are separate, see [Saves](#saves)).
 
 Command-line options (`install.bat -Option value`): `-InstallDir <dir>` (full install folder, skips the folder picker), `-Iso <file>`,
-`-AcceptMsvcLicense`, `-Shortcut yes|no`, `-CleanupAfterInstall` / `-KeepBuildFiles`, `-Ref <branch|tag>`. Advanced:
+`-AcceptMsvcLicense`, `-Shortcut yes|no`, `-CleanupAfterInstall` / `-KeepBuildFiles`, `-Language en|es|fr|it`, `-Ref <branch|tag>`. Advanced:
 `-GameDataDir <dir>` uses an already extracted disc folder (containing `default.xex`)
 instead of an ISO.
 
