@@ -197,6 +197,15 @@ itself is under `<profile id>\4E4D07D8\00000001\AFRO_0.SAV`; the shader cache is
 `Documents\afrorecomp` folder while the game is closed; to restore, copy it back.
 Deleting or rebuilding the install folder does not touch your saves.
 
+The launcher (shown at start, or hold Shift) has two buttons for this:
+- **Open saves folder** opens `Documents\afrorecomp` in Explorer (created if missing).
+- **Back up saves** copies the whole folder (except the shader `cache`) to a new
+  `Documents\afrorecomp-backups\saves-YYYYMMDD-HHMMSS\` folder and offers to open it.
+  It never deletes or overwrites anything.
+
+To restore a backup: close the game, then copy the contents of a `saves-...` folder
+back into `Documents\afrorecomp\` (keep a copy of the current folder first if unsure).
+
 ## Launcher and options
 The launcher (shown on first run, after each update, or with Shift) offers:
 language (English, Español, Français, Italiano), fullscreen or window, internal

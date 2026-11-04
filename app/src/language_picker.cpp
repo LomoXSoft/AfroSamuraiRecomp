@@ -25,6 +25,11 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <shellapi.h>
+#include <shlobj.h>
+#include <ctime>
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "ole32.lib")
 #endif
 
 REXCVAR_DEFINE_BOOL(choose_language, false, "Afro",
@@ -149,9 +154,88 @@ constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
               kIdHint = 104, kIdFpsLbl = 105, kIdFps = 106, kIdDispLbl = 107,
               kIdDisp = 108, kIdScaleLbl = 109, kIdScale = 110,
               kIdAdvBtn = 111, kIdXBtn = 112, kIdXWarn = 113, kIdXSepiaLbl = 114,
-              kIdXSepia = 115, kIdAdvBase = 200;
+              kIdXSepia = 115, kIdSavesOpen = 116, kIdSavesBackup = 117, kIdAdvBase = 200;
+
+// Save management (same language order as kText).
+struct SaveText { const wchar_t *open, *backup, *done, *empty, *fail; };
+const SaveText kSaveText[] = {
+    {L"Open saves folder", L"Back up saves", L"Saves backed up to:\n%s\n\nOpen the backup folder?",
+     L"There are no saves yet in:\n%s", L"Backup failed:\n%s"},
+    {L"Abrir carpeta de partidas", L"Copia de seguridad", L"Partidas copiadas en:\n%s\n\n\u00bfAbrir la carpeta de copias?",
+     L"Todav\u00eda no hay partidas en:\n%s", L"La copia ha fallado:\n%s"},
+    {L"Ouvrir les sauvegardes", L"Copier les sauvegardes", L"Sauvegardes copi\u00e9es dans :\n%s\n\nOuvrir le dossier des copies ?",
+     L"Aucune sauvegarde pour l'instant dans :\n%s", L"\u00c9chec de la copie :\n%s"},
+    {L"Apri cartella salvataggi", L"Backup salvataggi", L"Salvataggi copiati in:\n%s\n\nAprire la cartella dei backup?",
+     L"Ancora nessun salvataggio in:\n%s", L"Backup non riuscito:\n%s"},
+};
+
+// Same rule as ReXApp::SetupEnvironment: --user_data_root, else
+// Documents (FOLDERID_Documents) \ app name ("afrorecomp").
+std::filesystem::path SaveRoot() {
+  std::string cv = rex::cvar::GetFlagByName("user_data_root");
+  if (!cv.empty()) return std::filesystem::path(cv);
+  std::filesystem::path docs;
+  PWSTR p = nullptr;
+  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, nullptr, &p))) docs = p;
+  if (p) CoTaskMemFree(p);
+  return docs / L"afrorecomp";
+}
+
+void Explore(const std::filesystem::path& dir) {
+  ShellExecuteW(nullptr, L"explore", dir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
+
+std::wstring Fmt(const wchar_t* f, const std::wstring& a) {
+  std::wstring out(f);
+  auto i = out.find(L"%s");
+  if (i != std::wstring::npos) out.replace(i, 2, a);
+  return out;
+}
+
+void OpenSaves() {
+  std::error_code ec;
+  auto root = SaveRoot();
+  std::filesystem::create_directories(root, ec);
+  Explore(root);
+}
+
+// Copy the whole save root (except the shader cache) to a new timestamped
+// folder next to it. Never deletes or overwrites anything.
+void BackupSaves(HWND owner, int sel) {
+  const SaveText& t = kSaveText[sel];
+  auto root = SaveRoot();
+  std::error_code ec;
+  if (!std::filesystem::exists(root, ec) || std::filesystem::is_empty(root, ec)) {
+    MessageBoxW(owner, Fmt(t.empty, root.wstring()).c_str(), L"Afro Samurai", MB_OK | MB_ICONINFORMATION);
+    return;
+  }
+  wchar_t stamp[32];
+  std::time_t now = std::time(nullptr);
+  std::tm tm{};
+  localtime_s(&tm, &now);
+  wcsftime(stamp, 32, L"saves-%Y%m%d-%H%M%S", &tm);
+  auto base = root.parent_path() / (root.filename().wstring() + L"-backups");
+  auto dst = base / stamp;
+  for (int n = 2; std::filesystem::exists(dst, ec); ++n) dst = base / (std::wstring(stamp) + L"-" + std::to_wstring(n));
+  std::filesystem::create_directories(dst, ec);
+  if (!ec) {
+    for (auto& e : std::filesystem::directory_iterator(root, ec)) {
+      if (e.path().filename() == L"cache") continue;  // shader cache, not saves
+      std::filesystem::copy(e.path(), dst / e.path().filename(),
+                            std::filesystem::copy_options::recursive | std::filesystem::copy_options::skip_existing, ec);
+      if (ec) break;
+    }
+  }
+  if (ec) {
+    std::string m = ec.message();
+    MessageBoxW(owner, Fmt(t.fail, std::wstring(m.begin(), m.end()) + L"\n" + dst.wstring()).c_str(), L"Afro Samurai", MB_OK | MB_ICONERROR);
+    return;
+  }
+  if (MessageBoxW(owner, Fmt(t.done, dst.wstring()).c_str(), L"Afro Samurai", MB_YESNO | MB_ICONINFORMATION) == IDYES)
+    Explore(base);
+}
 constexpr int kFpsValues[] = {0, 30, 60};
-struct PickState { int sel = 0; bool remember = false; bool done = false; Options opt; };
+struct PickState { int sel = 0; bool remember = false; bool done = false; bool play = false; Options opt; };
 
 void FillCombo(HWND h, int id, std::initializer_list<const wchar_t*> items) {
   HWND c = GetDlgItem(h, id);
@@ -172,6 +256,8 @@ void ApplyTexts(HWND h, int sel) {
   SetDlgItemTextW(h, kIdScaleLbl, t.scale);
   SetDlgItemTextW(h, kIdAdvBtn, t.adv);
   SetDlgItemTextW(h, kIdXBtn, t.xbtn);
+  SetDlgItemTextW(h, kIdSavesOpen, kSaveText[sel].open);
+  SetDlgItemTextW(h, kIdSavesBackup, kSaveText[sel].backup);
   FillCombo(h, kIdDisp, {t.full, t.win});
 }
 
@@ -345,14 +431,21 @@ LRESULT CALLBACK PickProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   auto* st = reinterpret_cast<PickState*>(GetWindowLongPtrW(h, GWLP_USERDATA));
   switch (m) {
     case WM_COMMAND:
-      if (LOWORD(w) == kIdAdvBtn) {
+      if (LOWORD(w) == kIdSavesOpen) {
+        OpenSaves();
+      } else if (LOWORD(w) == kIdSavesBackup) {
+        BackupSaves(h, st->sel);
+      } else if (LOWORD(w) == kIdAdvBtn) {
         ShowAdvanced(h, st->sel, &st->opt);
       } else if (LOWORD(w) == kIdXBtn) {
         ShowExperimental(h, st->sel, &st->opt);
       } else if (LOWORD(w) == kIdCombo && HIWORD(w) == CBN_SELCHANGE) {
         st->sel = static_cast<int>(SendDlgItemMessageW(h, kIdCombo, CB_GETCURSEL, 0, 0));
         ApplyTexts(h, st->sel);
-      } else if (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL) {
+      } else if (LOWORD(w) == IDCANCEL) {  // Esc: same as closing the window
+        PostMessageW(h, WM_CLOSE, 0, 0);
+      } else if (LOWORD(w) == IDOK) {
+        st->play = true;
         st->opt.window = SendDlgItemMessageW(h, kIdDisp, CB_GETCURSEL, 0, 0) == 1;
         int si = static_cast<int>(SendDlgItemMessageW(h, kIdScale, CB_GETCURSEL, 0, 0));
         st->opt.scale = 1 + std::clamp(si, 0, 2);
@@ -370,6 +463,7 @@ LRESULT CALLBACK PickProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   return DefWindowProcW(h, m, w, l);
 }
 
+// Returns 0 when the window was closed (X, Alt+F4, Esc) instead of Play.
 unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   HINSTANCE inst = GetModuleHandleW(nullptr);
   WNDCLASSW wc{};
@@ -382,7 +476,12 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   const double sc = GetDpiForSystem() / 96.0;
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const DWORD style = WS_CAPTION | WS_SYSMENU;
-  RECT rc{0, 0, S(400), S(336)};
+  // Vertical layout (unscaled px); rows stack with no gaps when the
+  // advanced button is hidden.
+  const bool adv = REXCVAR_GET(advanced);
+  const int yAdv = 166, ySaves = adv ? 200 : 166, yCheck = ySaves + 40,
+            yHint = yCheck + 26, yPlay = yHint + 42, yEnd = yPlay + 34 + 20;
+  RECT rc{0, 0, S(400), S(yEnd)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   const int W = rc.right - rc.left, H = rc.bottom - rc.top;
   int x = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
@@ -426,10 +525,12 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   SendMessageW(disp, CB_SETCURSEL, o->window ? 1 : 0, 0);
   SendMessageW(scale, CB_SETCURSEL, (o->scale >= 1 && o->scale <= 3) ? o->scale - 1 : 0, 0);
   mk(L"BUTTON", WS_TABSTOP, 20, 132, 360, 28, kIdXBtn);  // always shown
-  if (REXCVAR_GET(advanced)) mk(L"BUTTON", WS_TABSTOP, 20, 166, 360, 28, kIdAdvBtn);
-  mk(L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, 20, 206, 360, 22, kIdCheck);
-  mk(L"STATIC", 0, 20, 232, 360, 36, kIdHint);
-  HWND play = mk(L"BUTTON", WS_TABSTOP | BS_DEFPUSHBUTTON, 140, 282, 120, 34,
+  if (adv) mk(L"BUTTON", WS_TABSTOP, 20, yAdv, 360, 28, kIdAdvBtn);
+  mk(L"BUTTON", WS_TABSTOP, 20, ySaves, 176, 28, kIdSavesOpen);
+  mk(L"BUTTON", WS_TABSTOP, 204, ySaves, 176, 28, kIdSavesBackup);
+  mk(L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, 20, yCheck, 360, 22, kIdCheck);
+  mk(L"STATIC", 0, 20, yHint, 360, 36, kIdHint);
+  HWND play = mk(L"BUTTON", WS_TABSTOP | BS_DEFPUSHBUTTON, 140, yPlay, 120, 34,
                  kIdPlay);
   if (st.remember) CheckDlgButton(h, kIdCheck, BST_CHECKED);
   ApplyTexts(h, st.sel);
@@ -443,6 +544,7 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
     }
   }
   UnregisterClassW(wc.lpszClassName, inst);
+  if (!st.play) return 0;
   *remember = st.remember;
   *o = st.opt;
   return kLangs[st.sel].id;
@@ -512,6 +614,11 @@ unsigned ApplyStartupLanguage() {
     }
     const Options stored = opt;  // advanced options persist only with "remember"
     lang = ShowPicker(initial, &remember, &opt);
+    if (!lang) {  // Launcher closed without Play: quit, keep the old config.
+      std::fprintf(stderr, "[afro] launcher closed, not starting the game\n");
+      std::fflush(nullptr);
+      ExitProcess(0);
+    }
     std::ofstream out(path, std::ios::trunc);
     out << "language=" << lang << "\nask=" << (remember ? 0 : 1) << "\nfps=" << (remember ? opt.fps : saved_fps)
         << "\nsepia=" << (remember ? opt.sepia : stored.sepia)
