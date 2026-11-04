@@ -12,7 +12,7 @@ Nothing is ever uploaded. Log: <root>\install.log
 Usage (normally just double-click install.bat):
   powershell -ExecutionPolicy Bypass -File install.ps1 [options]
 Options (all optional; anything missing is asked interactively):
-  -Root <dir>            install folder
+  -InstallDir <dir>      install folder (alias -Root); skips the folder picker
   -Iso <file>            your Afro Samurai (Europe) ISO
   -AcceptMsvcLicense     accept the Microsoft Visual Studio Build Tools license
                          without the interactive prompt
@@ -25,7 +25,7 @@ Advanced:
                          <root>\gamedata
 #>
 param(
-  [string]$Root, [string]$Iso, [switch]$AcceptMsvcLicense,
+  [Alias('Root')][string]$InstallDir, [string]$Iso, [switch]$AcceptMsvcLicense,
   [ValidateSet('', 'yes', 'no')][string]$Shortcut = '',
   [string]$Ref = 'main',
   [string]$RepoUrl = 'https://github.com/LomoXSoft/AfroSamuraiRecomp.git',
@@ -103,7 +103,34 @@ function Fetch($key) {
   Say ("    ok, {0:n1} MB, SHA-256 verified" -f ((Get-Item -LiteralPath $out).Length / 1MB))
   return $out
 }
-function Unzip($zip, $dest) { $ProgressPreference = 'SilentlyContinue'; Prog $script:DLSHARE 'extracting' -Force; if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }; Expand-Archive -LiteralPath $zip -DestinationPath $dest -Force }
+$TAR = Join-Path $env:SystemRoot 'System32\tar.exe'
+function Extract($arc, $dest, [int]$strip = 0, [switch]$Into) {
+  # Extracts with Windows' built-in tar (bsdtar: zip, tar.xz, ...), much faster than Expand-Archive.
+  # Into a temporary folder that is renamed at the end, so a cancelled run never leaves a
+  # half-extracted folder behind (-Into: add files to an existing folder instead).
+  Prog $script:DLSHARE ("extracting {0}..." -f (Split-Path $arc -Leaf)) -Force
+  $tmp = if ($Into) { $dest } else { "$dest.partial" }
+  if (-not $Into -and (Test-Path -LiteralPath $tmp)) { Remove-Item -LiteralPath $tmp -Recurse -Force }
+  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+  $ok = $false
+  if (Test-Path -LiteralPath $TAR) {
+    $a = @('-xf', $arc, '-C', $tmp); if ($strip) { $a += @('--strip-components', "$strip") }
+    & $TAR @a 2>&1 | ForEach-Object { Add-Content -LiteralPath $LOG "$_" }
+    $ok = ($LASTEXITCODE -eq 0)
+    if (-not $ok) { Say "    tar failed ($LASTEXITCODE), falling back to .NET unzip" Yellow }
+  }
+  if (-not $ok) {
+    if ($strip -or $arc -notmatch '\.(zip|whl)$') { throw "cannot extract $arc (tar.exe missing or failed)" }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $z = [IO.Compression.ZipFile]::OpenRead($arc)
+    try { foreach ($e in $z.Entries) { $t = Join-Path $tmp $e.FullName; if ($e.Name -eq '') { New-Item -ItemType Directory -Force -Path $t | Out-Null; continue }; New-Item -ItemType Directory -Force -Path (Split-Path $t -Parent) | Out-Null; [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $t, $true) } } finally { $z.Dispose() }
+  }
+  if (-not $Into) {
+    if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+    Rename-Item -LiteralPath $tmp (Split-Path $dest -Leaf)
+  }
+  Prog 1 -Force
+}
 function Run($exe, [string[]]$a, $wd = $null) {
   # Runs a program, streaming its output to the console and the log; throws on failure.
   if ($wd) { Push-Location -LiteralPath $wd }
@@ -128,10 +155,38 @@ Write-Host 'Builds the game from YOUR OWN disc image. Nothing is uploaded anywhe
 Write-Host ''
 $here = $PSScriptRoot
 $inRepo = Test-Path -LiteralPath (Join-Path $here 'build_win.bat')
-if (-not $Root) {
-  # From a clone: a sibling folder (keeps toolchain and game files out of the checkout); standalone: next to the script.
-  $def = if ($inRepo) { Join-Path (Split-Path (Split-Path $here -Parent) -Parent) 'AfroSamuraiRecomp-install' } else { Join-Path $here 'AfroSamuraiRecomp' }
-  $Root = Ask 'Install folder (needs about 20 GB free; avoid paths with spaces or non-ASCII characters if possible)' $def
+function PickFolder($start) {
+  try {
+    Add-Type -AssemblyName System.Windows.Forms
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+    $f = New-Object System.Windows.Forms.FolderBrowserDialog
+    $f.Description = 'Choose WHERE to install AfroSamuraiRecomp (a new folder is created inside it)'
+    $f.ShowNewFolderButton = $true
+    if (Test-Path -LiteralPath $start) { $f.SelectedPath = $start }
+    $top = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true }
+    if ($f.ShowDialog($top) -eq 'OK') { return $f.SelectedPath }
+    return $null
+  } catch { return (Ask 'Folder to install into (a new folder is created inside it)' $start) }
+}
+function CheckPath($p) {
+  $w = @()
+  if ($p -match '[^\x20-\x7E]') { $w += 'the path contains non-ASCII characters (accents, etc.), which can break the toolchain' }
+  if ($p.Length -gt 80) { $w += "the path is long ($($p.Length) characters); the build creates deep folders, prefer something short like C:\Games" }
+  try { $fr = (New-Object IO.DriveInfo ([IO.Path]::GetPathRoot($p))).AvailableFreeSpace / 1GB; if ($fr -lt $NEED_GB) { $w += ("only {0:n1} GB free on that drive, about {1} GB are needed" -f $fr, $NEED_GB) } } catch { }
+  $w | ForEach-Object { Write-Host "WARNING: $_" -ForegroundColor Yellow }
+}
+$NAME = if ($inRepo) { 'AfroSamuraiRecomp-install' } else { 'AfroSamuraiRecomp' }
+$Root = $InstallDir
+while (-not $Root) {
+  $start = if ($inRepo) { Split-Path (Split-Path $here -Parent) -Parent } else { $here }
+  Write-Host 'Choose the folder to install into (a window opens; a new folder is created inside it)...'
+  $parent = PickFolder $start
+  if (-not $parent) { $parent = Ask 'No folder chosen. Type a folder to install into' $start }
+  $cand = [IO.Path]::GetFullPath((Join-Path $parent $NAME))
+  if ($inRepo -and $cand -eq (Split-Path $here -Parent)) { $cand = "$cand-install" }
+  Write-Host ''; Write-Host "Install folder: $cand" -ForegroundColor Cyan
+  CheckPath $cand
+  if (YesNo 'Install there?' 'y') { $Root = $cand }
 }
 $Root = [IO.Path]::GetFullPath($Root)
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
@@ -189,25 +244,16 @@ try {
   Finish 'iso-hash'
 
   # ------------------------------------------------------- toolchain -------
-  Step 'git' 'MinGit (portable Git)' { Unzip (Fetch 'mingit') (Join-Path $TOOLS 'git') }
-  Step 'cmake' 'CMake (portable)' {
-    $z = Fetch 'cmake'; $tmp = Join-Path $TOOLS 'cmake.tmp'; Unzip $z $tmp
-    if (Test-Path -LiteralPath (Join-Path $TOOLS 'cmake')) { Remove-Item -LiteralPath (Join-Path $TOOLS 'cmake') -Recurse -Force }
-    Move-Item -LiteralPath (Get-ChildItem -LiteralPath $tmp -Directory | Select-Object -First 1).FullName (Join-Path $TOOLS 'cmake')
-    Remove-Item -LiteralPath $tmp -Recurse -Force
-  }
-  Step 'ninja' 'Ninja' { Unzip (Fetch 'ninja') (Join-Path $TOOLS 'ninja') }
+  Step 'git' 'MinGit (portable Git)' { Extract (Fetch 'mingit') (Join-Path $TOOLS 'git') }
+  Step 'cmake' 'CMake (portable)' { Extract (Fetch 'cmake') (Join-Path $TOOLS 'cmake') 1 }
+  Step 'ninja' 'Ninja' { Extract (Fetch 'ninja') (Join-Path $TOOLS 'ninja') }
   Step 'python' 'Python 3.12 (embeddable) + pycryptodome' {
-    $p = Join-Path $TOOLS 'python'; Unzip (Fetch 'python') $p
-    Expand-Archive -LiteralPath (Fetch 'pycryptodome') -DestinationPath $p -Force
+    $p = Join-Path $TOOLS 'python'; Extract (Fetch 'python') $p
+    Extract (Fetch 'pycryptodome') $p -Into
     Run (Join-Path $p 'python.exe') @('-c', 'import Crypto.Cipher.AES')
   }
   Step 'llvm' 'LLVM/Clang 20.1.8 (about 940 MB download)' {
-    $x = Fetch 'llvm'; $d = Join-Path $TOOLS 'llvm'
-    if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $d | Out-Null
-    Prog 0.9 'extracting (a few minutes)' -Force
-    Run "$env:SystemRoot\System32\tar.exe" @('-xf', $x, '-C', $d, '--strip-components', '1')
+    $d = Join-Path $TOOLS 'llvm'; Extract (Fetch 'llvm') $d 1
     if (-not (Test-Path -LiteralPath (Join-Path $d 'bin\clang++.exe'))) { throw 'clang++.exe missing after extraction' }
   }
   Step 'msvc' 'MSVC compiler + Windows SDK (portable, from Microsoft)' {
@@ -236,7 +282,7 @@ try {
     if ($REPO -ne $here2) { Git @('-C', $REPO, 'checkout', $Ref) }
   }
   Step 'sdk' 'ReXGlue SDK nightly 0.10.0.24-dev.gbd833a2' {
-    Unzip (Fetch 'rexsdk') (Join-Path $Root 'sdk')
+    Extract (Fetch 'rexsdk') (Join-Path $Root 'sdk')
     if (-not (Test-Path -LiteralPath (Join-Path $Root 'sdk\win-amd64\bin\rexglue.exe'))) {
       # zip layouts differ between nightlies: find rexglue.exe and move its parent into sdk\win-amd64
       $exe = Get-ChildItem -LiteralPath (Join-Path $Root 'sdk') -Recurse -Filter rexglue.exe | Select-Object -First 1
@@ -251,10 +297,13 @@ try {
     $s = Join-Path $Root 'rexglue-sdk'
     if (-not (Test-Path -LiteralPath (Join-Path $s '.git'))) {
       if (Test-Path -LiteralPath $s) { Remove-Item -LiteralPath $s -Recurse -Force }
-      Git @('-c', 'core.longpaths=true', 'clone', $REXGLUE_GIT, $s)
+      # blobless clone: full history (bd833a2 is reachable) but file contents only for the checkout
+      Git @('-c', 'core.longpaths=true', 'clone', '--filter=blob:none', '--no-checkout', $REXGLUE_GIT, $s)
     }
-    Git @('-C', $s, '-c', 'advice.detachedHead=false', 'checkout', $REXGLUE_COMMIT)
-    Git @('-C', $s, '-c', 'core.longpaths=true', 'submodule', 'update', '--init', '--recursive')
+    Git @('-C', $s, '-c', 'advice.detachedHead=false', '-c', 'core.longpaths=true', 'checkout', '-f', $REXGLUE_COMMIT)
+    # submodules: shallow at the recorded commits (much smaller), full fetch as a fallback
+    try { Git @('-C', $s, '-c', 'core.longpaths=true', 'submodule', 'update', '--init', '--recursive', '--depth', '1', '--jobs', '8') }
+    catch { Say '    shallow submodule fetch failed, retrying with full history' Yellow; Git @('-C', $s, '-c', 'core.longpaths=true', 'submodule', 'update', '--init', '--recursive', '--jobs', '8') }
   }
 
   # ------------------------------------------------------- game data -------

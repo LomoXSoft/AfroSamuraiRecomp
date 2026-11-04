@@ -53,7 +53,8 @@ Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 2. Download [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat)
    (right-click, *Save link as*) into an empty folder, or clone/download this repository
    and use the `install.bat` at its root.
-3. Double-click `install.bat`. It asks for an install folder and for your ISO,
+3. Double-click `install.bat`. It opens a folder picker (a new `AfroSamuraiRecomp` folder is
+   created inside the folder you choose) and a file picker for your ISO,
    then does everything else. Started from a clone, it builds that checkout and
    proposes `AfroSamuraiRecomp-install` next to it as the install folder.
 4. When it says `INSTALL OK`, play with the desktop shortcut or
@@ -84,7 +85,7 @@ in the console, the window title and the log. Re-running it skips finished steps
 The log is `<root>\install.log`. To uninstall, delete the install folder (and
 the shortcuts; saves are separate, see [Saves](#saves)).
 
-Command-line options (`install.bat -Option value`): `-Root <dir>`, `-Iso <file>`,
+Command-line options (`install.bat -Option value`): `-InstallDir <dir>` (full install folder, skips the folder picker), `-Iso <file>`,
 `-AcceptMsvcLicense`, `-Shortcut yes|no`, `-Ref <branch|tag>`. Advanced:
 `-GameDataDir <dir>` uses an already extracted disc folder (containing `default.xex`)
 instead of an ISO.
