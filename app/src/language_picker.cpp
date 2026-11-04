@@ -28,6 +28,8 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <ctime>
+#include <tlhelp32.h>
+#include <vector>
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "ole32.lib")
 #endif
@@ -154,86 +156,8 @@ constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
               kIdHint = 104, kIdFpsLbl = 105, kIdFps = 106, kIdDispLbl = 107,
               kIdDisp = 108, kIdScaleLbl = 109, kIdScale = 110,
               kIdAdvBtn = 111, kIdXBtn = 112, kIdXWarn = 113, kIdXSepiaLbl = 114,
-              kIdXSepia = 115, kIdSavesOpen = 116, kIdSavesBackup = 117, kIdAdvBase = 200;
+              kIdXSepia = 115, kIdSavesBtn = 116, kIdAdvBase = 200;
 
-// Save management (same language order as kText).
-struct SaveText { const wchar_t *open, *backup, *done, *empty, *fail; };
-const SaveText kSaveText[] = {
-    {L"Open saves folder", L"Back up saves", L"Saves backed up to:\n%s\n\nOpen the backup folder?",
-     L"There are no saves yet in:\n%s", L"Backup failed:\n%s"},
-    {L"Abrir carpeta de partidas", L"Copia de seguridad", L"Partidas copiadas en:\n%s\n\n\u00bfAbrir la carpeta de copias?",
-     L"Todav\u00eda no hay partidas en:\n%s", L"La copia ha fallado:\n%s"},
-    {L"Ouvrir les sauvegardes", L"Copier les sauvegardes", L"Sauvegardes copi\u00e9es dans :\n%s\n\nOuvrir le dossier des copies ?",
-     L"Aucune sauvegarde pour l'instant dans :\n%s", L"\u00c9chec de la copie :\n%s"},
-    {L"Apri cartella salvataggi", L"Backup salvataggi", L"Salvataggi copiati in:\n%s\n\nAprire la cartella dei backup?",
-     L"Ancora nessun salvataggio in:\n%s", L"Backup non riuscito:\n%s"},
-};
-
-// Same rule as ReXApp::SetupEnvironment: --user_data_root, else
-// Documents (FOLDERID_Documents) \ app name ("afrorecomp").
-std::filesystem::path SaveRoot() {
-  std::string cv = rex::cvar::GetFlagByName("user_data_root");
-  if (!cv.empty()) return std::filesystem::path(cv);
-  std::filesystem::path docs;
-  PWSTR p = nullptr;
-  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, nullptr, &p))) docs = p;
-  if (p) CoTaskMemFree(p);
-  return docs / L"afrorecomp";
-}
-
-void Explore(const std::filesystem::path& dir) {
-  ShellExecuteW(nullptr, L"explore", dir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-}
-
-std::wstring Fmt(const wchar_t* f, const std::wstring& a) {
-  std::wstring out(f);
-  auto i = out.find(L"%s");
-  if (i != std::wstring::npos) out.replace(i, 2, a);
-  return out;
-}
-
-void OpenSaves() {
-  std::error_code ec;
-  auto root = SaveRoot();
-  std::filesystem::create_directories(root, ec);
-  Explore(root);
-}
-
-// Copy the whole save root (except the shader cache) to a new timestamped
-// folder next to it. Never deletes or overwrites anything.
-void BackupSaves(HWND owner, int sel) {
-  const SaveText& t = kSaveText[sel];
-  auto root = SaveRoot();
-  std::error_code ec;
-  if (!std::filesystem::exists(root, ec) || std::filesystem::is_empty(root, ec)) {
-    MessageBoxW(owner, Fmt(t.empty, root.wstring()).c_str(), L"Afro Samurai", MB_OK | MB_ICONINFORMATION);
-    return;
-  }
-  wchar_t stamp[32];
-  std::time_t now = std::time(nullptr);
-  std::tm tm{};
-  localtime_s(&tm, &now);
-  wcsftime(stamp, 32, L"saves-%Y%m%d-%H%M%S", &tm);
-  auto base = root.parent_path() / (root.filename().wstring() + L"-backups");
-  auto dst = base / stamp;
-  for (int n = 2; std::filesystem::exists(dst, ec); ++n) dst = base / (std::wstring(stamp) + L"-" + std::to_wstring(n));
-  std::filesystem::create_directories(dst, ec);
-  if (!ec) {
-    for (auto& e : std::filesystem::directory_iterator(root, ec)) {
-      if (e.path().filename() == L"cache") continue;  // shader cache, not saves
-      std::filesystem::copy(e.path(), dst / e.path().filename(),
-                            std::filesystem::copy_options::recursive | std::filesystem::copy_options::skip_existing, ec);
-      if (ec) break;
-    }
-  }
-  if (ec) {
-    std::string m = ec.message();
-    MessageBoxW(owner, Fmt(t.fail, std::wstring(m.begin(), m.end()) + L"\n" + dst.wstring()).c_str(), L"Afro Samurai", MB_OK | MB_ICONERROR);
-    return;
-  }
-  if (MessageBoxW(owner, Fmt(t.done, dst.wstring()).c_str(), L"Afro Samurai", MB_YESNO | MB_ICONINFORMATION) == IDYES)
-    Explore(base);
-}
 constexpr int kFpsValues[] = {0, 30, 60};
 struct PickState { int sel = 0; bool remember = false; bool done = false; bool play = false; Options opt; };
 
@@ -244,6 +168,52 @@ void FillCombo(HWND h, int id, std::initializer_list<const wchar_t*> items) {
   for (auto* i : items) SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)i);
   SendMessageW(c, CB_SETCURSEL, cur < 0 ? 0 : cur, 0);
 }
+
+// Save management (same language order as kText).
+struct SaveText {
+  const wchar_t *manage, *folder, *open, *backup, *list, *restore, *del, *close, *done, *empty,
+      *fail, *pick, *restore_q, *restore_ok, *del_q, *del_ok, *running, *none;
+};
+const SaveText kSaveText[] = {
+    {L"Manage saved games...", L"Saves folder:", L"Open saves folder", L"Back up saves",
+     L"Backups (newest first):", L"Restore selected backup", L"Delete save data...", L"Close",
+     L"Saves backed up to:\n%s\n\nOpen the backup folder?", L"There are no saves yet in:\n%s",
+     L"The operation failed:\n%s", L"Select a backup in the list first.",
+     L"Restore this backup?\n%s\n\nYour current saves are replaced by it. A safety backup of the current saves is made first.",
+     L"Backup restored.\nA copy of the previous saves was kept in:\n%s",
+     L"DELETE all save data?\n\nThis removes your saved games (the shader cache and the backups are kept). A safety backup is made first.\n\nThis cannot be undone from the game.",
+     L"Save data deleted.\nA safety backup was kept in:\n%s",
+     L"Afro Samurai is running. Close the game first.", L"(no backups yet)"},
+    {L"Gestionar partidas guardadas...", L"Carpeta de partidas:", L"Abrir carpeta de partidas", L"Copia de seguridad",
+     L"Copias (la m\u00e1s reciente primero):", L"Restaurar la copia seleccionada", L"Borrar datos guardados...", L"Cerrar",
+     L"Partidas copiadas en:\n%s\n\n\u00bfAbrir la carpeta de copias?", L"Todav\u00eda no hay partidas en:\n%s",
+     L"La operaci\u00f3n ha fallado:\n%s", L"Selecciona antes una copia de la lista.",
+     L"\u00bfRestaurar esta copia?\n%s\n\nTus partidas actuales se sustituyen por ella. Antes se hace una copia de seguridad de las actuales.",
+     L"Copia restaurada.\nLas partidas anteriores se han guardado en:\n%s",
+     L"\u00bfBORRAR todos los datos guardados?\n\nSe eliminan tus partidas (la cach\u00e9 de shaders y las copias se conservan). Antes se hace una copia de seguridad.\n\nNo se puede deshacer desde el juego.",
+     L"Datos guardados borrados.\nSe ha guardado una copia de seguridad en:\n%s",
+     L"Afro Samurai se est\u00e1 ejecutando. Cierra antes el juego.", L"(todav\u00eda no hay copias)"},
+    {L"G\u00e9rer les sauvegardes...", L"Dossier des sauvegardes :", L"Ouvrir les sauvegardes", L"Copier les sauvegardes",
+     L"Copies (la plus r\u00e9cente d'abord) :", L"Restaurer la copie s\u00e9lectionn\u00e9e", L"Supprimer les sauvegardes...", L"Fermer",
+     L"Sauvegardes copi\u00e9es dans :\n%s\n\nOuvrir le dossier des copies ?", L"Aucune sauvegarde pour l'instant dans :\n%s",
+     L"L'op\u00e9ration a \u00e9chou\u00e9 :\n%s", L"S\u00e9lectionne d'abord une copie dans la liste.",
+     L"Restaurer cette copie ?\n%s\n\nTes sauvegardes actuelles seront remplac\u00e9es. Une copie de s\u00e9curit\u00e9 des actuelles est faite avant.",
+     L"Copie restaur\u00e9e.\nLes sauvegardes pr\u00e9c\u00e9dentes ont \u00e9t\u00e9 gard\u00e9es dans :\n%s",
+     L"SUPPRIMER toutes les sauvegardes ?\n\nTes parties sauvegard\u00e9es sont effac\u00e9es (le cache des shaders et les copies sont conserv\u00e9s). Une copie de s\u00e9curit\u00e9 est faite avant.\n\nImpossible d'annuler depuis le jeu.",
+     L"Sauvegardes supprim\u00e9es.\nUne copie de s\u00e9curit\u00e9 a \u00e9t\u00e9 gard\u00e9e dans :\n%s",
+     L"Afro Samurai est en cours d'ex\u00e9cution. Ferme d'abord le jeu.", L"(aucune copie pour l'instant)"},
+    {L"Gestisci salvataggi...", L"Cartella dei salvataggi:", L"Apri cartella salvataggi", L"Backup salvataggi",
+     L"Backup (il pi\u00f9 recente per primo):", L"Ripristina il backup selezionato", L"Elimina dati salvati...", L"Chiudi",
+     L"Salvataggi copiati in:\n%s\n\nAprire la cartella dei backup?", L"Ancora nessun salvataggio in:\n%s",
+     L"Operazione non riuscita:\n%s", L"Seleziona prima un backup nell'elenco.",
+     L"Ripristinare questo backup?\n%s\n\nI salvataggi attuali verranno sostituiti. Prima viene fatto un backup di sicurezza di quelli attuali.",
+     L"Backup ripristinato.\nI salvataggi precedenti sono stati conservati in:\n%s",
+     L"ELIMINARE tutti i dati salvati?\n\nI salvataggi vengono cancellati (la cache degli shader e i backup restano). Prima viene fatto un backup di sicurezza.\n\nNon si pu\u00f2 annullare dal gioco.",
+     L"Dati salvati eliminati.\nUn backup di sicurezza \u00e8 stato conservato in:\n%s",
+     L"Afro Samurai \u00e8 in esecuzione. Chiudi prima il gioco.", L"(ancora nessun backup)"},
+};
+constexpr int kIdSvFolder = 300, kIdSvOpen = 301, kIdSvBackup = 302, kIdSvList = 303,
+              kIdSvRestore = 304, kIdSvDelete = 305;
 
 void ApplyTexts(HWND h, int sel) {
   const UiText& t = kText[sel];
@@ -256,8 +226,7 @@ void ApplyTexts(HWND h, int sel) {
   SetDlgItemTextW(h, kIdScaleLbl, t.scale);
   SetDlgItemTextW(h, kIdAdvBtn, t.adv);
   SetDlgItemTextW(h, kIdXBtn, t.xbtn);
-  SetDlgItemTextW(h, kIdSavesOpen, kSaveText[sel].open);
-  SetDlgItemTextW(h, kIdSavesBackup, kSaveText[sel].backup);
+  SetDlgItemTextW(h, kIdSavesBtn, kSaveText[sel].manage);
   FillCombo(h, kIdDisp, {t.full, t.win});
 }
 
@@ -427,14 +396,257 @@ void ShowExperimental(HWND owner, int sel, Options* o) {
   UnregisterClassW(wc.lpszClassName, inst);
 }
 
+
+// Same rule as ReXApp::SetupEnvironment: --user_data_root, else
+// Documents (FOLDERID_Documents) \ app name ("afrorecomp").
+std::filesystem::path SaveRoot() {
+  std::string cv = rex::cvar::GetFlagByName("user_data_root");
+  if (!cv.empty()) return std::filesystem::path(cv);
+  std::filesystem::path docs;
+  PWSTR p = nullptr;
+  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, nullptr, &p))) docs = p;
+  if (p) CoTaskMemFree(p);
+  return docs / L"afrorecomp";
+}
+std::filesystem::path BackupBase() {
+  auto root = SaveRoot();
+  return root.parent_path() / (root.filename().wstring() + L"-backups");
+}
+bool IsCache(const std::filesystem::path& p) { return _wcsicmp(p.filename().c_str(), L"cache") == 0; }
+
+void Explore(const std::filesystem::path& dir) {
+  ShellExecuteW(nullptr, L"explore", dir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
+
+std::wstring Fmt(const wchar_t* f, const std::wstring& a) {
+  std::wstring out(f);
+  auto i = out.find(L"%s");
+  if (i != std::wstring::npos) out.replace(i, 2, a);
+  return out;
+}
+std::wstring Widen(const std::string& s) { return std::wstring(s.begin(), s.end()); }
+
+// Another afrorecomp.exe (not this launcher process) running?
+bool GameRunning() {
+  HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (snap == INVALID_HANDLE_VALUE) return false;
+  PROCESSENTRY32W pe{sizeof(pe)};
+  bool found = false;
+  for (BOOL ok = Process32FirstW(snap, &pe); ok; ok = Process32NextW(snap, &pe))
+    if (_wcsicmp(pe.szExeFile, L"afrorecomp.exe") == 0 && pe.th32ProcessID != GetCurrentProcessId()) found = true;
+  CloseHandle(snap);
+  return found;
+}
+
+bool HasSaves(const std::filesystem::path& root) {
+  std::error_code ec;
+  for (auto& e : std::filesystem::directory_iterator(root, ec))
+    if (!IsCache(e.path())) return true;
+  return false;
+}
+
+// Copy the save root (except the shader cache) to a new folder
+// afrorecomp-backups\saves-YYYYMMDD-HHMMSS[suffix]. Never overwrites.
+bool MakeBackup(const wchar_t* suffix, std::filesystem::path* dst_out, std::error_code& ec) {
+  auto root = SaveRoot();
+  wchar_t stamp[32];
+  std::time_t now = std::time(nullptr);
+  std::tm tm{};
+  localtime_s(&tm, &now);
+  wcsftime(stamp, 32, L"saves-%Y%m%d-%H%M%S", &tm);
+  auto base = BackupBase();
+  std::wstring name = std::wstring(stamp) + suffix;
+  auto dst = base / name;
+  for (int n = 2; std::filesystem::exists(dst, ec); ++n) dst = base / (name + L"-" + std::to_wstring(n));
+  ec.clear();
+  std::filesystem::create_directories(dst, ec);
+  if (!ec)
+    for (auto& e : std::filesystem::directory_iterator(root, ec)) {
+      if (IsCache(e.path())) continue;
+      std::filesystem::copy(e.path(), dst / e.path().filename(),
+                            std::filesystem::copy_options::recursive, ec);
+      if (ec) break;
+    }
+  *dst_out = dst;
+  return !ec;
+}
+
+// Remove the save data in the root, keeping the shader cache (and never
+// touching the backups folder, which is a sibling of the root).
+bool ClearSaves(std::error_code& ec) {
+  auto root = SaveRoot();
+  auto base = BackupBase();
+  std::vector<std::filesystem::path> items;
+  for (auto& e : std::filesystem::directory_iterator(root, ec))
+    if (!IsCache(e.path()) && e.path() != base) items.push_back(e.path());
+  if (ec) return false;
+  for (auto& p : items) { std::filesystem::remove_all(p, ec); if (ec) return false; }
+  return true;
+}
+
+struct SavesState { int sel = 0; bool done = false; std::vector<std::filesystem::path> backups; };
+
+void FillBackups(HWND h, SavesState* st) {
+  st->backups.clear();
+  std::error_code ec;
+  for (auto& e : std::filesystem::directory_iterator(BackupBase(), ec))
+    if (e.is_directory(ec)) st->backups.push_back(e.path());
+  std::sort(st->backups.begin(), st->backups.end(),
+            [](const auto& a, const auto& b) { return a.filename().wstring() > b.filename().wstring(); });
+  HWND lb = GetDlgItem(h, kIdSvList);
+  SendMessageW(lb, LB_RESETCONTENT, 0, 0);
+  for (auto& b : st->backups) SendMessageW(lb, LB_ADDSTRING, 0, (LPARAM)b.filename().c_str());
+  if (st->backups.empty()) SendMessageW(lb, LB_ADDSTRING, 0, (LPARAM)kSaveText[st->sel].none);
+  EnableWindow(GetDlgItem(h, kIdSvRestore), !st->backups.empty());
+}
+
+void Msg(HWND h, const std::wstring& m, UINT f) { MessageBoxW(h, m.c_str(), L"Afro Samurai", f); }
+
+void DoBackup(HWND h, SavesState* st) {
+  const SaveText& t = kSaveText[st->sel];
+  auto root = SaveRoot();
+  if (!HasSaves(root)) { Msg(h, Fmt(t.empty, root.wstring()), MB_OK | MB_ICONINFORMATION); return; }
+  std::error_code ec;
+  std::filesystem::path dst;
+  if (!MakeBackup(L"", &dst, ec)) { Msg(h, Fmt(t.fail, Widen(ec.message()) + L"\n" + dst.wstring()), MB_OK | MB_ICONERROR); return; }
+  FillBackups(h, st);
+  if (MessageBoxW(h, Fmt(t.done, dst.wstring()).c_str(), L"Afro Samurai", MB_YESNO | MB_ICONINFORMATION) == IDYES)
+    Explore(BackupBase());
+}
+
+// Safety backup of the current saves before restore/delete. Returns false
+// (and reports) on failure; *dst is empty when there was nothing to back up.
+bool SafetyBackup(HWND h, const SaveText& t, const wchar_t* suffix, std::filesystem::path* dst) {
+  dst->clear();
+  if (!HasSaves(SaveRoot())) return true;
+  std::error_code ec;
+  if (MakeBackup(suffix, dst, ec)) return true;
+  Msg(h, Fmt(t.fail, Widen(ec.message()) + L"\n" + dst->wstring()), MB_OK | MB_ICONERROR);
+  return false;
+}
+
+void DoRestore(HWND h, SavesState* st) {
+  const SaveText& t = kSaveText[st->sel];
+  int i = static_cast<int>(SendDlgItemMessageW(h, kIdSvList, LB_GETCURSEL, 0, 0));
+  if (i < 0 || i >= static_cast<int>(st->backups.size())) { Msg(h, t.pick, MB_OK | MB_ICONINFORMATION); return; }
+  auto src = st->backups[i];
+  if (MessageBoxW(h, Fmt(t.restore_q, src.wstring()).c_str(), L"Afro Samurai",
+                  MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) return;
+  if (GameRunning()) { Msg(h, t.running, MB_OK | MB_ICONWARNING); return; }
+  std::filesystem::path safety;
+  if (!SafetyBackup(h, t, L"-before-restore", &safety)) return;
+  std::error_code ec;
+  auto root = SaveRoot();
+  std::filesystem::create_directories(root, ec);
+  if (!ec && ClearSaves(ec))
+    for (auto& e : std::filesystem::directory_iterator(src, ec)) {
+      if (IsCache(e.path())) continue;
+      std::filesystem::copy(e.path(), root / e.path().filename(), std::filesystem::copy_options::recursive, ec);
+      if (ec) break;
+    }
+  if (ec) { Msg(h, Fmt(t.fail, Widen(ec.message()) + L"\n" + safety.wstring()), MB_OK | MB_ICONERROR); }
+  else Msg(h, Fmt(t.restore_ok, safety.empty() ? L"-" : safety.wstring()), MB_OK | MB_ICONINFORMATION);
+  FillBackups(h, st);
+}
+
+void DoDelete(HWND h, SavesState* st) {
+  const SaveText& t = kSaveText[st->sel];
+  auto root = SaveRoot();
+  if (!HasSaves(root)) { Msg(h, Fmt(t.empty, root.wstring()), MB_OK | MB_ICONINFORMATION); return; }
+  if (MessageBoxW(h, t.del_q, L"Afro Samurai", MB_YESNO | MB_ICONERROR | MB_DEFBUTTON2) != IDYES) return;
+  if (GameRunning()) { Msg(h, t.running, MB_OK | MB_ICONWARNING); return; }
+  std::filesystem::path safety;
+  if (!SafetyBackup(h, t, L"-before-delete", &safety)) return;
+  std::error_code ec;
+  if (!ClearSaves(ec)) Msg(h, Fmt(t.fail, Widen(ec.message()) + L"\n" + safety.wstring()), MB_OK | MB_ICONERROR);
+  else Msg(h, Fmt(t.del_ok, safety.wstring()), MB_OK | MB_ICONINFORMATION);
+  FillBackups(h, st);
+}
+
+LRESULT CALLBACK SavesProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+  auto* st = reinterpret_cast<SavesState*>(GetWindowLongPtrW(h, GWLP_USERDATA));
+  if (m == WM_CLOSE || (m == WM_COMMAND && (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL))) {
+    st->done = true;
+    DestroyWindow(h);
+    return 0;
+  }
+  if (m == WM_COMMAND && st) {
+    switch (LOWORD(w)) {
+      case kIdSvOpen: { std::error_code ec; std::filesystem::create_directories(SaveRoot(), ec); Explore(SaveRoot()); break; }
+      case kIdSvBackup: DoBackup(h, st); break;
+      case kIdSvRestore: DoRestore(h, st); break;
+      case kIdSvDelete: DoDelete(h, st); break;
+    }
+    return 0;
+  }
+  return DefWindowProcW(h, m, w, l);
+}
+
+// Modal "Manage saved games" dialog (same style as the Advanced settings one).
+void ShowSaves(HWND owner, int sel) {
+  const SaveText& t = kSaveText[sel];
+  HINSTANCE inst = GetModuleHandleW(nullptr);
+  WNDCLASSW wc{};
+  wc.lpfnWndProc = SavesProc;
+  wc.hInstance = inst;
+  wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+  wc.lpszClassName = L"AfroSaves";
+  RegisterClassW(&wc);
+  const double sc = GetDpiForSystem() / 96.0;
+  auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
+  const DWORD style = WS_CAPTION | WS_SYSMENU;
+  RECT rc{0, 0, S(420), S(412)};
+  AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
+  RECT orc;
+  GetWindowRect(owner, &orc);
+  std::wstring title = t.manage;
+  while (!title.empty() && title.back() == L'.') title.pop_back();
+  HWND h = CreateWindowExW(WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, wc.lpszClassName, title.c_str(),
+                           style | WS_VISIBLE, orc.left + S(20), orc.top + S(20),
+                           rc.right - rc.left, rc.bottom - rc.top, owner, nullptr, inst, nullptr);
+  if (!h) return;
+  SavesState st;
+  st.sel = sel;
+  SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&st));
+  auto mk = [&](const wchar_t* cls, const wchar_t* text, DWORD s_, int x, int y, int cw, int ch,
+                int id, DWORD ex = 0) {
+    HWND c = CreateWindowExW(ex, cls, text, WS_CHILD | WS_VISIBLE | s_, S(x), S(y), S(cw), S(ch),
+                             h, reinterpret_cast<HMENU>(INT_PTR(id)), inst, nullptr);
+    SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(UiFont()), TRUE);
+    return c;
+  };
+  std::wstring folder = std::wstring(t.folder) + L"\n" + SaveRoot().wstring();
+  mk(L"STATIC", folder.c_str(), SS_SUNKEN | SS_PATHELLIPSIS, 16, 14, 388, 40, kIdSvFolder);
+  mk(L"BUTTON", t.open, WS_TABSTOP, 16, 64, 388, 28, kIdSvOpen);
+  mk(L"BUTTON", t.backup, WS_TABSTOP, 16, 98, 388, 28, kIdSvBackup);
+  mk(L"STATIC", t.list, 0, 16, 138, 388, 20, 0);
+  mk(L"LISTBOX", L"", WS_TABSTOP | WS_VSCROLL | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 16, 160, 388, 110,
+     kIdSvList, WS_EX_CLIENTEDGE);
+  mk(L"BUTTON", t.restore, WS_TABSTOP, 16, 276, 388, 28, kIdSvRestore);
+  mk(L"BUTTON", t.del, WS_TABSTOP, 16, 318, 388, 28, kIdSvDelete);
+  HWND close = mk(L"BUTTON", t.close, WS_TABSTOP | BS_DEFPUSHBUTTON, 150, 362, 120, 32, IDCANCEL);
+  FillBackups(h, &st);
+  SetFocus(close);
+  EnableWindow(owner, FALSE);
+  MSG msg;
+  while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    if (!IsDialogMessageW(h, &msg)) {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
+  }
+  EnableWindow(owner, TRUE);
+  SetForegroundWindow(owner);
+  UnregisterClassW(wc.lpszClassName, inst);
+}
+
 LRESULT CALLBACK PickProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   auto* st = reinterpret_cast<PickState*>(GetWindowLongPtrW(h, GWLP_USERDATA));
   switch (m) {
     case WM_COMMAND:
-      if (LOWORD(w) == kIdSavesOpen) {
-        OpenSaves();
-      } else if (LOWORD(w) == kIdSavesBackup) {
-        BackupSaves(h, st->sel);
+      if (LOWORD(w) == kIdSavesBtn) {
+        ShowSaves(h, st->sel);
       } else if (LOWORD(w) == kIdAdvBtn) {
         ShowAdvanced(h, st->sel, &st->opt);
       } else if (LOWORD(w) == kIdXBtn) {
@@ -526,8 +738,7 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   SendMessageW(scale, CB_SETCURSEL, (o->scale >= 1 && o->scale <= 3) ? o->scale - 1 : 0, 0);
   mk(L"BUTTON", WS_TABSTOP, 20, 132, 360, 28, kIdXBtn);  // always shown
   if (adv) mk(L"BUTTON", WS_TABSTOP, 20, yAdv, 360, 28, kIdAdvBtn);
-  mk(L"BUTTON", WS_TABSTOP, 20, ySaves, 176, 28, kIdSavesOpen);
-  mk(L"BUTTON", WS_TABSTOP, 204, ySaves, 176, 28, kIdSavesBackup);
+  mk(L"BUTTON", WS_TABSTOP, 20, ySaves, 360, 28, kIdSavesBtn);
   mk(L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, 20, yCheck, 360, 22, kIdCheck);
   mk(L"STATIC", 0, 20, yHint, 360, 36, kIdHint);
   HWND play = mk(L"BUTTON", WS_TABSTOP | BS_DEFPUSHBUTTON, 140, yPlay, 120, 34,

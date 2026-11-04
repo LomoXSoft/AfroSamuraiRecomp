@@ -200,14 +200,21 @@ itself is under `<profile id>\4E4D07D8\00000001\AFRO_0.SAV`; the shader cache is
 `Documents\afrorecomp` folder while the game is closed; to restore, copy it back.
 Deleting or rebuilding the install folder does not touch your saves.
 
-The launcher (shown at start, or hold Shift) has two buttons for this:
-- **Open saves folder** opens `Documents\afrorecomp` in Explorer (created if missing).
-- **Back up saves** copies the whole folder (except the shader `cache`) to a new
-  `Documents\afrorecomp-backups\saves-YYYYMMDD-HHMMSS\` folder and offers to open it.
-  It never deletes or overwrites anything.
+The launcher (shown at start, or hold Shift) has a **Manage saved games...** button
+under *Advanced settings*. It opens a window with:
+- **Open saves folder**: opens `Documents\afrorecomp` in Explorer (created if missing).
+- **Back up saves**: copies the saves (not the shader `cache`) to a new
+  `Documents\afrorecomp-backups\saves-YYYYMMDD-HHMMSS\` folder. Never overwrites anything.
+- **Restore selected backup**: pick a backup from the list (newest first) and confirm.
+  The current saves are first backed up automatically (`saves-...-before-restore`), then
+  replaced by the chosen backup. The shader cache is kept.
+- **Delete save data...**: after a strong confirmation (default No), the current saves are
+  backed up automatically (`saves-...-before-delete`) and then deleted. The shader cache
+  and all backups are kept.
 
-To restore a backup: close the game, then copy the contents of a `saves-...` folder
-back into `Documents\afrorecomp\` (keep a copy of the current folder first if unsure).
+Restore and delete are refused while the game is running. Backups are plain folders:
+you can also restore one by hand (close the game, copy the contents of a `saves-...`
+folder back into `Documents\afrorecomp\`).
 
 ## Launcher and options
 The launcher (shown on first run, after each update, or with Shift) offers:
