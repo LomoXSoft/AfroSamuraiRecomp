@@ -437,12 +437,26 @@ try {
   }
 
   # ------------------------------------------------------- sources ---------
+  # The source step always runs (no stamp), so a re-run picks up new commits.
+  Remove-Item -LiteralPath (Join-Path $STAMPS 'repo.done') -Force -ErrorAction SilentlyContinue
   Step 'repo' (T 't_repo' $Ref) {
     if (-not (Test-Path -LiteralPath (Join-Path $REPO '.git'))) {
       if (Test-Path -LiteralPath $REPO) { Remove-Item -LiteralPath $REPO -Recurse -Force }
       Git @('clone', $RepoUrl, $REPO)
     }
-    if ($REPO -ne $here2) { Git @('-C', $REPO, 'checkout', $Ref) }
+    if ($REPO -ne $here2) {
+      Git @('-C', $REPO, 'fetch', '--tags', $RepoUrl, $Ref)
+      Git @('-C', $REPO, 'checkout', '--detach', 'FETCH_HEAD')
+    }
+  }
+  # Build stamps are only valid for the source revision they were built from:
+  # a new commit makes build-app / build-gpu run again (incremental build).
+  $REV = (& (Join-Path $TOOLS 'git\cmd\git.exe') -C $REPO rev-parse HEAD).Trim()
+  $revFile = Join-Path $STAMPS 'build.rev'
+  $oldRev = if (Test-Path -LiteralPath $revFile) { (Get-Content -LiteralPath $revFile -Raw).Trim() } else { '' }
+  if ($oldRev -ne $REV) {
+    foreach ($n in 'build-app', 'build-gpu', 'build') { Remove-Item -LiteralPath (Join-Path $STAMPS "$n.done") -Force -ErrorAction SilentlyContinue }
+    Say "    source revision: $REV (previous build: $(if ($oldRev) { $oldRev } else { 'unknown' })) -> rebuild"
   }
   Step 'sdk' 'ReXGlue SDK nightly 0.10.0.24-dev.gbd833a2' {
     Extract (Fetch 'rexsdk') (Join-Path $Root 'sdk')
@@ -497,7 +511,7 @@ try {
     }
     Say (T 'ok_file' $c[0])
   }
-  Mark 'build'; Finish 'verify'
+  Mark 'build'; Set-Content -LiteralPath $revFile -Value $REV -Encoding ASCII; Finish 'verify'
 
   # ------------------------------------------------------- game folder -----
   # Self-contained copy of what is needed to play: <root>\game (exe, DLLs, launcher) + Play.bat.
