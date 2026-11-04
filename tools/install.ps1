@@ -19,6 +19,8 @@ Options (all optional; anything missing is asked interactively):
   -Shortcut yes|no       create desktop + Start menu shortcuts
   -Ref <branch|tag>      repository revision to build (default: main)
   -RepoUrl <url|path>    repository to clone (default: the GitHub repo)
+  -CleanupAfterInstall   at the end, delete everything not needed to play (no question)
+  -KeepBuildFiles        at the end, keep the toolchain and build files (no question)
 Advanced:
   -GameDataDir <dir>     use an already extracted disc folder (must contain
                          default.xex) instead of an ISO; it is copied into
@@ -29,7 +31,8 @@ param(
   [ValidateSet('', 'yes', 'no')][string]$Shortcut = '',
   [string]$Ref = 'main',
   [string]$RepoUrl = 'https://github.com/LomoXSoft/AfroSamuraiRecomp.git',
-  [string]$GameDataDir
+  [string]$GameDataDir,
+  [switch]$CleanupAfterInstall, [switch]$KeepBuildFiles
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'Continue'
@@ -203,7 +206,9 @@ Say "install folder: $Root"
 Say "log file:       $LOG"
 
 try {
-  # ------------------------------------------------------- inputs ----------
+  # ------------------------------------------------------- questions -------
+  # Every question is asked here, before any download, so the rest runs unattended.
+  Write-Host ''; Write-Host 'All questions are asked now; after that the installation runs to the end on its own.' -ForegroundColor Cyan
   $script:STEP = 'choose game data'
   $haveGame = Test-Path -LiteralPath (Join-Path $Root 'gamedata\default.xex')
   if (-not $haveGame -and -not $GameDataDir -and -not $Iso) {
@@ -243,6 +248,42 @@ try {
   }
   Finish 'iso-hash'
 
+  # Microsoft license for the portable MSVC compiler + Windows SDK (only if not installed yet).
+  $script:STEP = 'Microsoft license'
+  $needMsvc = -not (Done 'msvc')
+  if ($needMsvc -and -not $AcceptMsvcLicense) {
+    $lic = 'https://go.microsoft.com/fwlink/?LinkId=2327714'
+    try {
+      $m = Invoke-RestMethod -UseBasicParsing -Uri 'https://aka.ms/vs/stable/channel'
+      $bt = $m.channelItems | Where-Object { $_.id -eq 'Microsoft.VisualStudio.Product.BuildTools' } | Select-Object -First 1
+      $u = ($bt.localizedResources | Where-Object { $_.language -eq 'en-us' } | Select-Object -First 1).license
+      if ($u) { $lic = $u }
+    } catch { }
+    Write-Host ''
+    Write-Host 'The Microsoft C++ compiler and Windows SDK are downloaded from Microsoft''s official'
+    Write-Host 'Visual Studio servers. They are covered by the Visual Studio Build Tools license:'
+    Write-Host "  $lic" -ForegroundColor Cyan
+    Say "MSVC license shown: $lic"
+    if (-not (YesNo 'Do you accept the Visual Studio Build Tools license?' 'n')) { throw 'The Microsoft license was not accepted; the compiler cannot be downloaded.' }
+    $AcceptMsvcLicense = $true; Say 'MSVC license accepted by the user'
+  }
+
+  # Shortcuts (answer remembered for re-runs).
+  $script:STEP = 'shortcuts question'
+  $scFile = Join-Path $STAMPS 'shortcut.answer'
+  if (-not $Shortcut -and (Test-Path -LiteralPath $scFile)) { $Shortcut = (Get-Content -LiteralPath $scFile -Raw).Trim() }
+  if (-not $Shortcut) { $Shortcut = if (YesNo 'Create desktop and Start menu shortcuts when finished?' 'y') { 'yes' } else { 'no' } }
+  Set-Content -LiteralPath $scFile -Value $Shortcut
+
+  Write-Host ''
+  Write-Host 'Summary' -ForegroundColor Cyan
+  Say "  install folder: $Root"
+  Say ("  game data:      {0}" -f $(if ($GameDataDir) { "$GameDataDir (copied)" } elseif ($Iso) { $Iso } else { 'already extracted' }))
+  Say ("  Microsoft license: {0}" -f $(if ($needMsvc) { 'accepted' } else { 'MSVC already installed' }))
+  Say "  shortcuts:      $Shortcut"
+  Say '  Starting now; no more questions. This takes about 30-60 minutes.'
+  Write-Host ''
+
   # ------------------------------------------------------- toolchain -------
   Step 'git' 'MinGit (portable Git)' { Extract (Fetch 'mingit') (Join-Path $TOOLS 'git') }
   Step 'cmake' 'CMake (portable)' { Extract (Fetch 'cmake') (Join-Path $TOOLS 'cmake') 1 }
@@ -261,14 +302,8 @@ try {
     $py = Join-Path $TOOLS 'python\python.exe'
     Say '    The Microsoft C++ compiler and Windows SDK are downloaded from Microsoft''s official'
     Say '    Visual Studio servers and are covered by the Visual Studio Build Tools license.'
-    if ($AcceptMsvcLicense) {
-      Say '    license accepted with -AcceptMsvcLicense'
-      Run $py @('portable-msvc.py', '--accept-license') $TOOLS
-    } else {
-      Push-Location -LiteralPath $TOOLS
-      try { & $py portable-msvc.py; $code = $LASTEXITCODE } finally { Pop-Location }
-      if ($code -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $TOOLS 'msvc\setup_x64.bat'))) { throw 'MSVC was not installed (license not accepted or download failed).' }
-    }
+    if (-not $AcceptMsvcLicense) { throw 'Microsoft license not accepted' }   # asked at the start
+    Run $py @('portable-msvc.py', '--accept-license') $TOOLS
     if (-not (Test-Path -LiteralPath (Join-Path $TOOLS 'msvc\setup_x64.bat'))) { throw 'msvc\setup_x64.bat missing' }
     Remove-Item -LiteralPath (Join-Path $TOOLS 'downloads') -Recurse -Force -ErrorAction SilentlyContinue
   }
@@ -336,15 +371,31 @@ try {
   }
   Mark 'build'; Finish 'verify'
 
+  # ------------------------------------------------------- game folder -----
+  # Self-contained copy of what is needed to play: <root>\game (exe, DLLs, launcher) + Play.bat.
+  # Shortcuts point here, so it keeps working if the build files are deleted later.
+  $script:STEP = 'game folder'
+  $GAME = Join-Path $Root 'game'
+  New-Item -ItemType Directory -Force -Path $GAME | Out-Null
+  Get-ChildItem -LiteralPath $out -File | Where-Object {
+    $_.Name -notmatch '\.(stock|pdb|ilk|lib|exp|ninja|cmake|log)$' -and $_.Name -notmatch '^(CMakeCache\.txt|\.ninja_.*|compile_commands\.json)$'
+  } | ForEach-Object { Copy-Item -LiteralPath $_.FullName (Join-Path $GAME $_.Name) -Force }
+  $ico = Join-Path $REPO 'app\afro_icon.ico'; if (Test-Path -LiteralPath $ico) { Copy-Item -LiteralPath $ico (Join-Path $GAME 'afro_icon.ico') -Force }
+  # Same options as tools\run_win.bat.
+  @('@echo off', 'rem Start Afro Samurai Recomp. Log: ..\afro.log. Hold Shift at start for the launcher.', 'cd /d "%~dp0"',
+    'afrorecomp.exe --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --readback_resolve=fast --log_file="%~dp0..\afro.log" %*') |
+    Set-Content -LiteralPath (Join-Path $GAME 'Play.bat') -Encoding ASCII
+  foreach ($n in 'afrorecomp.exe', 'rexruntime.dll', 'rexgpu-xenos.dll') { if (-not (Test-Path -LiteralPath (Join-Path $GAME $n))) { throw "$n missing in $GAME" } }
+  Say "    game folder: $GAME"
+
   # ------------------------------------------------------- shortcut --------
   $script:STEP = 'shortcuts'
-  if (-not $Shortcut) { $Shortcut = if (YesNo 'Create desktop and Start menu shortcuts?' 'y') { 'yes' } else { 'no' } }
   if ($Shortcut -eq 'yes') {
     $ws = New-Object -ComObject WScript.Shell
     foreach ($dir in @([Environment]::GetFolderPath('Desktop'), (Join-Path ([Environment]::GetFolderPath('Programs')) ''))) {
       $l = $ws.CreateShortcut((Join-Path $dir 'Afro Samurai Recomp.lnk'))
-      $l.TargetPath = Join-Path $REPO 'tools\run_win.bat'; $l.WorkingDirectory = $REPO
-      $ico = Join-Path $REPO 'app\afro_icon.ico'; if (Test-Path -LiteralPath $ico) { $l.IconLocation = $ico }
+      $l.TargetPath = Join-Path $GAME 'Play.bat'; $l.WorkingDirectory = $GAME
+      if (Test-Path -LiteralPath (Join-Path $GAME 'afro_icon.ico')) { $l.IconLocation = Join-Path $GAME 'afro_icon.ico' }
       $l.Save(); Say "    shortcut: $($l.FullName)"
     }
   }
@@ -355,10 +406,41 @@ try {
   Say '[100%] All steps finished.' Green
   Say ''
   Say ("INSTALL OK in {0:n0} min." -f $mins) Green
-  Say "Play:  $REPO\tools\run_win.bat   (hold Shift at start to show the launcher again)"
+  Say "Play:  $GAME\Play.bat   (hold Shift at start to show the launcher again)"
   Say "Saves: $([Environment]::GetFolderPath('MyDocuments'))\afrorecomp"
   Say "Log:   $Root\afro.log (game), $LOG (installer)"
-  Say "Downloads in $DLDIR can be deleted to free space (about 1 GB)."
+
+  # ------------------------------------------------------- optional cleanup ---
+  # Only folders INSIDE the install root; never the ISO, gamedata, game, logs or saves.
+  $script:STEP = 'cleanup'
+  $junk = @('tools', 'downloads', 'rexglue-sdk', 'sdk', 'afrorecomp', '.install') | ForEach-Object { Join-Path $Root $_ } |
+    Where-Object { (Test-Path -LiteralPath $_) -and ([IO.Path]::GetFullPath($_)).StartsWith($Root + '\', [StringComparison]::OrdinalIgnoreCase) }
+  if ($inRepo) { $junk = @($junk | Where-Object { $_ -ne $here2 }) }   # never delete the checkout the installer runs from
+  $isoFull = if ($Iso) { [IO.Path]::GetFullPath($Iso) } else { '' }
+  if ($isoFull) { $junk = @($junk | Where-Object { -not $isoFull.StartsWith($_ + '\', [StringComparison]::OrdinalIgnoreCase) }) }
+  $bytes = 0; foreach ($j in $junk) { $bytes += (Get-ChildItem -LiteralPath $j -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum }
+  $gb = $bytes / 1GB
+  if ($junk.Count -gt 0 -and -not $KeepBuildFiles) {
+    $doIt = [bool]$CleanupAfterInstall
+    if (-not $CleanupAfterInstall) {
+      $msg = ("Installation finished.`n`nDelete the files that are only needed to build the game and keep just what is needed to play?`n`n" +
+        "This frees about {0:n1} GB (toolchain, ReXGlue SDK and source, build files, downloads).`n" +
+        "Kept: the game folder ({1}), the extracted game data, the logs. Your ISO and your saves are never touched.`n`n" +
+        "Note: updating or rebuilding later needs a full new install (everything is downloaded again).") -f $gb, $GAME
+      try {
+        Add-Type -AssemblyName System.Windows.Forms
+        $r = [System.Windows.Forms.MessageBox]::Show($msg, 'AfroSamuraiRecomp - free disk space?', 'YesNo', 'Question', 'Button2')
+        $doIt = ($r -eq 'Yes')
+      } catch { Write-Host $msg; $doIt = YesNo 'Delete them?' 'n' }
+    }
+    if ($doIt) {
+      Say ("Deleting build files ({0:n1} GB)..." -f $gb)
+      foreach ($j in $junk) { Remove-Item -LiteralPath $j -Recurse -Force -ErrorAction Continue; Say "    deleted $j" }
+      Say ("Freed about {0:n1} GB. To update later, run the installer again (full download)." -f $gb) Green
+    } else {
+      Say ("Build files kept ({0:n1} GB in tools, sdk, rexglue-sdk, afrorecomp, downloads)." -f $gb)
+    }
+  }
   exit 0
 } catch {
   Say ''

@@ -57,8 +57,12 @@ Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
    created inside the folder you choose) and a file picker for your ISO,
    then does everything else. Started from a clone, it builds that checkout and
    proposes `AfroSamuraiRecomp-install` next to it as the install folder.
-4. When it says `INSTALL OK`, play with the desktop shortcut or
-   `<root>\afrorecomp\tools\run_win.bat`.
+4. All questions (install folder, ISO, Microsoft license, shortcuts) come first;
+   then it runs to the end without stopping. When it says `INSTALL OK`, play with the
+   desktop shortcut or `<root>\game\Play.bat`.
+5. Finally it offers (default No) to delete what is only needed for building
+   (toolchain, ReXGlue SDK/source, build files, downloads) and keep just `<root>\game`,
+   `<root>\gamedata` and the logs. Updating later then needs a full new install.
 
 What the installer does (`tools/install.ps1`, run with the PowerShell execution
 policy bypassed for that process only):
@@ -86,7 +90,7 @@ The log is `<root>\install.log`. To uninstall, delete the install folder (and
 the shortcuts; saves are separate, see [Saves](#saves)).
 
 Command-line options (`install.bat -Option value`): `-InstallDir <dir>` (full install folder, skips the folder picker), `-Iso <file>`,
-`-AcceptMsvcLicense`, `-Shortcut yes|no`, `-Ref <branch|tag>`. Advanced:
+`-AcceptMsvcLicense`, `-Shortcut yes|no`, `-CleanupAfterInstall` / `-KeepBuildFiles`, `-Ref <branch|tag>`. Advanced:
 `-GameDataDir <dir>` uses an already extracted disc folder (containing `default.xex`)
 instead of an ISO.
 
