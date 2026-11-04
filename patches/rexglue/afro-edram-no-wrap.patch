@@ -1,0 +1,45 @@
+diff --git a/src/graphics/pipeline/render_target/cache.cpp b/src/graphics/pipeline/render_target/cache.cpp
+index 953c5fd..b084d88 100644
+--- a/src/graphics/pipeline/render_target/cache.cpp
++++ b/src/graphics/pipeline/render_target/cache.cpp
+@@ -31,6 +31,12 @@
+ REXCVAR_DEFINE_BOOL(mrt_edram_used_range_clamp_to_min, true, "GPU",
+                     "Clamp MRT EDRAM used range to minimum");
+ 
++REXCVAR_DEFINE_BOOL(afro_edram_no_wrap, true, "GPU",
++                    "afro: do not let a render target's estimated EDRAM range wrap "
++                    "past tile 2048 into tile 0 (host RT path). Stops an over-estimated "
++                    "depth-only draw at 736t from taking ownership of the color image at "
++                    "0t, whose lossy color->depth->color transfer blacks out the frame.");
++
+ REXCVAR_DEFINE_BOOL(execute_unclipped_draw_vs_on_cpu_for_psi_render_backend, true, "GPU",
+                     "Execute unclipped draw VS on CPU for PSI render backend");
+ 
+@@ -658,6 +664,27 @@ bool RenderTargetCache::Update(bool is_rasterization_done,
+                                        rt_base);
+   }
+ 
++  // afro: clamp wrap-around ownership (see cvar description). Only the host
++  // render target path is affected by ownership transfers; the ROV path keeps
++  // the EDRAM in one buffer and never converts data between formats.
++  if (!interlock_barrier_only && REXCVAR_GET(afro_edram_no_wrap)) {
++    for (uint32_t i = 0; i < edram_bases_sorted_count; ++i) {
++      uint32_t rt_base = edram_bases_sorted[i].first;
++      if (rt_base < xenos::kEdramTileCount &&
++          rt_base + rt_lengths_tiles[i] > xenos::kEdramTileCount) {
++        static bool afro_wrap_logged = false;
++        if (!afro_wrap_logged) {
++          afro_wrap_logged = true;
++          REXGPU_INFO("afro edram no-wrap: clamped [{}{}] at {}t from {} to {} tiles",
++                      edram_bases_sorted[i].second ? "c" : "d",
++                      edram_bases_sorted[i].second ? edram_bases_sorted[i].second - 1 : 0,
++                      rt_base, rt_lengths_tiles[i], xenos::kEdramTileCount - rt_base);
++        }
++        rt_lengths_tiles[i] = xenos::kEdramTileCount - rt_base;
++      }
++    }
++  }
++
+   if (interlock_barrier_only) {
+     // Because a full pixel shader interlock barrier may clear the ownership map
+     // (since it flushes all previous writes, and there's no need for another

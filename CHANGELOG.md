@@ -2,6 +2,21 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.0.12 – RTV black frames fixed, stable 30 FPS
+- Fixed: black frames in combat and at cutscene camera cuts on the RTV path.
+  Cause: EDRAM range wraparound in the render target cache. The end-of-frame
+  depth-only pass (at tile 736, estimated 2048 tiles long) wrapped round to tile 0
+  and took ownership of the colour image (tiles 0-720); the lossy
+  colour->depth->colour transfer blacked out frames whenever the game skipped the
+  pass that restores it. New GPU plugin patch `patches/rexglue/afro-edram-no-wrap.patch`
+  (cvar `afro_edram_no_wrap`, default true) clamps the range instead of wrapping.
+- Default GPU render path is RTV again: correct image at a stable 30 FPS.
+  ROV remains selectable as a fallback (Advanced options / `--advanced`, or
+  `--render_target_path_d3d12=rov`).
+- `tools/build_gpu_plugin.bat` now applies every `patches/rexglue/*.patch` in
+  name order, skipping patches that are already applied.
+- Known issue: some gameplay voice lines are silent or cut off.
+
 ## 0.0.11 – first public preview (source only)
 - Default GPU render path is ROV (`render_target_path_d3d12=rov`): no black frames,
   but slow on some GPUs. The faster RTV path still shows black frames in combat and

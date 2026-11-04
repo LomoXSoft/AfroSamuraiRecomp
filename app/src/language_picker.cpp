@@ -71,7 +71,7 @@ struct AdvItem {
 };
 const AdvItem kAdv[] = {
     {"rt", "render_target_path_d3d12", L"Render target path", 3, {"", "rtv", "rov"},
-     {L"Default (ROV)", L"D3D12 RTV", L"D3D12 ROV"}},
+     {L"Default (RTV)", L"D3D12 RTV", L"D3D12 ROV"}},
     {"readback", "readback_resolve", L"readback_resolve", 4, {"", "fast", "some", "full"},
      {L"none", L"fast", L"some", L"full"}},
     {"occlusion", "occlusion_query_enable", L"occlusion_query_enable", 2, {"", "false"}, {}},
@@ -446,9 +446,10 @@ unsigned ApplyStartupLanguage() {
   for (int i = 0; i < kAdvN; ++i)
     if (opt.adv[i] > 0 && !Explicit(kAdv[i].cvar))
       SetCvar(kAdv[i].cvar, kAdv[i].values[opt.adv[i]]);
-  // Default render path: ROV (the host-RT path shows black frames in this game).
+  // Default render path: RTV (host render targets; black frames fixed by the
+  // afro_edram_no_wrap GPU plugin patch). ROV stays selectable as a fallback.
   if (opt.adv[0] == 0 && !Explicit("render_target_path_d3d12"))
-    SetCvar("render_target_path_d3d12", "rov");
+    SetCvar("render_target_path_d3d12", "rtv");
   if (!Explicit("resolution_scale") && opt.scale > 1)
     SetCvar("resolution_scale", std::to_string(opt.scale));
   rex::cvar::SetFlagByName("user_language", std::to_string(lang));

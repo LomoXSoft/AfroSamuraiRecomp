@@ -28,11 +28,16 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ## Status and limitations
-Preview (0.0.11). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
+Preview (0.0.12). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
-- Default GPU path is **ROV**: correct image but slow (can drop below 15 FPS on
-  some GPUs). The faster RTV path shows black frames in combat and at cutscene
-  camera cuts; this is being investigated.
+- Default GPU path is **RTV** (host render targets): correct image at a stable
+  30 FPS. The black frames of earlier versions are fixed by the
+  `afro-edram-no-wrap` GPU plugin patch.
+- **ROV** is still available as an optional fallback (correct image but slow,
+  can drop below 15 FPS): Advanced options (`--advanced`) or
+  `--render_target_path_d3d12=rov`.
+- Known issue: some voice lines in gameplay are silent or cut off (music and
+  sound effects are fine).
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -110,17 +115,17 @@ Settings are stored in `afro_language.cfg` next to the exe.
 Developer options: start with `--advanced` (e.g. `tools\run_win.bat --advanced`)
 to show the "Advanced options..." button (render path, resolve readback, game
 effect toggles, GPU diagnostics). Any ReXGlue cvar can also be passed on the
-command line, e.g. `--render_target_path_d3d12=rtv`.
+command line, e.g. `--render_target_path_d3d12=rov`.
 
 ## Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
-- `patches/rexglue/` – GPU plugin patch (BSD-3, see its README).
+- `patches/rexglue/` – GPU plugin patches (BSD-3, see its README).
 
 ## Plans
-- Fix the black frames on the fast RTV path, then make it the default.
+- Fix the broken voice lines.
 - Performance work; controller and audio polish.
 - Possibly other game versions and Linux/Vulkan.
 
