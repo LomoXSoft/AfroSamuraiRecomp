@@ -54,8 +54,33 @@ same BSD 3-Clause license. It contains code only, no game data.
   diagnostic log of XMA context state.
 Set `--afro_xma_substream=false` / `--afro_xma_fix=false` for A/B tests.
 
+## afro-xma-frameless-chain.patch (runtime: XMA audio decoder, `rexruntime.dll`)
+Same license as above (BSD 3-Clause, modifies ReXGlue code; code only).
+- cvar `afro_xma_frameless_chain` (default true): when a stream's next packet
+  holds no frame start (the frame spans the whole packet), keep following that
+  stream's own packet chain (skip counts), also into the next input block,
+  instead of jumping to packet 0 of the next block, which belongs to another
+  stream. Fixes cutscene lines that went silent after a camera cut and stayed
+  silent (e.g. the second boss cutscene).
+- `--afro_xma_log=true` also logs `afro xma ctx N chain ...` lines.
+
+## zz-afro-perf-log.patch (GPU plugin, `rexgpu-xenos.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last
+(name order). Diagnostics for the FPS drops, all default off:
+- `afro_perf_log` (false): per-second summary `afro perf 1s: ...` plus
+  `afro perf slow frame N: ...` for frames longer than `afro_perf_slow_ms`
+  (37): draws, copies, RT changes, EDRAM transfers, new pipelines/shaders,
+  texture loads, uploads, readbacks and their GPU-sync stalls, occlusion
+  queries, and time split into idle / waits / busy. Capped by `afro_perf_log_max`.
+- `afro_occlusion_async` (false), experimental: occlusion queries no longer
+  stall the CPU per query; results are written when the GPU submission finishes.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
-order (skipping those already applied) to `<root>\rexglue-sdk`, builds
-only `rexgpu-xenos.dll` and `rexruntime.dll` and copies them next to the exe
-(the stock DLLs are kept as `*.dll.stock`). Re-run it after `build_win.bat`.
+order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and
+`rexruntime.dll` and copies them next to the exe (the stock DLLs are kept as
+`*.dll.stock`). Already-applied patches are detected even when later patches
+touch the same lines (the whole stack is checked on a scratch git index, the
+working tree is not touched) and remembered with stamp files in
+`rexglue-sdk\.git\afro-patches`. `tools\build_win.bat` restores the patched
+DLLs at the end, so the two scripts can be run in either order.

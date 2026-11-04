@@ -2,6 +2,24 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.0.14 – all cutscene voices fixed, experimental advanced settings
+- Fixed: cutscene lines silent after a camera cut, and everything after them
+  (e.g. the second boss cutscene). Cause: when a stream's next packet holds no
+  frame start, the decoder jumped to packet 0 of the next input block (another
+  stream). New runtime patch `patches/rexglue/afro-xma-frameless-chain.patch`
+  (cvar `afro_xma_frameless_chain`, default true).
+- Launcher: new "Advanced settings (experimental)" dialog with the FPS cap
+  (default "Original (30 capped)" = no override) and a sepia filter toggle.
+- Launcher: internal resolution defaults to native (1x); resolution, FPS and
+  sepia are only kept with "remember".
+- New diagnostics patch `patches/rexglue/zz-afro-perf-log.patch`: `afro_perf_log`
+  and experimental `afro_occlusion_async` (both off).
+- Build scripts: `build_gpu_plugin.bat` detects an already-applied patch stack
+  (and keeps stamps); `build_win.bat` restores the patched DLLs.
+- Known issues: FPS drops when objects break or the camera splits;
+  if two tutorial prompts appear at once, the first one can stay
+  stuck on screen (original game behaviour; restarting the level clears it).
+
 ## 0.0.13 – cinematic voices fixed
 - Fixed: cinematic dialogue lines silent or cut off (e.g. at camera cuts).
   Cause: these lines are multi-stream (5.1) XMA with the voice in the centre

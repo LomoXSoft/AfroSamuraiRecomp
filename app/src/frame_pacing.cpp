@@ -50,6 +50,13 @@ void FxTick() {
   auto* mem = rex::system::kernel_memory();
   if (!mem) return;
   auto at = [&](uint32_t a) { return mem->TranslateVirtual<uint8_t*>(a); };
+  static bool reported = false;
+  if (!reported) {  // once: which effects are forced off (launcher / command line)
+    reported = true;
+    std::string off;
+    for (auto& f : kFx) if (!f.on()) off += std::string(f.name) + " ";
+    REXLOG_INFO("afro fx: forced off: {}", off.empty() ? "none" : off);
+  }
   std::string st;
   for (auto& f : kFx) {
     uint8_t* b = at(f.addr);

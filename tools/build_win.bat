@@ -21,4 +21,9 @@ if not exist generated\default\gen_v3.stamp (
 )
 cmake --preset win-amd64-release -DCMAKE_PREFIX_PATH="%R%\sdk\win-amd64" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ || exit /b 1
 cmake --build out\build\win-amd64-release -j %NUMBER_OF_PROCESSORS% || exit /b 1
+rem The app build copies the stock SDK DLLs next to the exe: put the patched ones back
+rem (built by tools\build_gpu_plugin.bat) so the order of the two scripts does not matter.
+set D=%~dp0..\app\out\build\win-amd64-release
+set P=%R%\rexglue-sdk\out\win-amd64\Release
+for %%F in (rexgpu-xenos.dll rexruntime.dll) do if exist "%P%\%%F" (copy /y "%P%\%%F" "%D%\%%F" >nul && echo patched %%F restored)
 echo BUILD OK

@@ -28,7 +28,7 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ## Status and limitations
-Preview (0.0.13). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
+Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
 - Default GPU path is **RTV** (host render targets): correct image at a stable
   30 FPS. The black frames of earlier versions are fixed by the
@@ -36,9 +36,11 @@ Preview (0.0.13). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - **ROV** is still available as an optional fallback (correct image but slow,
   can drop below 15 FPS): Advanced options (`--advanced`) or
   `--render_target_path_d3d12=rov`.
-- Voices work, including cinematic dialogue (fixed in 0.0.13 by the
-  `afro-xma-fix-log` runtime patch).
-- Known issue: some tutorial pop-ups advance too fast (before the voice line ends).
+- Voices work, including all cinematic dialogue (0.0.13 `afro-xma-fix-log` and
+  0.0.14 `afro-xma-frameless-chain` runtime patches).
+- Known issues: FPS drops when objects break or the camera splits;
+  if two tutorial prompts appear at once, the first one can stay
+  stuck on screen (original game behaviour; restarting the level clears it).
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -111,9 +113,13 @@ Hold **Shift** while starting to show the launcher again.
 
 ## Launcher and options
 The launcher (shown on first run, after each update, or with Shift) offers:
-language (English, Español, Français, Italiano), frame rate (original / 30 / 60),
-fullscreen or window, internal resolution (1x/2x/3x) and "remember and don't ask again".
-Settings are stored in `afro_language.cfg` next to the exe.
+language (English, Español, Français, Italiano), fullscreen or window, internal
+resolution (1x native by default / 2x / 3x) and "remember and don't ask again".
+The **Advanced settings (experimental)** button opens the frame-rate cap
+(default "Original (30 capped)": the game's own 30 FPS pacing, no override;
+30 / 60 are experimental) and the sepia filter toggle.
+Settings are stored in `afro_language.cfg` next to the exe; without "remember",
+resolution, frame rate and sepia go back to their defaults on the next start.
 
 Developer options: start with `--advanced` (e.g. `tools\run_win.bat --advanced`)
 to show the "Advanced options..." button (render path, resolve readback, game
@@ -128,7 +134,6 @@ command line, e.g. `--render_target_path_d3d12=rov`.
 - `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
 
 ## Plans
-- Fix the tutorial pop-ups that advance too fast.
 - Performance work; controller and audio polish.
 - Possibly other game versions and Linux/Vulkan.
 

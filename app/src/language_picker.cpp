@@ -80,7 +80,6 @@ const AdvItem kAdv[] = {
     {"directresolve", "direct_host_resolve", L"direct_host_resolve", 2, {"", "false"}, {}},
     {"fx_dof", "afro_fx_dof", L"FX: depth of field", 2, {"", "false"}, {}},
     {"fx_bloom", "afro_fx_bloom", L"FX: bloom", 2, {"", "false"}, {}},
-    {"fx_sepia", "afro_fx_sepia", L"FX: sepia", 2, {"", "false"}, {}},
     {"fx_blood", "afro_fx_blood", L"FX: blood", 2, {"", "false"}, {}},
     {"fx_focus", "afro_fx_focus", L"FX: focus (slow-mo)", 2, {"", "false"}, {}},
     {"intfix", "afro_int_fetch_scale", L"GPU: integer fetch fix (d119505)", 2, {"", "false"}, {}},
@@ -94,7 +93,7 @@ const AdvItem kAdv[] = {
 };
 constexpr int kAdvN = sizeof(kAdv) / sizeof(kAdv[0]);
 
-struct Options { int fps = 0; bool window = false; int scale = 1; int adv[kAdvN] = {}; };
+struct Options { int fps = 0; int sepia = 0; /* 0 on, 1 off */ bool window = false; int scale = 1; int adv[kAdvN] = {}; };
 
 // GPU-plugin cvars (rexgpu-xenos.dll) are registered only when the plugin is
 // loaded, after the launcher runs, and SetFlagByName rejects unknown names.
@@ -123,25 +122,34 @@ bool Explicit(const char* name) {
 
 #ifdef _WIN32
 // Launcher window: options grouped so more can be added later (one row each).
-struct UiText { const wchar_t *title, *lang, *remember, *hint, *play, *fps, *fps_orig, *disp, *full, *win, *scale, *adv, *def, *off, *ok, *on; };
+struct UiText { const wchar_t *title, *lang, *remember, *hint, *play, *fps, *fps_orig, *disp, *full, *win, *scale, *adv, *def, *off, *ok, *on, *xbtn, *xwarn, *sepia, *sepia_on, *sepia_off; };
 const UiText kText[] = {
     {L"afrorecomp_v" AFRO_VERSION_W L" - Launcher", L"Language:", L"Remember and don't ask again",
      L"Hold Shift at launch to show this window again.", L"Play",
-     L"Frame rate:", L"Original (game)", L"Display:", L"Fullscreen", L"Window", L"Internal resolution:", L"Advanced options...", L"Default", L"Off", L"OK", L"On"},
+     L"Frame rate:", L"Original (30 capped)", L"Display:", L"Fullscreen", L"Window", L"Internal resolution:", L"Advanced options...", L"Default", L"Off", L"OK", L"On",
+     L"Advanced settings (experimental)...", L"Warning: these settings are experimental and not fully tested. The game runs at a fixed 30 FPS; the FPS cap may not behave as expected.",
+     L"Sepia filter:", L"On (original)", L"Off"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanzador", L"Idioma:", L"Recordar y no volver a preguntar",
      L"Mant\u00e9n May\u00fas al iniciar para volver a ver esta ventana.", L"Jugar",
-     L"Fotogramas:", L"Original (juego)", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resoluci\u00f3n interna:", L"Opciones avanzadas...", L"Por defecto", L"Desactivado", L"Aceptar", L"Activado"},
+     L"Fotogramas:", L"Original (30 capados)", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resoluci\u00f3n interna:", L"Opciones avanzadas...", L"Por defecto", L"Desactivado", L"Aceptar", L"Activado",
+     L"Ajustes avanzados (experimental)...", L"Atenci\u00f3n: estos ajustes son experimentales y no est\u00e1n probados del todo. El juego funciona a 30 FPS fijos; el l\u00edmite de FPS puede no comportarse como se espera.",
+     L"Filtro sepia:", L"Activado (original)", L"Desactivado"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanceur", L"Langue :", L"M\u00e9moriser et ne plus demander",
      L"Maintenez Maj au d\u00e9marrage pour revoir cette fen\u00eatre.", L"Jouer",
-     L"Images/s :", L"Original (jeu)", L"Affichage :", L"Plein \u00e9cran", L"Fen\u00eatre", L"R\u00e9solution interne :", L"Options avanc\u00e9es...", L"Par d\u00e9faut", L"D\u00e9sactiv\u00e9", L"OK", L"Activ\u00e9"},
+     L"Images/s :", L"Original (limit\u00e9 \u00e0 30)", L"Affichage :", L"Plein \u00e9cran", L"Fen\u00eatre", L"R\u00e9solution interne :", L"Options avanc\u00e9es...", L"Par d\u00e9faut", L"D\u00e9sactiv\u00e9", L"OK", L"Activ\u00e9",
+     L"R\u00e9glages avanc\u00e9s (exp\u00e9rimental)...", L"Attention : ces r\u00e9glages sont exp\u00e9rimentaux et pas enti\u00e8rement test\u00e9s. Le jeu tourne \u00e0 30 FPS fixes ; la limite de FPS peut ne pas se comporter comme pr\u00e9vu.",
+     L"Filtre s\u00e9pia :", L"Activ\u00e9 (original)", L"D\u00e9sactiv\u00e9"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Avvio", L"Lingua:", L"Ricorda e non chiedere pi\u00f9",
      L"Tieni premuto Maiusc all'avvio per rivedere questa finestra.", L"Gioca",
-     L"Fotogrammi:", L"Originale (gioco)", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:", L"Opzioni avanzate...", L"Predefinito", L"Disattivato", L"OK", L"Attivato"},
+     L"Fotogrammi:", L"Originale (limitato a 30)", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:", L"Opzioni avanzate...", L"Predefinito", L"Disattivato", L"OK", L"Attivato",
+     L"Impostazioni avanzate (sperimentale)...", L"Attenzione: queste impostazioni sono sperimentali e non del tutto testate. Il gioco gira a 30 FPS fissi; il limite di FPS potrebbe non comportarsi come previsto.",
+     L"Filtro seppia:", L"Attivato (originale)", L"Disattivato"},
 };
 constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
               kIdHint = 104, kIdFpsLbl = 105, kIdFps = 106, kIdDispLbl = 107,
               kIdDisp = 108, kIdScaleLbl = 109, kIdScale = 110,
-              kIdAdvBtn = 111, kIdAdvBase = 200;
+              kIdAdvBtn = 111, kIdXBtn = 112, kIdXWarn = 113, kIdXSepiaLbl = 114,
+              kIdXSepia = 115, kIdAdvBase = 200;
 constexpr int kFpsValues[] = {0, 30, 60};
 struct PickState { int sel = 0; bool remember = false; bool done = false; Options opt; };
 
@@ -160,11 +168,10 @@ void ApplyTexts(HWND h, int sel) {
   SetDlgItemTextW(h, kIdCheck, t.remember);
   SetDlgItemTextW(h, kIdHint, t.hint);
   SetDlgItemTextW(h, kIdPlay, t.play);
-  SetDlgItemTextW(h, kIdFpsLbl, t.fps);
   SetDlgItemTextW(h, kIdDispLbl, t.disp);
   SetDlgItemTextW(h, kIdScaleLbl, t.scale);
   SetDlgItemTextW(h, kIdAdvBtn, t.adv);
-  FillCombo(h, kIdFps, {t.fps_orig, L"30", L"60"});
+  SetDlgItemTextW(h, kIdXBtn, t.xbtn);
   FillCombo(h, kIdDisp, {t.full, t.win});
 }
 
@@ -259,18 +266,93 @@ void ShowAdvanced(HWND owner, int sel, Options* o) {
   UnregisterClassW(wc.lpszClassName, inst);
 }
 
+LRESULT CALLBACK XProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+  auto* st = reinterpret_cast<AdvState*>(GetWindowLongPtrW(h, GWLP_USERDATA));
+  if ((m == WM_COMMAND && (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL)) || m == WM_CLOSE) {
+    if (LOWORD(w) == IDOK && m == WM_COMMAND) {
+      int fi = static_cast<int>(SendDlgItemMessageW(h, kIdFps, CB_GETCURSEL, 0, 0));
+      st->opt->fps = kFpsValues[std::clamp(fi, 0, 2)];
+      st->opt->sepia = SendDlgItemMessageW(h, kIdXSepia, CB_GETCURSEL, 0, 0) == 1 ? 1 : 0;
+    }
+    st->done = true;
+    DestroyWindow(h);
+    return 0;
+  }
+  return DefWindowProcW(h, m, w, l);
+}
+
+// Modal "Advanced settings (experimental)" window: user-facing, always available.
+// Only FPS cap and sepia filter; saved only when "Remember" is ticked.
+void ShowExperimental(HWND owner, int sel, Options* o) {
+  const UiText& t = kText[sel];
+  HINSTANCE inst = GetModuleHandleW(nullptr);
+  WNDCLASSW wc{};
+  wc.lpfnWndProc = XProc;
+  wc.hInstance = inst;
+  wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+  wc.lpszClassName = L"AfroExperimental";
+  RegisterClassW(&wc);
+  const double sc = GetDpiForSystem() / 96.0;
+  auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
+  const DWORD style = WS_CAPTION | WS_SYSMENU;
+  RECT rc{0, 0, S(420), S(244)};
+  AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
+  RECT orc;
+  GetWindowRect(owner, &orc);
+  std::wstring title = t.xbtn;
+  while (!title.empty() && title.back() == L'.') title.pop_back();
+  HWND h = CreateWindowExW(WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, wc.lpszClassName, title.c_str(),
+                           style | WS_VISIBLE, orc.left + S(20), orc.top + S(20),
+                           rc.right - rc.left, rc.bottom - rc.top, owner, nullptr, inst, nullptr);
+  if (!h) return;
+  AdvState st;
+  st.opt = o;
+  SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&st));
+  auto mk = [&](const wchar_t* cls, const wchar_t* text, DWORD s_, int x, int y, int cw, int ch,
+                int id) {
+    HWND c = CreateWindowExW(0, cls, text, WS_CHILD | WS_VISIBLE | s_, S(x), S(y), S(cw), S(ch),
+                             h, reinterpret_cast<HMENU>(INT_PTR(id)), inst, nullptr);
+    SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(UiFont()), TRUE);
+    return c;
+  };
+  const DWORD cbs = WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL;
+  mk(L"STATIC", t.xwarn, SS_SUNKEN, 16, 14, 388, 68, kIdXWarn);
+  mk(L"STATIC", t.fps, SS_CENTERIMAGE, 16, 98, 180, 26, 0);
+  HWND fps = mk(L"COMBOBOX", L"", cbs, 204, 98, 200, 200, kIdFps);
+  for (auto* i : {t.fps_orig, L"30", L"60"}) SendMessageW(fps, CB_ADDSTRING, 0, (LPARAM)i);
+  SendMessageW(fps, CB_SETCURSEL, o->fps == 30 ? 1 : o->fps == 60 ? 2 : 0, 0);
+  mk(L"STATIC", t.sepia, SS_CENTERIMAGE, 16, 136, 180, 26, kIdXSepiaLbl);
+  HWND sep = mk(L"COMBOBOX", L"", cbs, 204, 136, 200, 200, kIdXSepia);
+  SendMessageW(sep, CB_ADDSTRING, 0, (LPARAM)t.sepia_on);
+  SendMessageW(sep, CB_ADDSTRING, 0, (LPARAM)t.sepia_off);
+  SendMessageW(sep, CB_SETCURSEL, o->sepia ? 1 : 0, 0);
+  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 150, 190, 120, 32, IDOK);
+  EnableWindow(owner, FALSE);
+  MSG msg;
+  while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    if (!IsDialogMessageW(h, &msg)) {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
+  }
+  EnableWindow(owner, TRUE);
+  SetForegroundWindow(owner);
+  UnregisterClassW(wc.lpszClassName, inst);
+}
+
 LRESULT CALLBACK PickProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   auto* st = reinterpret_cast<PickState*>(GetWindowLongPtrW(h, GWLP_USERDATA));
   switch (m) {
     case WM_COMMAND:
       if (LOWORD(w) == kIdAdvBtn) {
         ShowAdvanced(h, st->sel, &st->opt);
+      } else if (LOWORD(w) == kIdXBtn) {
+        ShowExperimental(h, st->sel, &st->opt);
       } else if (LOWORD(w) == kIdCombo && HIWORD(w) == CBN_SELCHANGE) {
         st->sel = static_cast<int>(SendDlgItemMessageW(h, kIdCombo, CB_GETCURSEL, 0, 0));
         ApplyTexts(h, st->sel);
       } else if (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL) {
-        int fi = static_cast<int>(SendDlgItemMessageW(h, kIdFps, CB_GETCURSEL, 0, 0));
-        st->opt.fps = kFpsValues[std::clamp(fi, 0, 2)];
         st->opt.window = SendDlgItemMessageW(h, kIdDisp, CB_GETCURSEL, 0, 0) == 1;
         int si = static_cast<int>(SendDlgItemMessageW(h, kIdScale, CB_GETCURSEL, 0, 0));
         st->opt.scale = 1 + std::clamp(si, 0, 2);
@@ -334,20 +416,17 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   HWND combo = mk(L"COMBOBOX", cbs, 180, 20, 200, 200, kIdCombo);
   for (auto& l : kLangs) SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)l.label);
   SendMessageW(combo, CB_SETCURSEL, st.sel, 0);
-  mk(L"STATIC", SS_CENTERIMAGE, 20, 56, 150, 26, kIdFpsLbl);
-  HWND fps = mk(L"COMBOBOX", cbs, 180, 56, 200, 200, kIdFps);
-  mk(L"STATIC", SS_CENTERIMAGE, 20, 92, 150, 26, kIdDispLbl);
-  HWND disp = mk(L"COMBOBOX", cbs, 180, 92, 200, 200, kIdDisp);
-  mk(L"STATIC", SS_CENTERIMAGE, 20, 128, 150, 26, kIdScaleLbl);
-  HWND scale = mk(L"COMBOBOX", cbs, 180, 128, 200, 200, kIdScale);
+  mk(L"STATIC", SS_CENTERIMAGE, 20, 56, 150, 26, kIdDispLbl);
+  HWND disp = mk(L"COMBOBOX", cbs, 180, 56, 200, 200, kIdDisp);
+  mk(L"STATIC", SS_CENTERIMAGE, 20, 92, 150, 26, kIdScaleLbl);
+  HWND scale = mk(L"COMBOBOX", cbs, 180, 92, 200, 200, kIdScale);
   for (auto* i : {L"1x (720p)", L"2x (1440p)", L"3x (2160p)"})
     SendMessageW(scale, CB_ADDSTRING, 0, (LPARAM)i);
-  SendMessageW(fps, CB_ADDSTRING, 0, (LPARAM)L"-");
   SendMessageW(disp, CB_ADDSTRING, 0, (LPARAM)L"-");
-  SendMessageW(fps, CB_SETCURSEL, o->fps == 30 ? 1 : o->fps == 60 ? 2 : 0, 0);
   SendMessageW(disp, CB_SETCURSEL, o->window ? 1 : 0, 0);
   SendMessageW(scale, CB_SETCURSEL, (o->scale >= 1 && o->scale <= 3) ? o->scale - 1 : 0, 0);
-  if (REXCVAR_GET(advanced)) mk(L"BUTTON", WS_TABSTOP, 180, 164, 200, 28, kIdAdvBtn);
+  mk(L"BUTTON", WS_TABSTOP, 20, 132, 360, 28, kIdXBtn);  // always shown
+  if (REXCVAR_GET(advanced)) mk(L"BUTTON", WS_TABSTOP, 20, 166, 360, 28, kIdAdvBtn);
   mk(L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, 20, 206, 360, 22, kIdCheck);
   mk(L"STATIC", 0, 20, 232, 360, 36, kIdHint);
   HWND play = mk(L"BUTTON", WS_TABSTOP | BS_DEFPUSHBUTTON, 140, 282, 120, 34,
@@ -392,6 +471,7 @@ unsigned ApplyStartupLanguage() {
       if (line.rfind("ask=", 0) == 0) ask = line[4] != '0';
       if (line.rfind("version=", 0) == 0) { seen_version = line.substr(8); while (!seen_version.empty() && (seen_version.back() == '\r' || seen_version.back() == ' ')) seen_version.pop_back(); }
       if (line.rfind("fps=", 0) == 0) opt.fps = std::atoi(line.c_str() + 4);
+      if (line.rfind("sepia=", 0) == 0) opt.sepia = line[6] == '1' ? 1 : 0;
       if (line.rfind("window=", 0) == 0) opt.window = line[7] == '1';
       for (int i = 0; i < kAdvN; ++i) {
         std::string k = std::string(kAdv[i].key) + "=";
@@ -402,6 +482,13 @@ unsigned ApplyStartupLanguage() {
     }
   }
   if (!Valid(lang)) { lang = 0; ask = true; }
+  // Internal resolution defaults to native (1x); a saved scale is only kept
+  // when "Remember" was ticked (ask=0).
+  const int saved_scale = opt.scale;
+  if (ask) opt.scale = 1;
+  // Same for the frame rate: default "Original (30 capped)" = no host cap.
+  const int saved_fps = opt.fps;
+  if (ask) opt.fps = 0;
   // Without --advanced, saved diagnostic options are ignored (safe defaults).
   const Options saved_adv = opt;
   if (!REXCVAR_GET(advanced))
@@ -426,8 +513,9 @@ unsigned ApplyStartupLanguage() {
     const Options stored = opt;  // advanced options persist only with "remember"
     lang = ShowPicker(initial, &remember, &opt);
     std::ofstream out(path, std::ios::trunc);
-    out << "language=" << lang << "\nask=" << (remember ? 0 : 1) << "\nfps=" << opt.fps
-        << "\nwindow=" << (opt.window ? 1 : 0) << "\nscale=" << opt.scale
+    out << "language=" << lang << "\nask=" << (remember ? 0 : 1) << "\nfps=" << (remember ? opt.fps : saved_fps)
+        << "\nsepia=" << (remember ? opt.sepia : stored.sepia)
+        << "\nwindow=" << (opt.window ? 1 : 0) << "\nscale=" << (remember ? opt.scale : saved_scale)
         << "\nversion=" << AFRO_VERSION << "\n";
     for (int i = 0; i < kAdvN; ++i)
       out << kAdv[i].key << "="
@@ -439,8 +527,11 @@ unsigned ApplyStartupLanguage() {
 #endif
   if (!lang) lang = 1;
   // Command-line / toml values win over the launcher.
-  if (!Explicit("afro_fps_cap"))
+  // Original (0) passes no override: the game keeps its own 30 FPS pacing.
+  if (opt.fps > 0 && !Explicit("afro_fps_cap"))
     SetCvar("afro_fps_cap", std::to_string(opt.fps));
+  if (opt.sepia && !Explicit("afro_fx_sepia"))
+    SetCvar("afro_fx_sepia", "false");
   if (!Explicit("fullscreen"))
     SetCvar("fullscreen", opt.window ? "false" : "true");
   for (int i = 0; i < kAdvN; ++i)

@@ -1,0 +1,586 @@
+diff --git a/include/rex/graphics/d3d12/command_processor.h b/include/rex/graphics/d3d12/command_processor.h
+index 96d362b..5de9e85 100644
+--- a/include/rex/graphics/d3d12/command_processor.h
++++ b/include/rex/graphics/d3d12/command_processor.h
+@@ -195,6 +195,10 @@ class D3D12CommandProcessor : public CommandProcessor {
+   // Returns the text to display in the GPU backend name in the window title.
+   std::string GetWindowTitleText() const;
+ 
++  // afro: asynchronous occlusion query results (afro_occlusion_async).
++  void AfroPollOcclusionQueries(bool flush);
++  void AfroDropOrAwaitOcclusionQueries(uint32_t address, bool await_all);
++
+  protected:
+   bool SetupContext() override;
+   void ShutdownContext() override;
+diff --git a/src/graphics/CMakeLists.txt b/src/graphics/CMakeLists.txt
+index da7ae1a..b7e84bd 100644
+--- a/src/graphics/CMakeLists.txt
++++ b/src/graphics/CMakeLists.txt
+@@ -18,6 +18,7 @@ set(REXGPU_XENOS_SOURCES
+     # GPU system
+     graphics_system.cpp
+     command_processor.cpp
++    afro_perf.cpp
+     util/draw_extent_estimator.cpp
+     util/draw.cpp
+     packet_disassembler.cpp
+diff --git a/src/graphics/afro_perf.cpp b/src/graphics/afro_perf.cpp
+new file mode 100644
+index 0000000..cadb977
+--- /dev/null
++++ b/src/graphics/afro_perf.cpp
+@@ -0,0 +1,109 @@
++// afro: per-frame perf log. Counters are always collected (relaxed atomics);
++// lines are only written with --afro_perf_log=true.
++#include "afro_perf.h"
++
++#include <algorithm>
++#include <string>
++
++#include <rex/cvar.h>
++#include <rex/logging.h>
++
++#ifdef _WIN32
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#endif
++
++REXCVAR_DEFINE_BOOL(afro_perf_log, false, "GPU",
++                    "afro: log GPU-emulation perf counters every second and for every slow frame");
++REXCVAR_DEFINE_DOUBLE(afro_perf_slow_ms, 37.0, "GPU",
++                      "afro: frames longer than this (ms, swap to swap) get their own perf line");
++REXCVAR_DEFINE_INT32(afro_perf_log_max, 100000, "GPU", "afro: max afro_perf_log lines");
++
++namespace rex::graphics::afro_perf {
++std::atomic<uint64_t> g[kCount];
++void (*g_idle_poll)(void*) = nullptr;
++void* g_idle_ctx = nullptr;
++
++namespace {
++uint64_t last_swap_us = 0, frame_no = 0, lines = 0;
++uint64_t prev[kCount] = {}, win[kCount] = {};
++uint64_t win_start_us = 0, win_frames = 0, win_slow = 0;
++double win_max_ms = 0;
++#ifdef _WIN32
++uint64_t FileTimeUs(const FILETIME& f) {
++  return ((uint64_t(f.dwHighDateTime) << 32) | f.dwLowDateTime) / 10;
++}
++uint64_t last_proc_cpu_us = 0, last_cp_cpu_us = 0;
++void CpuTimes(uint64_t& proc_us, uint64_t& cp_us) {
++  FILETIME c, e, k, u;
++  proc_us = cp_us = 0;
++  if (GetProcessTimes(GetCurrentProcess(), &c, &e, &k, &u)) proc_us = FileTimeUs(k) + FileTimeUs(u);
++  if (GetThreadTimes(GetCurrentThread(), &c, &e, &k, &u)) cp_us = FileTimeUs(k) + FileTimeUs(u);
++}
++#endif
++
++std::string Fmt(const uint64_t* d, double frame_ms, double frames) {
++  auto ms = [&](Counter c) { return d[c] / 1000.0 / frames; };
++  auto n = [&](Counter c) { return d[c] / frames; };
++  double busy = frame_ms - ms(kCpIdleUs) - ms(kCpWaitRegUs) - ms(kFenceWaitUs);
++  return fmt::format(
++      "draws {:.0f} (skipped {:.0f}) copies {:.0f} rtchg {:.0f} xfer {:.0f} ({:.0f} t) "
++      "pipes+ {:.1f} shaders+ {:.1f} tex {:.1f} ({:.2f} MB) upload {:.2f} MB inval {:.0f} "
++      "readback {:.1f} (sync stalls {:.1f}) occl {:.1f} (sync {:.1f}, dropped {:.1f}) | cp busy {:.1f} idle {:.1f} waitreg {:.1f} fence {:.1f} ms",
++      n(kDraws), n(kDrawsSkipped), n(kCopies), n(kRtChanges), n(kTransfers), n(kTransferTiles),
++      n(kPipelinesNew), n(kShadersTranslated), n(kTextureLoads), n(kTextureLoadBytes) / 1048576.0,
++      n(kUploadBytes) / 1048576.0, n(kInvalidations), n(kReadbacks), n(kReadbackStalls), n(kOcclusionQueries), n(kOcclusionSync),
++      n(kOcclusionDropped), busy, ms(kCpIdleUs),
++      ms(kCpWaitRegUs), ms(kFenceWaitUs));
++}
++}  // namespace
++
++void OnSwap() {
++  const uint64_t now = NowUs();
++  uint64_t cur[kCount], d[kCount];
++  for (int i = 0; i < kCount; ++i) {
++    cur[i] = g[i].load(std::memory_order_relaxed);
++    d[i] = cur[i] - prev[i];
++    prev[i] = cur[i];
++  }
++  ++frame_no;
++  if (!last_swap_us) { last_swap_us = win_start_us = now; return; }
++  const double frame_ms = (now - last_swap_us) / 1000.0;
++  last_swap_us = now;
++  if (!REXCVAR_GET(afro_perf_log)) { win_start_us = now; win_frames = 0; return; }
++  const bool can_log = lines < uint64_t(std::max(REXCVAR_GET(afro_perf_log_max), 0));
++  for (int i = 0; i < kCount; ++i) win[i] += d[i];
++  ++win_frames;
++  if (frame_ms > win_max_ms) win_max_ms = frame_ms;
++  if (frame_ms > REXCVAR_GET(afro_perf_slow_ms)) {
++    ++win_slow;
++    if (can_log) {
++      REXGPU_INFO("afro perf slow frame {}: {:.1f} ms | {}", frame_no, frame_ms, Fmt(d, frame_ms, 1));
++      ++lines;
++    }
++  }
++  const double win_s = (now - win_start_us) / 1e6;
++  if (win_s >= 1.0) {
++    std::string cpu;
++#ifdef _WIN32
++    uint64_t p, c;
++    CpuTimes(p, c);
++    if (last_proc_cpu_us)
++      cpu = fmt::format(" | cpu process {:.0f}% (of one core) cp-thread {:.0f}%",
++                        (p - last_proc_cpu_us) / (win_s * 1e4), (c - last_cp_cpu_us) / (win_s * 1e4));
++    last_proc_cpu_us = p;
++    last_cp_cpu_us = c;
++#endif
++    if (can_log) {
++      REXGPU_INFO("afro perf 1s: {:.1f} fps, max {:.1f} ms, slow {} | per frame: {}{}",
++                  win_frames / win_s, win_max_ms, win_slow,
++                  Fmt(win, win_s * 1000.0 / win_frames, double(win_frames)), cpu);
++      ++lines;
++    }
++    for (auto& w : win) w = 0;
++    win_frames = win_slow = 0;
++    win_max_ms = 0;
++    win_start_us = now;
++  }
++}
++}  // namespace rex::graphics::afro_perf
+diff --git a/src/graphics/afro_perf.h b/src/graphics/afro_perf.h
+new file mode 100644
+index 0000000..cbd5a45
+--- /dev/null
++++ b/src/graphics/afro_perf.h
+@@ -0,0 +1,34 @@
++// afro: lightweight per-frame GPU-emulation perf counters (afro_perf_log).
++#pragma once
++#include <atomic>
++#include <chrono>
++#include <cstdint>
++
++namespace rex::graphics::afro_perf {
++enum Counter : int {
++  kDraws, kDrawsSkipped, kCopies, kRtChanges, kTransfers, kTransferTiles,
++  kPipelinesNew, kShadersTranslated, kTextureLoads, kTextureLoadBytes,
++  kUploadBytes, kInvalidations, kCpIdleUs, kCpWaitRegUs, kFenceWaitUs,
++  kReadbacks, kReadbackStalls, kOcclusionQueries, kOcclusionSync, kOcclusionDropped,
++  kCount
++};
++extern std::atomic<uint64_t> g[kCount];
++inline void Add(Counter c, uint64_t v = 1) { g[c].fetch_add(v, std::memory_order_relaxed); }
++inline uint64_t NowUs() {
++  return uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(
++                      std::chrono::steady_clock::now().time_since_epoch())
++                      .count());
++}
++// Adds the elapsed microseconds to a counter when it goes out of scope.
++struct ScopedUs {
++  Counter c; uint64_t t0;
++  explicit ScopedUs(Counter c_) : c(c_), t0(NowUs()) {}
++  ~ScopedUs() { Add(c, NowUs() - t0); }
++};
++// Called once per guest frame (IssueSwap) on the command processor thread.
++void OnSwap();
++// Called by the command processor while it idles (waiting for guest commands).
++extern void (*g_idle_poll)(void* ctx);
++extern void* g_idle_ctx;
++inline void IdlePoll() { if (g_idle_poll) g_idle_poll(g_idle_ctx); }
++}  // namespace rex::graphics::afro_perf
+diff --git a/src/graphics/command_processor.cpp b/src/graphics/command_processor.cpp
+index a744375..f6d095b 100644
+--- a/src/graphics/command_processor.cpp
++++ b/src/graphics/command_processor.cpp
+@@ -17,6 +17,7 @@
+ 
+ #include <fmt/format.h>
+ 
++#include "afro_perf.h"
+ #include <rex/cvar.h>
+ #include <rex/dbg.h>
+ #include <rex/perf/counter.h>
+@@ -217,6 +218,7 @@ void CommandProcessor::WorkerThreadMain() {
+       // We spin here waiting for new ones, as the overhead of waiting on our
+       // event is too high.
+       PrepareForWait();
++      ::rex::graphics::afro_perf::ScopedUs afro_idle(::rex::graphics::afro_perf::kCpIdleUs);
+       uint32_t loop_count = 0;
+       do {
+         // If we spin around too much, revert to a "low-power" state.
+@@ -227,6 +229,7 @@ void CommandProcessor::WorkerThreadMain() {
+         }
+ 
+         rex::thread::MaybeYield();
++        ::rex::graphics::afro_perf::IdlePoll();
+         loop_count++;
+         write_ptr_index = write_ptr_index_.load();
+       } while (worker_running_ && pending_fns_.empty() &&
+@@ -1032,6 +1035,7 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(memory::RingBuffer* reade
+     if (!matched) {
+       // Wait.
+       if (wait >= 0x100) {
++        ::rex::graphics::afro_perf::ScopedUs afro_wr(::rex::graphics::afro_perf::kCpWaitRegUs);
+         PrepareForWait();
+         if (!REXCVAR_GET(vsync)) {
+           // User wants it fast and dangerous.
+@@ -1039,6 +1043,7 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(memory::RingBuffer* reade
+         } else {
+           rex::thread::Sleep(std::chrono::milliseconds(wait / 0x100));
+         }
++        ::rex::graphics::afro_perf::IdlePoll();
+         rex::thread::SyncMemory();
+         ReturnFromWait();
+ 
+diff --git a/src/graphics/d3d12/command_processor.cpp b/src/graphics/d3d12/command_processor.cpp
+index d32398d..6307058 100644
+--- a/src/graphics/d3d12/command_processor.cpp
++++ b/src/graphics/d3d12/command_processor.cpp
+@@ -15,6 +15,8 @@
+ #include <sstream>
+ #include <utility>
+ 
++#include "../afro_perf.h"
++#include <deque>
+ #include <rex/assert.h>
+ #include <rex/cvar.h>
+ #include <rex/dbg.h>
+@@ -32,6 +34,9 @@
+ #include <rex/ui/d3d12/d3d12_presenter.h>
+ #include <rex/ui/d3d12/d3d12_util.h>
+ 
++REXCVAR_DEFINE_BOOL(afro_occlusion_async, false, "GPU",
++                    "afro: do not stall the CPU on every occlusion query; write the result to guest "
++                    "memory when the GPU has finished it (polled while the command processor idles)");
+ REXCVAR_DEFINE_BOOL(d3d12_bindless, true, "GPU/D3D12", "Use bindless resources where available")
+     .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
+ 
+@@ -150,6 +155,60 @@ void D3D12CommandProcessor::InitializeShaderStorage(const std::filesystem::path&
+   pipeline_cache_->InitializeShaderStorage(cache_root, title_id, blocking);
+ }
+ 
++namespace {
++struct AfroPendingQuery {
++  uint32_t host_index;
++  uint64_t submission;
++  uint32_t address;
++};
++std::deque<AfroPendingQuery> afro_pending_queries;
++void AfroIdlePollThunk(void* ctx) {
++  static_cast<rex::graphics::d3d12::D3D12CommandProcessor*>(ctx)->AfroPollOcclusionQueries(true);
++}
++}  // namespace
++
++void D3D12CommandProcessor::AfroPollOcclusionQueries(bool flush) {
++  if (afro_pending_queries.empty() || !submission_fence_) {
++    return;
++  }
++  if (flush && submission_open_ && afro_pending_queries.back().submission >= submission_current_) {
++    EndSubmission(false);
++  }
++  const uint64_t done = submission_fence_->GetCompletedValue();
++  while (!afro_pending_queries.empty() && afro_pending_queries.front().submission <= done) {
++    const AfroPendingQuery q = afro_pending_queries.front();
++    afro_pending_queries.pop_front();
++    auto* sample_counts = memory_->TranslatePhysical<xenos::xe_gpu_depth_sample_counts*>(q.address);
++    if (sample_counts && occlusion_query_readback_mapping_) {
++      WriteGuestOcclusionResult(sample_counts,
++                                NormalizeOcclusionSamples(occlusion_query_readback_mapping_[q.host_index]));
++    }
++  }
++}
++
++// A new query reusing the memory of a pending one: the guest has re-armed it,
++// so the old result is abandoned (writing it now could clobber the new markers).
++void D3D12CommandProcessor::AfroDropOrAwaitOcclusionQueries(uint32_t address, bool await_all) {
++  if (afro_pending_queries.empty()) {
++    return;
++  }
++  if (await_all) {
++    ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kOcclusionSync);
++    CheckSubmissionFence(afro_pending_queries.back().submission);
++    AfroPollOcclusionQueries(false);
++    afro_pending_queries.clear();
++    return;
++  }
++  for (auto it = afro_pending_queries.begin(); it != afro_pending_queries.end();) {
++    if (it->address == address) {
++      ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kOcclusionDropped);
++      it = afro_pending_queries.erase(it);
++    } else {
++      ++it;
++    }
++  }
++}
++
+ bool D3D12CommandProcessor::ExecutePacketType3_EVENT_WRITE_ZPD(memory::RingBuffer* reader,
+                                                                uint32_t packet, uint32_t count) {
+   if (!REXCVAR_GET(occlusion_query_enable) || !occlusion_query_resources_available_) {
+@@ -192,6 +251,9 @@ bool D3D12CommandProcessor::ExecutePacketType3_EVENT_WRITE_ZPD(memory::RingBuffe
+       sample_counts->ZFail_A == kQueryFinished || sample_counts->ZFail_B == kQueryFinished;
+   bool is_end = is_end_via_z_pass || is_end_via_z_fail;
+ 
++  if (!is_end && REXCVAR_GET(afro_occlusion_async)) {
++    AfroDropOrAwaitOcclusionQueries(sample_count_addr, afro_pending_queries.size() > 4096);
++  }
+   if (!is_end) {
+     if (active_occlusion_query_.valid &&
+         active_occlusion_query_.sample_count_address != sample_count_addr) {
+@@ -1627,6 +1689,9 @@ bool D3D12CommandProcessor::SetupContext() {
+ }
+ 
+ void D3D12CommandProcessor::ShutdownContext() {
++  ::rex::graphics::afro_perf::g_idle_poll = nullptr;
++  ::rex::graphics::afro_perf::g_idle_ctx = nullptr;
++  afro_pending_queries.clear();
+   AwaitAllQueueOperationsCompletion();
+   InvalidateAllVertexBufferResidency();
+   ShutdownOcclusionQueryResources();
+@@ -1894,6 +1959,7 @@ void D3D12CommandProcessor::OnGammaRampPWLValueWritten() {
+ void D3D12CommandProcessor::IssueSwap(uint32_t frontbuffer_ptr, uint32_t frontbuffer_width,
+                                       uint32_t frontbuffer_height) {
+   SCOPE_profile_cpu_f("gpu");
++  ::rex::graphics::afro_perf::OnSwap();
+   vertex_buffers_in_sync_[0] = 0;
+   vertex_buffers_in_sync_[1] = 0;
+ 
+@@ -2275,6 +2341,7 @@ bool D3D12CommandProcessor::IssueDraw(xenos::PrimitiveType primitive_type, uint3
+   SCOPE_profile_cpu_f("gpu");
+ #endif  // XE_GPU_FINE_GRAINED_DRAW_SCOPES
+ 
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kDraws);
+   ID3D12Device* device = GetD3D12Provider().GetDevice();
+   const RegisterFile& regs = *register_file_;
+ 
+@@ -2400,6 +2467,7 @@ bool D3D12CommandProcessor::IssueDraw(xenos::PrimitiveType primitive_type, uint3
+   }
+   if (REXCVAR_GET(async_shader_compilation) &&
+       pipeline_cache_->GetD3D12PipelineByHandle(pipeline_handle) == nullptr) {
++    ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kDrawsSkipped);
+     return true;
+   }
+ 
+@@ -2731,6 +2799,7 @@ bool D3D12CommandProcessor::IssueDraw(xenos::PrimitiveType primitive_type, uint3
+ }
+ 
+ bool D3D12CommandProcessor::IssueDraw_MemexportReadbackFullPath(uint32_t total_size) {
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kReadbacks);
+   if (!total_size || memexport_ranges_.empty()) {
+     return true;
+   }
+@@ -2776,6 +2845,7 @@ bool D3D12CommandProcessor::IssueDraw_MemexportReadbackFullPath(uint32_t total_s
+ }
+ 
+ bool D3D12CommandProcessor::IssueDraw_MemexportReadbackFastPath(uint32_t total_size) {
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kReadbacks);
+   if (!total_size || memexport_ranges_.empty()) {
+     return true;
+   }
+@@ -2874,6 +2944,7 @@ bool D3D12CommandProcessor::IssueCopy() {
+ #if XE_GPU_FINE_GRAINED_DRAW_SCOPES
+   SCOPE_profile_cpu_f("gpu");
+ #endif  // XE_GPU_FINE_GRAINED_DRAW_SCOPES
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kCopies);
+   if (!BeginSubmission(true)) {
+     return false;
+   }
+@@ -2887,6 +2958,7 @@ bool D3D12CommandProcessor::IssueCopy() {
+ }
+ 
+ bool D3D12CommandProcessor::IssueCopy_ReadbackResolvePath() {
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kReadbacks);
+   uint32_t written_address, written_length;
+   if (!render_target_cache_->Resolve(*memory_, *shared_memory_, *texture_cache_, written_address,
+                                      written_length)) {
+@@ -3075,8 +3147,11 @@ bool D3D12CommandProcessor::IssueCopy_ReadbackResolvePath() {
+   uint32_t read_index = write_index;
+   if (use_delayed_sync) {
+     read_index = 1 - write_index;
+-  } else if (!AwaitAllQueueOperationsCompletion()) {
+-    return true;
++  } else {
++    ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kReadbackStalls);
++    if (!AwaitAllQueueOperationsCompletion()) {
++      return true;
++    }
+   }
+ 
+   bool is_cache_miss = false;
+@@ -3084,6 +3159,7 @@ bool D3D12CommandProcessor::IssueCopy_ReadbackResolvePath() {
+                            !rb.mapped_data[read_index])) {
+     is_cache_miss = true;
+     read_index = write_index;
++    ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kReadbackStalls);
+     if (!AwaitAllQueueOperationsCompletion()) {
+       return true;
+     }
+@@ -3118,6 +3194,7 @@ void D3D12CommandProcessor::CheckSubmissionFence(uint64_t await_submission) {
+                     SUCCEEDED(queue_operations_since_submission_fence_->SetEventOnCompletion(
+                         fence_value, fence_completion_event_)))) {
+         PROFILE_CMD_BUFFER_STALL();
++        ::rex::graphics::afro_perf::ScopedUs afro_fw(::rex::graphics::afro_perf::kFenceWaitUs);
+         WaitForSingleObject(fence_completion_event_, INFINITE);
+         queue_operations_done_since_submission_signal_ = false;
+       } else {
+@@ -3137,10 +3214,12 @@ void D3D12CommandProcessor::CheckSubmissionFence(uint64_t await_submission) {
+     if (SUCCEEDED(
+             submission_fence_->SetEventOnCompletion(await_submission, fence_completion_event_))) {
+       PROFILE_CMD_BUFFER_STALL();
++      ::rex::graphics::afro_perf::ScopedUs afro_fw(::rex::graphics::afro_perf::kFenceWaitUs);
+       WaitForSingleObject(fence_completion_event_, INFINITE);
+       submission_completed_ = submission_fence_->GetCompletedValue();
+     }
+   }
++  AfroPollOcclusionQueries(false);
+   if (submission_completed_ < await_submission) {
+     REXGPU_ERROR("Failed to await a submission completion Direct3D 12 fence");
+   }
+@@ -4880,6 +4959,8 @@ bool D3D12CommandProcessor::AcquireOcclusionQueryIndex(uint32_t& host_index_out)
+ }
+ 
+ void D3D12CommandProcessor::DisableHostOcclusionQueries() {
++  REXGPU_WARN("afro: host occlusion queries disabled (fallback to fake sample counts)");
++  AfroDropOrAwaitOcclusionQueries(0, true);
+   if (active_occlusion_query_.valid && occlusion_query_heap_) {
+     uint32_t host_index = active_occlusion_query_.host_index;
+     // Clear before EndSubmission to prevent the EndSubmission safety net from issuing a second
+@@ -4943,6 +5024,19 @@ bool D3D12CommandProcessor::EndGuestOcclusionQuery(
+   deferred_command_list_.D3DResolveQueryData(
+       occlusion_query_heap_.Get(), D3D12_QUERY_TYPE_OCCLUSION, host_index, 1,
+       occlusion_query_readback_.Get(), sizeof(uint64_t) * host_index);
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kOcclusionQueries);
++
++  if (REXCVAR_GET(afro_occlusion_async)) {
++    // Result is written later by AfroPollOcclusionQueries; the guest keeps
++    // seeing its "not finished" markers until then.
++    afro_pending_queries.push_back({host_index, submission_current_, sample_count_address});
++    if (!::rex::graphics::afro_perf::g_idle_poll) {
++      ::rex::graphics::afro_perf::g_idle_ctx = this;
++      ::rex::graphics::afro_perf::g_idle_poll = AfroIdlePollThunk;
++    }
++    return true;
++  }
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kOcclusionSync);
+ 
+   if (!EndSubmission(false)) {
+     return false;
+diff --git a/src/graphics/d3d12/pipeline_cache.cpp b/src/graphics/d3d12/pipeline_cache.cpp
+index 8e6b854..36fa55e 100644
+--- a/src/graphics/d3d12/pipeline_cache.cpp
++++ b/src/graphics/d3d12/pipeline_cache.cpp
+@@ -24,6 +24,7 @@
+ 
+ #include <fmt/format.h>
+ 
++#include "../afro_perf.h"
+ #include <rex/assert.h>
+ #include <rex/chrono/clock.h>
+ #include <rex/cvar.h>
+@@ -1013,6 +1014,7 @@ bool PipelineCache::ConfigurePipeline(
+   std::memcpy(&new_pipeline->description, &runtime_description, sizeof(runtime_description));
+   new_pipeline->root_signature.store(runtime_description.root_signature, std::memory_order_release);
+   pipelines_.emplace(hash, new_pipeline);
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kPipelinesNew);
+   COUNT_profile_set("gpu/pipeline_cache/pipelines", pipelines_.size());
+ 
+   if (use_async) {
+@@ -1059,6 +1061,7 @@ bool PipelineCache::TranslateAnalyzedShader(DxbcShaderTranslator& translator,
+                                             D3D12Shader::D3D12Translation& translation,
+                                             IDxbcConverter* dxbc_converter, IDxcUtils* dxc_utils,
+                                             IDxcCompiler* dxc_compiler) {
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kShadersTranslated);
+   D3D12Shader& shader = static_cast<D3D12Shader&>(translation.shader());
+ 
+   // Perform translation.
+diff --git a/src/graphics/d3d12/render_target_cache.cpp b/src/graphics/d3d12/render_target_cache.cpp
+index 3786c91..5c346eb 100644
+--- a/src/graphics/d3d12/render_target_cache.cpp
++++ b/src/graphics/d3d12/render_target_cache.cpp
+@@ -21,6 +21,7 @@
+ #include <tuple>
+ #include <utility>
+ 
++#include "../afro_perf.h"
+ #include <rex/assert.h>
+ #include <rex/cvar.h>
+ #include <rex/graphics/d3d12/command_processor.h>
+@@ -1081,6 +1082,21 @@ bool D3D12RenderTargetCache::Update(bool is_rasterization_done,
+       RenderTarget* const* depth_and_color_render_targets =
+           last_update_accumulated_render_targets();
+       ++afro_rt_seq;
++      {
++        static RenderTarget* afro_perf_last[1 + xenos::kMaxColorRenderTargets] = {};
++        const std::vector<Transfer>* tr = last_update_transfers();
++        bool chg = false;
++        for (uint32_t i = 0; i < 1 + xenos::kMaxColorRenderTargets; ++i) {
++          chg |= afro_perf_last[i] != depth_and_color_render_targets[i];
++          afro_perf_last[i] = depth_and_color_render_targets[i];
++          for (const Transfer& t : tr[i]) {
++            ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kTransfers);
++            ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kTransferTiles,
++                                            t.end_tiles - t.start_tiles);
++          }
++        }
++        if (chg) ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kRtChanges);
++      }
+       if (AfroRtLogOn()) {
+         static RenderTarget* afro_last_rts[1 + xenos::kMaxColorRenderTargets] = {};
+         const std::vector<Transfer>* transfers = last_update_transfers();
+diff --git a/src/graphics/d3d12/shared_memory.cpp b/src/graphics/d3d12/shared_memory.cpp
+index a5c97a0..fa5beaa 100644
+--- a/src/graphics/d3d12/shared_memory.cpp
++++ b/src/graphics/d3d12/shared_memory.cpp
+@@ -13,6 +13,7 @@
+ #include <utility>
+ #include <vector>
+ 
++#include "../afro_perf.h"
+ #include <rex/assert.h>
+ #include <rex/cvar.h>
+ #include <rex/graphics/d3d12/command_processor.h>
+@@ -309,6 +310,9 @@ bool D3D12SharedMemory::UploadRanges(
+   CommitUAVWritesAndTransitionBuffer(D3D12_RESOURCE_STATE_COPY_DEST);
+   command_processor_.SubmitBarriers();
+   auto& command_list = command_processor_.GetDeferredCommandList();
++  for (auto upload_range : upload_page_ranges)
++    ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kUploadBytes,
++                                    uint64_t(upload_range.second) << page_size_log2());
+   for (auto upload_range : upload_page_ranges) {
+     uint32_t upload_range_start = upload_range.first;
+     uint32_t upload_range_length = upload_range.second;
+diff --git a/src/graphics/pipeline/texture/cache.cpp b/src/graphics/pipeline/texture/cache.cpp
+index c0e029c..a9dd02c 100644
+--- a/src/graphics/pipeline/texture/cache.cpp
++++ b/src/graphics/pipeline/texture/cache.cpp
+@@ -13,6 +13,7 @@
+ #include <cstdint>
+ #include <utility>
+ 
++#include "../../afro_perf.h"
+ #include <rex/assert.h>
+ #include <rex/chrono/clock.h>
+ #include <rex/cvar.h>
+@@ -445,6 +446,11 @@ bool TextureCache::CommitPreparedTextureLoad(const PendingTextureLoad& pending_l
+                                              pending_load.load_mips)) {
+     return false;
+   }
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kTextureLoads);
++  ::rex::graphics::afro_perf::Add(
++      ::rex::graphics::afro_perf::kTextureLoadBytes,
++      (pending_load.load_base ? texture.GetGuestBaseSize() : 0) +
++          (pending_load.load_mips ? texture.GetGuestMipsSize() : 0));
+ 
+   // Mark the ranges as uploaded and watch them. This is needed for scaled
+   // resolves as well to detect when the CPU wants to reuse the memory for a
+diff --git a/src/graphics/shared_memory.cpp b/src/graphics/shared_memory.cpp
+index ec0df7c..05ffc11 100644
+--- a/src/graphics/shared_memory.cpp
++++ b/src/graphics/shared_memory.cpp
+@@ -13,6 +13,7 @@
+ #include <cstring>
+ #include <utility>
+ 
++#include "afro_perf.h"
+ #include <rex/assert.h>
+ #include <rex/bit.h>
+ #include <rex/dbg.h>
+@@ -485,6 +486,7 @@ std::pair<uint32_t, uint32_t> SharedMemory::MemoryInvalidationCallback(
+     return std::make_pair(uint32_t(0), UINT32_MAX);
+   }
+   length = std::min(length, kBufferSize - physical_address_start);
++  ::rex::graphics::afro_perf::Add(::rex::graphics::afro_perf::kInvalidations);
+   uint32_t physical_address_last = physical_address_start + (length - 1);
+ 
+   uint32_t page_first = physical_address_start >> page_size_log2_;

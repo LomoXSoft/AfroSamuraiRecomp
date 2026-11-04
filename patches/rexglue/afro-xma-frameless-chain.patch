@@ -1,0 +1,79 @@
+diff --git a/src/audio/xma_context.cpp b/src/audio/xma_context.cpp
+index 9787582..54cab89 100644
+--- a/src/audio/xma_context.cpp
++++ b/src/audio/xma_context.cpp
+@@ -49,6 +49,10 @@ REXCVAR_DEFINE_BOOL(afro_xma_substream, true, "Audio",
+                     "afro: keep multi-stream XMA2 (5.1 cinematics) on their own packet chain: "
+                     "follow packet skip counts within and across input buffers");
+ 
++REXCVAR_DEFINE_BOOL(afro_xma_frameless_chain, true, "Audio",
++                    "afro: when a sub-stream's next packet has no frame start, keep following "
++                    "its skip chain (across input buffers) instead of jumping to packet 0");
++
+ namespace rex::audio {
+ 
+ static uint64_t afro_xma_log_lines = 0;
+@@ -63,6 +67,10 @@ bool AfroXmaLogOn() {
+ 
+ using stream::BitStream;
+ 
++static void AfroXmaChainLog(uint32_t ctx, const char* what, uint32_t pkt, uint32_t count) {
++  REXAPU_INFO("afro xma ctx {} chain {} pkt={} count={}", ctx, what, pkt, count);
++}
++
+ static constexpr uint32_t kAfroMaxCtx = 512;
+ static int32_t afro_pending_overflow[kAfroMaxCtx] = {};
+ static bool afro_pending_init = [] {
+@@ -837,10 +845,29 @@ void XmaContext::Decode(XMA_CONTEXT_DATA* data) {
+     return;
+   }
+ 
++  if (REXCVAR_GET(afro_xma_substream) && REXCVAR_GET(afro_xma_frameless_chain) &&
++      next_packet_index < current_input_packet_count &&
++      xma::GetPacketFrameOffset(current_input_buffer + next_packet_index * kBytesPerPacket) >
++          kMaxFrameSizeinBits) {
++    // The next packet of this sub-stream carries no frame start (frame spans
++    // it entirely). Follow the chain via skip counts, possibly into the next
++    // input buffer, instead of falling back to packet 0 of the next buffer
++    // (which belongs to another sub-stream -> the voice stream was lost after
++    // a frameless packet at the end of a 32 KB block, e.g. e02b_cin_dialog).
++    if (AfroXmaLogOn()) {
++      AfroXmaChainLog(id(), "frameless-chain", next_packet_index, current_input_packet_count);
++    }
++    AfroResumeInBuffer(data, next_packet_index);
++    return;
++  }
++
+   uint32_t next_input_offset =
+       GetNextPacketReadOffset(current_input_buffer, next_packet_index, current_input_packet_count);
+ 
+   if (REXCVAR_GET(afro_xma_substream) && next_packet_index >= current_input_packet_count) {
++    if (AfroXmaLogOn()) {
++      AfroXmaChainLog(id(), "overflow", next_packet_index, current_input_packet_count);
++    }
+     // Continue the sub-stream's chain in the next buffer at the packet the
+     // skip count points to (index relative to the end of this buffer).
+     uint32_t overflow = next_packet_index - current_input_packet_count;
+@@ -885,6 +912,11 @@ void XmaContext::AfroResumeInBuffer(XMA_CONTEXT_DATA* data, uint32_t overflow) {
+       const uint32_t ffo = xma::GetPacketFrameOffset(pk);
+       if (ffo <= kMaxFrameSizeinBits) {
+         data->input_buffer_read_offset = idx * kBitsPerPacket + ffo;
++        if (AfroXmaLogOn()) {
++          REXAPU_INFO("afro xma ctx {} chain resume buf={} pkt={}/{} rd={}", id(),
++                      uint32_t(data->current_buffer), idx, count,
++                      uint32_t(data->input_buffer_read_offset));
++        }
+         return;
+       }
+       const uint8_t sk = xma::GetPacketSkipCount(pk);
+@@ -900,6 +932,10 @@ void XmaContext::AfroResumeInBuffer(XMA_CONTEXT_DATA* data, uint32_t overflow) {
+   if (!data->IsCurrentInputBufferValid()) {
+     afro_pending_overflow[id() % kAfroMaxCtx] = int32_t(overflow);
+   }
++  if (AfroXmaLogOn()) {
++    REXAPU_INFO("afro xma ctx {} chain resume-pending overflow={} valid={}", id(), overflow,
++                int(data->IsCurrentInputBufferValid()));
++  }
+   data->input_buffer_read_offset = kBitsPerPacketHeader;
+ }
+ 
