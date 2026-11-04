@@ -7,7 +7,10 @@ it private. Requires: pip install pycryptodome
 usage: xex_to_pe.py default.xex default.pe path/to/rexglue-sdk"""
 import re, struct, sys
 from pathlib import Path
-from Crypto.Cipher import AES
+try:
+    from Crypto.Cipher import AES
+except ImportError:
+    sys.exit('xex_to_pe.py needs pycryptodome: run  python -m pip install pycryptodome')
 
 xex_path, out_path, sdk = sys.argv[1], sys.argv[2], Path(sys.argv[3])
 src = (sdk / 'src/system/xex_module.cpp').read_text(errors='ignore')

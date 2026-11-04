@@ -46,7 +46,9 @@ Preview (0.0.11). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
   - Visual Studio 2022 Build Tools (MSVC + Windows SDK) – run the build from a
     "x64 Native Tools" prompt, or put a portable MSVC in `<root>\tools\msvc` with `setup_x64.bat`.
   - LLVM/Clang 20 (`clang++`), CMake ≥ 3.25, Ninja, Git.
-  - Python 3 with `pip install pycryptodome`.
+  - Python 3 with pycryptodome: `python -m pip install pycryptodome`
+    (or inside a virtual environment: `python -m venv <root>\venv` and run the
+    build from a prompt where `<root>\venv\Scripts\activate` was called).
 - ReXGlue SDK nightly **0.10.0.24-dev.gbd833a2** (prebuilt) and the ReXGlue
   source at the same commit.
 
@@ -64,7 +66,7 @@ Never share these files or anything generated from them.
 ## Building
 Folder layout (`<root>` = e.g. `C:\afro`):
 
-    <root>\afrorecomp      this repository
+    <root>\afrorecomp      this repository (cloned into a folder named afrorecomp)
     <root>\sdk\win-amd64   ReXGlue SDK nightly (bin\rexglue.exe inside)
     <root>\rexglue-sdk     ReXGlue source at bd833a2
     <root>\gamedata        your extracted disc
@@ -73,7 +75,7 @@ Folder layout (`<root>` = e.g. `C:\afro`):
 Steps:
 
     cd C:\afro
-    git clone https://github.com/LomoXSoft/afrorecomp.git
+    git clone https://github.com/LomoXSoft/AfroSamuraiRecomp.git afrorecomp
     rem SDK: download rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip from
     rem https://github.com/rexglue/rexglue-sdk/releases/tag/nightly-20261002-bd833a2a
     rem and extract it so that C:\afro\sdk\win-amd64\bin\rexglue.exe exists.
