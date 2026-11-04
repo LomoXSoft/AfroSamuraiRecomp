@@ -2,6 +2,18 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.0.13 – cinematic voices fixed
+- Fixed: cinematic dialogue lines silent or cut off (e.g. at camera cuts).
+  Cause: these lines are multi-stream (5.1) XMA with the voice in the centre
+  stream; the XMA decoder restarted at packet 0 on every new 32 KB input block,
+  so the centre stream was lost. New runtime patch
+  `patches/rexglue/afro-xma-fix-log.patch` (cvar `afro_xma_substream`, default true).
+- XMA decoder: backport of Xenia-canary's `Work()` loop / output-valid handling
+  (cvar `afro_xma_fix`, default true); optional `afro_xma_log` diagnostics.
+- `tools/build_gpu_plugin.bat` now also builds and installs `rexruntime.dll`
+  (stock kept as `rexruntime.dll.stock`).
+- Known issue: some tutorial pop-ups advance too fast.
+
 ## 0.0.12 – RTV black frames fixed, stable 30 FPS
 - Fixed: black frames in combat and at cutscene camera cuts on the RTV path.
   Cause: EDRAM range wraparound in the render target cache. The end-of-frame

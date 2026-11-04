@@ -1,0 +1,344 @@
+diff --git a/include/rex/audio/xma/context.h b/include/rex/audio/xma/context.h
+index 8426798..9ea899a 100644
+--- a/include/rex/audio/xma/context.h
++++ b/include/rex/audio/xma/context.h
+@@ -237,6 +237,7 @@ class XmaContext {
+   }
+ 
+  private:
++  void AfroResumeInBuffer(XMA_CONTEXT_DATA* data, uint32_t overflow);
+   static void SwapInputBuffer(XMA_CONTEXT_DATA* data);
+   static int GetSampleRate(int id);
+   static int16_t GetPacketNumber(size_t size, size_t bit_offset);
+diff --git a/src/audio/xma_context.cpp b/src/audio/xma_context.cpp
+index 11b83be..9787582 100644
+--- a/src/audio/xma_context.cpp
++++ b/src/audio/xma_context.cpp
+@@ -13,6 +13,7 @@
+ #include <cstring>
+ 
+ #include <rex/audio/xma/context.h>
++#include <rex/cvar.h>
+ #include <rex/audio/xma/decoder.h>
+ #include <rex/audio/xma/helpers.h>
+ #include <rex/dbg.h>
+@@ -36,10 +37,39 @@ extern "C" {
+ // Credits for most of this code goes to:
+ // https://github.com/koolkdev/libertyv/blob/master/libav_wrapper/xma2dec.c
+ 
++REXCVAR_DEFINE_BOOL(afro_xma_log, false, "Audio",
++                    "afro: log XMA context state transitions and .xma file opens");
++REXCVAR_DEFINE_BOOL(afro_xma_log_all, false, "Audio", "afro: log every XMA kick (verbose)");
++REXCVAR_DEFINE_INT32(afro_xma_log_max, 200000, "Audio", "afro: max afro_xma_log lines");
++REXCVAR_DEFINE_BOOL(afro_xma_fix, true, "Audio",
++                    "afro: canary-style output_buffer_valid handling (only invalidate when the "
++                    "ring is really full) and drain the current frame before leaving Work()");
++
++REXCVAR_DEFINE_BOOL(afro_xma_substream, true, "Audio",
++                    "afro: keep multi-stream XMA2 (5.1 cinematics) on their own packet chain: "
++                    "follow packet skip counts within and across input buffers");
++
+ namespace rex::audio {
+ 
++static uint64_t afro_xma_log_lines = 0;
++bool AfroXmaLogOn() {
++  if (!REXCVAR_GET(afro_xma_log) ||
++      afro_xma_log_lines >= uint64_t(std::max(REXCVAR_GET(afro_xma_log_max), 0))) {
++    return false;
++  }
++  ++afro_xma_log_lines;
++  return true;
++}
++
+ using stream::BitStream;
+ 
++static constexpr uint32_t kAfroMaxCtx = 512;
++static int32_t afro_pending_overflow[kAfroMaxCtx] = {};
++static bool afro_pending_init = [] {
++  for (auto& v : afro_pending_overflow) v = -1;
++  return true;
++}();
++
+ const uint32_t XmaContext::kBitsPerPacketHeader;
+ const uint32_t XmaContext::kOutputMaxSizeBytes;
+ 
+@@ -132,21 +162,72 @@ bool XmaContext::Work() {
+     return true;
+   }
+ 
++  const bool fix = REXCVAR_GET(afro_xma_fix);
++  const uint32_t start_write = uint32_t(output_rb.write_offset());
+   while (remaining_subframe_blocks_in_output_buffer_ >= minimum_subframe_decode_count) {
++    const uint32_t pre_decode_offset = data.input_buffer_read_offset;
++    const uint8_t pre_remaining_subframes = current_frame_remaining_subframes_;
+     Decode(&data);
+     Consume(&output_rb, &data);
+ 
+-    if (!data.IsAnyInputBufferValid() || data.error_status == 4) {
++    if (!fix) {
++      if (!data.IsAnyInputBufferValid() || data.error_status == 4) {
++        break;
++      }
++      continue;
++    }
++    // canary 6bef1fb: don't strand the rest of the current frame; nothing
++    // would ever kick this context again to deliver it.
++    if ((!data.IsAnyInputBufferValid() || data.error_status == 4) &&
++        current_frame_remaining_subframes_ == 0) {
++      break;
++    }
++    // No progress possible (e.g. split frame waiting for the next buffer).
++    if (pre_remaining_subframes == 0 && data.input_buffer_read_offset == pre_decode_offset &&
++        current_frame_remaining_subframes_ == 0) {
+       break;
+     }
+   }
+ 
+   data.output_buffer_write_offset = output_rb.write_offset() / kOutputBytesPerBlock;
+ 
+-  if (output_rb.empty()) {
++  if (fix) {
++    // Only report "output full" when the ring really is full. An empty ring
++    // after a starved kick (input not refilled yet) must stay valid, or the
++    // game treats the voice as finished.
++    if (remaining_subframe_blocks_in_output_buffer_ == 0 && output_rb.empty()) {
++      data.output_buffer_valid = 0;
++    }
++  } else if (output_rb.empty()) {
+     data.output_buffer_valid = 0;
+   }
+ 
++  if (AfroXmaLogOn()) {
++    const bool changed = initial_data.input_buffer_0_valid != data.input_buffer_0_valid ||
++                         initial_data.input_buffer_1_valid != data.input_buffer_1_valid ||
++                         initial_data.output_buffer_valid != data.output_buffer_valid ||
++                         initial_data.error_status != data.error_status;
++    const uint32_t cap = output_rb.capacity() ? uint32_t(output_rb.capacity()) : 1u;
++    const uint32_t wrote = (uint32_t(output_rb.write_offset()) + cap - start_write) % cap;
++    if (changed || wrote == 0 || REXCVAR_GET(afro_xma_log_all)) {
++      REXAPU_INFO(
++          "afro xma ctx {} work in={}{}->{}{} cur={} rd={} out_valid={}->{} r={} w={} blocks={} "
++          "wrote={} remsub={} err={} sr={} st={} sdc={} b0={:08X}/{} b1={:08X}/{}",
++          id(), (int)initial_data.input_buffer_0_valid, (int)initial_data.input_buffer_1_valid,
++          (int)data.input_buffer_0_valid, (int)data.input_buffer_1_valid, (int)data.current_buffer,
++          (uint32_t)data.input_buffer_read_offset, (int)initial_data.output_buffer_valid,
++          (int)data.output_buffer_valid, (uint32_t)data.output_buffer_read_offset,
++          (uint32_t)data.output_buffer_write_offset, (uint32_t)data.output_buffer_block_count,
++          wrote / kOutputBytesPerBlock, (int)current_frame_remaining_subframes_,
++          (uint32_t)data.error_status, (uint32_t)data.sample_rate, (int)data.is_stereo,
++          (uint32_t)data.subframe_decode_count, (uint32_t)data.input_buffer_0_ptr,
++          (uint32_t)data.input_buffer_0_packet_count, (uint32_t)data.input_buffer_1_ptr,
++          (uint32_t)data.input_buffer_1_packet_count);
++    } else {
++      --afro_xma_log_lines;
++    }
++  }
++
+   StoreContextMerged(data, initial_data, context_ptr);
+   return true;
+ }
+@@ -209,6 +290,7 @@ void XmaContext::ResetDecoderState() {
+   current_frame_remaining_subframes_ = 0;
+   loop_frame_output_limit_ = 0;
+   loop_start_skip_pending_ = false;
++  afro_pending_overflow[id() % kAfroMaxCtx] = -1;
+ }
+ 
+ void XmaContext::Disable() {
+@@ -304,6 +386,18 @@ const uint8_t* XmaContext::GetNextPacket(XMA_CONTEXT_DATA* data, uint32_t next_p
+     return nullptr;
+   }
+ 
++  if (REXCVAR_GET(afro_xma_substream)) {
++    // The skip count may run past the end of this buffer into the next one
++    // (multi-stream XMA2 interleaves sub-streams across 32 KB blocks).
++    const uint32_t overflow = next_packet_index - current_input_packet_count;
++    const uint32_t next_count = next_buffer_index == 0 ? data->input_buffer_0_packet_count
++                                                       : data->input_buffer_1_packet_count;
++    if (overflow >= next_count) {
++      return nullptr;
++    }
++    return memory()->TranslatePhysical(next_buffer_address) + overflow * kBytesPerPacket;
++  }
++
+   return memory()->TranslatePhysical(next_buffer_address);
+ }
+ 
+@@ -316,6 +410,16 @@ uint32_t XmaContext::GetNextPacketReadOffset(uint8_t* buffer, uint32_t next_pack
+     if (packet_frame_offset <= kMaxFrameSizeinBits) {
+       return (next_packet_index * kBitsPerPacket) + packet_frame_offset;
+     }
++    if (REXCVAR_GET(afro_xma_substream)) {
++      // canary 7015473: a frameless packet belongs to this sub-stream; follow
++      // its own skip count instead of stepping onto another stream's packet.
++      const uint8_t next_skip = xma::GetPacketSkipCount(next_packet);
++      if (next_skip == 0xFF) {
++        break;
++      }
++      next_packet_index += next_skip + 1;
++      continue;
++    }
+     next_packet_index++;
+   }
+ 
+@@ -543,6 +647,17 @@ void XmaContext::Decode(XMA_CONTEXT_DATA* data) {
+     }
+   }
+ 
++  if (afro_pending_overflow[id() % kAfroMaxCtx] >= 0) {
++    const uint32_t ov = uint32_t(afro_pending_overflow[id() % kAfroMaxCtx]);
++    afro_pending_overflow[id() % kAfroMaxCtx] = -1;
++    if (REXCVAR_GET(afro_xma_substream) && data->input_buffer_read_offset == kBitsPerPacketHeader) {
++      AfroResumeInBuffer(data, ov);
++      if (!data->IsCurrentInputBufferValid()) {
++        return;
++      }
++    }
++  }
++
+   uint8_t* current_input_buffer = GetCurrentInputBuffer(data);
+ 
+   input_buffer_.fill(0);
+@@ -725,6 +840,21 @@ void XmaContext::Decode(XMA_CONTEXT_DATA* data) {
+   uint32_t next_input_offset =
+       GetNextPacketReadOffset(current_input_buffer, next_packet_index, current_input_packet_count);
+ 
++  if (REXCVAR_GET(afro_xma_substream) && next_packet_index >= current_input_packet_count) {
++    // Continue the sub-stream's chain in the next buffer at the packet the
++    // skip count points to (index relative to the end of this buffer).
++    uint32_t overflow = next_packet_index - current_input_packet_count;
++    SwapInputBuffer(data);
++    if (!data->IsCurrentInputBufferValid()) {
++      // Next buffer not queued yet: remember where to resume.
++      afro_pending_overflow[id() % kAfroMaxCtx] = int32_t(overflow);
++      data->input_buffer_read_offset = kBitsPerPacketHeader;
++      return;
++    }
++    AfroResumeInBuffer(data, overflow);
++    return;
++  }
++
+   if (next_input_offset == kBitsPerPacketHeader) {
+     SwapInputBuffer(data);
+     if (data->IsAnyInputBufferValid()) {
+@@ -740,6 +870,39 @@ void XmaContext::Decode(XMA_CONTEXT_DATA* data) {
+   data->input_buffer_read_offset = next_input_offset;
+ }
+ 
++void XmaContext::AfroResumeInBuffer(XMA_CONTEXT_DATA* data, uint32_t overflow) {
++  for (int guard = 0; guard < 2 && data->IsCurrentInputBufferValid(); ++guard) {
++    const uint32_t count = data->GetCurrentInputBufferPacketCount();
++    if (overflow >= count) {
++      overflow -= count;
++      SwapInputBuffer(data);
++      continue;
++    }
++    uint8_t* buf = GetCurrentInputBuffer(data);
++    uint32_t idx = overflow;
++    while (idx < count) {
++      uint8_t* pk = buf + idx * kBytesPerPacket;
++      const uint32_t ffo = xma::GetPacketFrameOffset(pk);
++      if (ffo <= kMaxFrameSizeinBits) {
++        data->input_buffer_read_offset = idx * kBitsPerPacket + ffo;
++        return;
++      }
++      const uint8_t sk = xma::GetPacketSkipCount(pk);
++      if (sk == 0xFF) {
++        idx = count;
++        break;
++      }
++      idx += sk + 1;
++    }
++    overflow = idx - count;
++    SwapInputBuffer(data);
++  }
++  if (!data->IsCurrentInputBufferValid()) {
++    afro_pending_overflow[id() % kAfroMaxCtx] = int32_t(overflow);
++  }
++  data->input_buffer_read_offset = kBitsPerPacketHeader;
++}
++
+ void XmaContext::ConvertFrame(const uint8_t** samples, bool is_two_channel,
+                               uint8_t* output_buffer) {
+   // Loop through every sample, convert and drop it into the output array.
+diff --git a/src/kernel/xboxkrnl/xboxkrnl_audio_xma.cpp b/src/kernel/xboxkrnl/xboxkrnl_audio_xma.cpp
+index a84b5f5..d17e2c5 100644
+--- a/src/kernel/xboxkrnl/xboxkrnl_audio_xma.cpp
++++ b/src/kernel/xboxkrnl/xboxkrnl_audio_xma.cpp
+@@ -25,6 +25,8 @@
+ #include <rex/system/kernel_state.h>
+ #include <rex/system/xtypes.h>
+ 
++namespace rex::audio { bool AfroXmaLogOn(); }
++
+ namespace rex::kernel::xboxkrnl {
+ using namespace rex::system;
+ 
+@@ -70,6 +72,9 @@ u32 XMACreateContext_entry(mapped_u32 context_out_ptr) {
+           ->xma_decoder();
+   uint32_t context_ptr = xma_decoder->AllocateContext();
+   *context_out_ptr = context_ptr;
++  if (rex::audio::AfroXmaLogOn()) {
++    REXKRNL_INFO("afro xma create -> {:08X}", context_ptr);
++  }
+   if (!context_ptr) {
+     return X_STATUS_NO_MEMORY;
+   }
+@@ -80,6 +85,14 @@ u32 XMAReleaseContext_entry(mapped_void context_ptr) {
+   auto xma_decoder =
+       static_cast<audio::AudioSystem*>(REX_KERNEL_STATE()->emulator()->audio_system())
+           ->xma_decoder();
++  if (rex::audio::AfroXmaLogOn()) {
++    XMA_CONTEXT_DATA d(context_ptr);
++    REXKRNL_INFO("afro xma release {:08X} in={}{} rd={} out_valid={} r={} w={}",
++                 context_ptr.guest_address(), (int)d.input_buffer_0_valid,
++                 (int)d.input_buffer_1_valid, (uint32_t)d.input_buffer_read_offset,
++                 (int)d.output_buffer_valid, (uint32_t)d.output_buffer_read_offset,
++                 (uint32_t)d.output_buffer_write_offset);
++  }
+   xma_decoder->ReleaseContext(context_ptr.guest_address());
+   return 0;
+ }
+@@ -187,6 +200,18 @@ u32 XMAInitializeContext_entry(mapped_void context_ptr, ppc_ptr_t<XMA_CONTEXT_IN
+   context.Store(context_ptr);
+ 
+   StoreXmaContextIndexedRegister(REX_KERNEL_STATE(), 0x1A80, context_ptr.guest_address());
++  if (rex::audio::AfroXmaLogOn()) {
++    REXKRNL_INFO("afro xma init {:08X} in0={:08X}/{} in1={:08X}/{} rd={} out={:08X}/{} sdc={} "
++                 "sr={} st={} loop={}",
++                 context_ptr.guest_address(), (uint32_t)context.input_buffer_0_ptr,
++                 (uint32_t)context.input_buffer_0_packet_count,
++                 (uint32_t)context.input_buffer_1_ptr,
++                 (uint32_t)context.input_buffer_1_packet_count,
++                 (uint32_t)context.input_buffer_read_offset, (uint32_t)context.output_buffer_ptr,
++                 (uint32_t)context.output_buffer_block_count,
++                 (uint32_t)context.subframe_decode_count, (uint32_t)context.sample_rate,
++                 (int)context.is_stereo, (uint32_t)context.loop_count);
++  }
+ 
+   return 0;
+ }
+diff --git a/src/kernel/xboxkrnl/xboxkrnl_io.cpp b/src/kernel/xboxkrnl/xboxkrnl_io.cpp
+index cce4f65..bab7236 100644
+--- a/src/kernel/xboxkrnl/xboxkrnl_io.cpp
++++ b/src/kernel/xboxkrnl/xboxkrnl_io.cpp
+@@ -29,6 +29,8 @@
+ #include <rex/system/xtypes.h>
+ #include <rex/thread/mutex.h>
+ 
++namespace rex::audio { bool AfroXmaLogOn(); }
++
+ namespace rex::kernel::xboxkrnl {
+ using namespace rex::system;
+ 
+@@ -168,6 +170,10 @@ u32 NtCreateFile_entry(mapped_u32 handle_out, u32 desired_access,
+   }
+ 
+   *handle_out = handle;
++  if (target_path.find(".xma") != std::string::npos && rex::audio::AfroXmaLogOn()) {
++    REXKRNL_INFO("afro xma open '{}' -> {:#x} handle={:#x}", target_path, (uint32_t)result,
++                 (uint32_t)handle);
++  }
+   if (XFAILED(result)) {
+     REXKRNL_IMPORT_FAIL("NtCreateFile", "path='{}' -> {:#x}", target_path, result);
+   } else {

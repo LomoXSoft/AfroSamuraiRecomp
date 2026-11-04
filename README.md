@@ -28,7 +28,7 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ## Status and limitations
-Preview (0.0.12). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
+Preview (0.0.13). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
 - Default GPU path is **RTV** (host render targets): correct image at a stable
   30 FPS. The black frames of earlier versions are fixed by the
@@ -36,8 +36,9 @@ Preview (0.0.12). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - **ROV** is still available as an optional fallback (correct image but slow,
   can drop below 15 FPS): Advanced options (`--advanced`) or
   `--render_target_path_d3d12=rov`.
-- Known issue: some voice lines in gameplay are silent or cut off (music and
-  sound effects are fine).
+- Voices work, including cinematic dialogue (fixed in 0.0.13 by the
+  `afro-xma-fix-log` runtime patch).
+- Known issue: some tutorial pop-ups advance too fast (before the voice line ends).
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -94,7 +95,9 @@ Steps:
 PE image, jump-table overrides and icon from it, runs the ReXGlue code
 generator (a few minutes, ~130 MB of generated C++) and compiles. The output is
 `app\out\build\win-amd64-release\afrorecomp.exe`. `build_gpu_plugin.bat` builds
-the patched GPU plugin (see `patches/rexglue/README.md`); recommended.
+the patched GPU plugin and the patched runtime (`rexgpu-xenos.dll` and
+`rexruntime.dll`, see `patches/rexglue/README.md`); recommended, and required for
+correct image and voices.
 
 To rebuild from scratch after updating, delete `app\generated\default` and
 `app\afro_switch_tables.toml`.
@@ -122,10 +125,10 @@ command line, e.g. `--render_target_path_d3d12=rov`.
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
-- `patches/rexglue/` – GPU plugin patches (BSD-3, see its README).
+- `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
 
 ## Plans
-- Fix the broken voice lines.
+- Fix the tutorial pop-ups that advance too fast.
 - Performance work; controller and audio polish.
 - Possibly other game versions and Linux/Vulkan.
 

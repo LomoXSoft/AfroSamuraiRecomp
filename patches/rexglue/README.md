@@ -1,4 +1,4 @@
-# ReXGlue GPU plugin patches
+# ReXGlue GPU plugin and runtime patches
 
 ## xenia-d119505.patch (backport of xenia-canary d119505, part A)
 
@@ -36,8 +36,26 @@ frame when the game skips the pass that restores it (camera cuts, combat).
 ROV is not affected. Logs once: `afro edram no-wrap: clamped ...`.
 `--afro_edram_no_wrap=false` disables it for A/B tests.
 
+## afro-xma-fix-log.patch (runtime: XMA audio decoder, `rexruntime.dll`)
+Modifies BSD-3 ReXGlue code (Copyright (c) 2026 Tom Clay; portions Copyright
+(c) 2022 Ben Vanik and Xenia project contributors) and is distributed under the
+same BSD 3-Clause license. It contains code only, no game data.
+- cvar `afro_xma_substream` (default true), our own fix: cinematic dialogue is
+  stored as multi-stream (5.1) XMA, three interleaved stereo streams with the
+  voice in the centre stream. The decoder restarted at packet 0 of every new
+  input block, so streams 1-2 decoded stream 0's packets and the centre channel
+  was lost (lines silent or cut off at camera cuts). The fix continues each
+  stream at its next packet in the next block.
+- cvar `afro_xma_fix` (default true): backport of Xenia-canary's
+  `XmaContext::Work()` loop and `output_buffer_valid` handling (only invalidate
+  the output buffer when it is really full, drain the current frame, stop on no
+  progress). Credit: Xenia-canary project contributors.
+- cvars `afro_xma_log`, `afro_xma_log_all`, `afro_xma_log_max` (default off):
+  diagnostic log of XMA context state.
+Set `--afro_xma_substream=false` / `--afro_xma_fix=false` for A/B tests.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order (skipping those already applied) to `<root>\rexglue-sdk`, builds
-only `rexgpu-xenos.dll` and copies it next to the exe (the stock DLL is kept as
-`rexgpu-xenos.dll.stock`). Re-run it after `build_win.bat`.
+only `rexgpu-xenos.dll` and `rexruntime.dll` and copies them next to the exe
+(the stock DLLs are kept as `*.dll.stock`). Re-run it after `build_win.bat`.
