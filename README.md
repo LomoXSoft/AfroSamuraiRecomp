@@ -1,4 +1,4 @@
-# afrorecomp – Afro Samurai (Xbox 360) static recompilation
+# AfroSamuraiRecomp – Afro Samurai (Xbox 360) static recompilation
 
 Unofficial, work-in-progress static recompilation of **Afro Samurai** (Xbox 360,
 Europe, title ID 4E4D07D8) to native Windows x64 using
@@ -11,11 +11,13 @@ contains code translated from the game, so everyone builds it from their own cop
 ## Contents
 - [What it is](#what-it-is)
 - [Status and limitations](#status-and-limitations)
+- [Quick start (installer)](#quick-start-installer)
 - [Requirements](#requirements)
 - [Getting your game files](#getting-your-game-files)
-- [Building](#building)
-- [Playing](#playing)
+- [Manual build](#manual-build)
+- [Playing](#playing) ([Controls](#controls), [Saves](#saves))
 - [Launcher and options](#launcher-and-options)
+- [Troubleshooting](#troubleshooting)
 - [Repository layout](#repository-layout)
 - [Plans](#plans)
 - [License and legal notice](#license-and-legal-notice)
@@ -46,70 +48,148 @@ Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - Windows x64 only for now (D3D12).
 - Expect bugs; saves and settings may change between versions.
 
+## Quick start (installer)
+1. Make an ISO of your own Afro Samurai (Europe) disc (see [Getting your game files](#getting-your-game-files)).
+2. Download [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat)
+   (right-click, *Save link as*) into an empty folder, or clone/download this repository
+   and use the `install.bat` at its root.
+3. Double-click `install.bat`. It asks for an install folder and for your ISO,
+   then does everything else.
+4. When it says `INSTALL OK`, play with the desktop shortcut or
+   `<root>\afrorecomp\tools\run_win.bat`.
+
+What the installer does (`tools/install.ps1`, run with the PowerShell execution
+policy bypassed for that process only):
+- Checks free disk space (about 20 GB) and lists your GPU (Direct3D 12 needed).
+- Verifies the ISO SHA-1 (`29394DB1854DFC59C767D768C8D35E0A08ACB73D`) and warns if it does not match.
+- Downloads a **portable** toolchain into `<root>\tools`, only from official
+  sources, each pinned and SHA-256-verified: MinGit, CMake, Ninja, LLVM/Clang
+  20.1.8, Python 3.12 (embeddable) + pycryptodome, and the MSVC compiler + Windows SDK
+  (fetched from Microsoft's Visual Studio servers with
+  [portable-msvc.py](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977);
+  you are asked to accept the Microsoft Visual Studio license).
+- Downloads the ReXGlue SDK nightly, clones the ReXGlue source at `bd833a2` and this repository,
+  extracts your disc into `<root>\gamedata`, runs both build scripts and checks the output.
+- Optionally creates desktop and Start menu shortcuts.
+
+No admin rights needed; nothing is installed system-wide (no PATH, registry or
+Visual Studio installer changes) and nothing is uploaded. Downloads are about
+1 GB of archives (LLVM alone is 900 MB), about 1 GB of MSVC/Windows SDK packages
+and about 2 GB of ReXGlue source; the whole folder ends up around 12-13 GB
+(`<root>\downloads` can be deleted afterwards). A full run took about 30 minutes on
+a fast connection with a modern CPU; expect up to 1-2 hours on slower ones.
+It shows the overall progress (e.g. `[ 42%] Step 5/14: LLVM/Clang ... (downloading ...: 312/896 MB)`)
+in the console, the window title and the log. Re-running it skips finished steps, so after an error just fix the cause and run it again.
+The log is `<root>\install.log`. To uninstall, delete the install folder (and
+the shortcuts; saves are separate, see [Saves](#saves)).
+
+Command-line options (`install.bat -Option value`): `-Root <dir>`, `-Iso <file>`,
+`-AcceptMsvcLicense`, `-Shortcut yes|no`, `-Ref <branch|tag>`. Advanced:
+`-GameDataDir <dir>` uses an already extracted disc folder (containing `default.xex`)
+instead of an ISO.
+
 ## Requirements
-- Windows 10/11 x64, a D3D12 GPU.
+- Windows 10/11 x64, a GPU with Direct3D 12 and current drivers.
 - Original Afro Samurai disc (Europe) and a way to make an ISO of it.
-- ~10 GB free disk space.
-- Toolchain (on PATH, or portable copies under `<root>\tools`, see below):
-  - Visual Studio 2022 Build Tools (MSVC + Windows SDK) – run the build from a
-    "x64 Native Tools" prompt, or put a portable MSVC in `<root>\tools\msvc` with `setup_x64.bat`.
-  - LLVM/Clang 20 (`clang++`), CMake ≥ 3.25, Ninja, Git.
-  - Python 3 with pycryptodome: `python -m pip install pycryptodome`
-    (or inside a virtual environment: `python -m venv <root>\venv` and run the
-    build from a prompt where `<root>\venv\Scripts\activate` was called).
+- About 20 GB free disk space (the finished install uses about 12-13 GB).
+- A controller (see [Controls](#controls)).
+- For a manual build only (the installer downloads all of this):
+  - MSVC + Windows SDK: Visual Studio 2022 Build Tools ("Desktop development with C++"),
+    run from an "x64 Native Tools Command Prompt", or a portable MSVC in
+    `<root>\tools\msvc` with `setup_x64.bat` (as produced by portable-msvc.py).
+  - LLVM/Clang 20 (`clang++`), CMake >= 3.25, Ninja, Git.
+  - Python 3.8 or newer with pycryptodome: `python -m pip install pycryptodome`.
+  - Each of these can be on PATH or portable under `<root>\tools`
+    (`git\cmd`, `llvm\bin`, `cmake\bin`, `ninja`, `python`, `msvc`); portable copies win.
 - ReXGlue SDK nightly **0.10.0.24-dev.gbd833a2** (prebuilt) and the ReXGlue
   source at the same commit.
 
 ## Getting your game files
-1. Make an ISO of your own disc (e.g. with a compatible drive and dumping tool).
-2. Create a root folder, e.g. `C:\afro`, and extract the whole disc into
-   `C:\afro\gamedata`:
+Only the Europe disc is supported (Redump 17884, ISO SHA-1
+`29394DB1854DFC59C767D768C8D35E0A08ACB73D`). Make the ISO from your own disc,
+for example with a DVD drive that can read Xbox 360 discs and a disc dumping
+tool, or from a backup of your own disc that you made with your console.
+Check the SHA-1 with `certutil -hashfile "Afro Samurai.iso" SHA1`.
+This project does not help with obtaining the game in any other way.
+Never share the ISO, the extracted files or anything generated from them.
 
-       python tools\xiso_extract.py "Afro Samurai.iso" C:\afro\gamedata /
+## Manual build
+Folder layout (`<root>` = e.g. `C:\afro`; avoid spaces and non-ASCII characters in it):
 
-   `gamedata\default.xex` must exist afterwards.
-
-Never share these files or anything generated from them.
-
-## Building
-Folder layout (`<root>` = e.g. `C:\afro`):
-
-    <root>\afrorecomp      this repository (cloned into a folder named afrorecomp)
+    <root>\afrorecomp      this repository (any folder name works)
     <root>\sdk\win-amd64   ReXGlue SDK nightly (bin\rexglue.exe inside)
     <root>\rexglue-sdk     ReXGlue source at bd833a2
-    <root>\gamedata        your extracted disc
-    <root>\tools           optional portable toolchain (msvc, llvm, git)
+    <root>\gamedata        your extracted disc (default.xex inside)
+    <root>\tools           optional portable toolchain
 
-Steps:
+1. Open a command prompt (the "x64 Native Tools" one if you use Visual Studio Build Tools) and create the root:
 
-    cd C:\afro
-    git clone https://github.com/LomoXSoft/AfroSamuraiRecomp.git afrorecomp
-    rem SDK: download rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip from
-    rem https://github.com/rexglue/rexglue-sdk/releases/tag/nightly-20261002-bd833a2a
-    rem and extract it so that C:\afro\sdk\win-amd64\bin\rexglue.exe exists.
-    git clone --recurse-submodules https://github.com/rexglue/rexglue-sdk.git rexglue-sdk
-    cd rexglue-sdk && git checkout bd833a2 && git submodule update --init --recursive && cd ..
-    cd afrorecomp
-    tools\build_win.bat
-    tools\build_gpu_plugin.bat
+       mkdir C:\afro
+       cd /d C:\afro
+
+2. Clone this repository:
+
+       git clone https://github.com/LomoXSoft/AfroSamuraiRecomp.git afrorecomp
+
+3. Download `rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip` from
+   <https://github.com/rexglue/rexglue-sdk/releases/tag/nightly-20261002-bd833a2a>
+   and extract it so that `C:\afro\sdk\win-amd64\bin\rexglue.exe` exists.
+4. Clone the ReXGlue source at the same commit (a few GB with submodules):
+
+       git clone https://github.com/rexglue/rexglue-sdk.git rexglue-sdk
+       cd rexglue-sdk
+       git checkout bd833a2
+       git submodule update --init --recursive
+       cd ..
+
+5. Extract your disc into `C:\afro\gamedata` (takes a few minutes):
+
+       python afrorecomp\tools\xiso_extract.py "D:\path\to\Afro Samurai.iso" C:\afro\gamedata /
+
+   `C:\afro\gamedata\default.xex` must exist afterwards.
+6. Build the game and then the patched GPU plugin and runtime:
+
+       cd afrorecomp
+       tools\build_win.bat
+       tools\build_gpu_plugin.bat
+
+   Both end with `BUILD OK` and `GPU PLUGIN + RUNTIME OK`.
 
 `build_win.bat` copies your `default.xex`, extracts (privately, gitignored) the
 PE image, jump-table overrides and icon from it, runs the ReXGlue code
-generator (a few minutes, ~130 MB of generated C++) and compiles. The output is
-`app\out\build\win-amd64-release\afrorecomp.exe`. `build_gpu_plugin.bat` builds
-the patched GPU plugin and the patched runtime (`rexgpu-xenos.dll` and
-`rexruntime.dll`, see `patches/rexglue/README.md`); recommended, and required for
-correct image and voices.
+generator (a few minutes, ~130 MB of generated C++, log in `<root>\codegen_win.log`)
+and compiles. The output is
+`app\out\build\win-amd64-release\afrorecomp.exe`. `build_gpu_plugin.bat` applies
+`patches\rexglue\*.patch` to `<root>\rexglue-sdk` and builds the patched
+`rexgpu-xenos.dll` and `rexruntime.dll` next to the exe (see `patches/rexglue/README.md`);
+it is required for a correct image and voices.
 
-To rebuild from scratch after updating, delete `app\generated\default` and
-`app\afro_switch_tables.toml`.
+To update: `git pull` in `afrorecomp`, then run both scripts again. To rebuild
+from scratch, also delete `app\generated\default` and `app\afro_switch_tables.toml`.
 
 ## Playing
 
     tools\run_win.bat
 
-Runs the game with `gamedata` from `<root>` and writes `<root>\afro.log`.
+Run it from the `afrorecomp` folder (or use the installer's shortcut). It starts
+the game with `<root>\gamedata` and writes the log to `<root>\afro.log`.
 Hold **Shift** while starting to show the launcher again.
+
+### Controls
+An Xbox controller or any other controller SDL recognises (XInput, DualShock/DualSense,
+etc.) works out of the box; the game was designed for a gamepad and prompts show
+Xbox buttons. Keyboard and mouse are **not** enabled by default. There is
+experimental keyboard emulation of a controller from ReXGlue, untested with this game:
+start with `tools\run_win.bat --mnk_mode=true` (WASD = left stick, arrow keys = right stick,
+Space = A, Backspace = B, L = X, P = Y, Q/E = triggers, 1/3 = bumpers, Enter = Start,
+Tab = Back, Shift+arrows = D-pad).
+
+### Saves
+Saves are stored in your Documents folder, in `Documents\afrorecomp\` (the save
+itself is under `<profile id>\4E4D07D8\00000001\AFRO_0.SAV`; the shader cache is in
+`Documents\afrorecomp\cache`). To back them up, copy the whole
+`Documents\afrorecomp` folder while the game is closed; to restore, copy it back.
+Deleting or rebuilding the install folder does not touch your saves.
 
 ## Launcher and options
 The launcher (shown on first run, after each update, or with Shift) offers:
@@ -126,9 +206,43 @@ to show the "Advanced options..." button (render path, resolve readback, game
 effect toggles, GPU diagnostics). Any ReXGlue cvar can also be passed on the
 command line, e.g. `--render_target_path_d3d12=rov`.
 
+## Troubleshooting
+- **`xex_to_pe.py needs pycryptodome`**: run `python -m pip install pycryptodome`
+  with the same `python` the build uses (`where python`). The installer's portable Python already has it.
+- **`clang++ not found` / `cmake not found` / `ninja not found`**: the tool is neither
+  on PATH nor under `<root>\tools`. Install it, use the installer, or check the folder names in the layout above.
+- **`PATCH FAILED: <name>.patch`** in `build_gpu_plugin.bat`: the patches are applied
+  to `<root>\rexglue-sdk` in name order and stamped in `rexglue-sdk\.git\afro-patches`,
+  so re-running is safe. A failure usually means the ReXGlue source is not at `bd833a2`
+  or was modified. Reset it with `git -C <root>\rexglue-sdk checkout -f bd833a2`,
+  `git -C <root>\rexglue-sdk clean -fd src include` and delete `.git\afro-patches`, then run the script again.
+- **`CODEGEN FAILED`**: see `<root>\codegen_win.log`. Usually `gamedata\default.xex`
+  is not from the Europe disc or the extraction was incomplete.
+- **Black screen, black frames or broken image**: make sure `build_gpu_plugin.bat`
+  ran after the last `build_win.bat` and printed `GPU PLUGIN + RUNTIME OK`, and update the GPU driver.
+  As a fallback, try the ROV path: `tools\run_win.bat --render_target_path_d3d12=rov` (slower).
+- **No voices in cutscenes or no sound**: the patched `rexruntime.dll` is missing
+  (run `build_gpu_plugin.bat` again). Check that Windows' default audio output is the device you expect.
+- **Game does not start / crashes**: look at the end of `<root>\afro.log`.
+
+### Getting a log
+Every run writes `<root>\afro.log` (overwritten each time, so copy it right after the problem).
+Useful extra flags for `tools\run_win.bat`:
+- `--afro_xma_log=true` – audio (XMA) decoding details, for sound or voice problems.
+- `--afro_perf_log=true` – per-second performance counters, for FPS drops.
+
+### Reporting an issue
+Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with:
+the version or commit (`git -C <root>\afrorecomp log -1 --oneline`), your Windows version,
+GPU and driver, what you did and what happened (a screenshot helps), and `afro.log`
+(and `install.log` or the build output for build problems).
+**Never attach game files**: no ISO, `default.xex`, `default.pe`, `gamedata` contents,
+`app\assets`, `app\generated` or anything else extracted from the disc.
+
 ## Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
+- `install.bat`, `tools/install.ps1` – one-click installer.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
 - `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
