@@ -1,5 +1,158 @@
 # Mid-asm hooks (src/frame_pacing.cpp). Addresses only, no game data.
-# Before the D3D Swap's call to VdSwap: count guest frames and optionally pace them.
 [[midasm_hook]]
 address = 0x8236D74C
 name = "AfroSwapHook"
+registers = ["r31"]
+
+[[midasm_hook]]
+address = 0x82333790
+name = "AfroPresentIntervalHook"
+registers = ["r11"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x8233375C
+name = "AfroPresentIntervalHook2"
+registers = ["r11"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x8235E864
+name = "AfroPresentBitHook"
+registers = ["r10"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x8236CE10
+name = "AfroPresentIntervalConsumeHook"
+registers = ["r29"]
+after_instruction = true
+
+# Experimental (60): primary sim dt 0x828B1C04 only (NOT 1BF0 measured, NOT 1C08
+# which is sometimes a 1.0 time-scale — forcing it caused ~4x with const patches).
+[[midasm_hook]]
+address = 0x826A0D0C
+name = "AfroDtStore1C04a"
+registers = ["r28", "f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826A0DC8
+name = "AfroDtStore1C04b"
+registers = ["r28", "f31"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826A0E2C
+name = "AfroDtStore1C04c"
+registers = ["r28", "f31"]
+after_instruction = true
+
+# Constant pool 1/30 (0x820EB774) -> 1/60. Needed so per-present anim/cutscene
+# steps and frame→time conversions stay at wall-clock speed at 60 presents.
+# (92f93d1 left these alone → intro still too fast; do NOT also force 1C08.)
+
+[[midasm_hook]]
+address = 0x82676350
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826D5DD0
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826DE0F0
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826F2B10
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826F3418
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826F3620
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826F36C4
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826F3780
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x826F3844
+name = "AfroDt30_f0"
+registers = ["f0"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x82663264
+name = "AfroDt30_f1"
+registers = ["f1"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x827174D8
+name = "AfroDt30_f1"
+registers = ["f1"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x8271757C
+name = "AfroDt30_f1"
+registers = ["f1"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x8265CDF8
+name = "AfroDt30_f31"
+registers = ["f31"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x8265CF74
+name = "AfroDt30_f31"
+registers = ["f31"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x8272A860
+name = "AfroDt30_f31"
+registers = ["f31"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x82373AE4
+name = "AfroDt30_f9"
+registers = ["f9"]
+after_instruction = true
+
+# Diagnostic: Ent timeType converter (sub_82676300). mode0=*1/30 (frameIn30hz),
+# mode1=*1/60, mode2=raw. Logs once per mode + counts in afro fps line.
+# Used to see whether intro cutscenes go through frame→time (vs pure frame-index).
+[[midasm_hook]]
+address = 0x82676314
+name = "AfroCineTimeConvertHook"
+registers = ["r11", "f31"]
+after_instruction = true

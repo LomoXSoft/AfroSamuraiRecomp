@@ -1,0 +1,69 @@
+name: Bug or Experimental 60 feedback
+description: Report a bug or Experimental (60) test result. Attach afro.log after a privacy check. No game files.
+title: "[bug] "
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping. **Do not attach** ISO, `gamedata`, `default.xex`/`default.pe`, saves, or other game data unless a maintainer asks.
+        Review `afro.log` for paths you want to redact before uploading.
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Frame rate mode
+      options:
+        - Original (30)
+        - Experimental (60)
+        - Not sure / mixed
+    validations:
+      required: true
+  - type: input
+    id: resolution
+    attributes:
+      label: Internal resolution
+      description: Launcher value (1x / 2x / 3x) or `resolution_scale` if set on the command line.
+      placeholder: "1x (720p)"
+    validations:
+      required: true
+  - type: input
+    id: cpu_gpu
+    attributes:
+      label: CPU / GPU (and GPU driver if known)
+      placeholder: "e.g. Ryzen 7 … / Radeon RX … (driver …)"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "e.g. Windows 11 23H2"
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Cutscene / location
+      description: Where it happened (intro, named cutscene, level, menu, …).
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: What you did, what you expected, what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Build version / commit
+      description: App version from the launcher title (afrorecomp_v…) and/or `git log -1 --oneline` from the source checkout if you have one.
+      placeholder: "0.0.16 / <sha>"
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Attach **`afro.log`** (and `install.log` only for install failures) using the issue attachment UI.
+        Log locations: installer/`Play.bat` → `<install-root>\afro.log`; `tools\run_win.bat` → checkout root `afro.log` (folder that contains `app\` and `tools\`).

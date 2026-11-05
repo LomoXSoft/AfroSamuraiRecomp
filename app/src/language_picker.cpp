@@ -100,7 +100,7 @@ const AdvItem kAdv[] = {
 };
 constexpr int kAdvN = sizeof(kAdv) / sizeof(kAdv[0]);
 
-struct Options { int fps = 0; int sepia = 0; /* 0 on, 1 off */ bool window = false; int scale = 1; int adv[kAdvN] = {}; };
+struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ bool window = false; int scale = 1; int adv[kAdvN] = {}; };
 
 // GPU-plugin cvars (rexgpu-xenos.dll) are registered only when the plugin is
 // loaded, after the launcher runs, and SetFlagByName rejects unknown names.
@@ -129,27 +129,27 @@ bool Explicit(const char* name) {
 
 #ifdef _WIN32
 // Launcher window: options grouped so more can be added later (one row each).
-struct UiText { const wchar_t *title, *lang, *remember, *hint, *play, *fps, *fps_orig, *disp, *full, *win, *scale, *adv, *def, *off, *ok, *on, *xbtn, *xwarn, *sepia, *sepia_on, *sepia_off; };
+struct UiText { const wchar_t *title, *lang, *remember, *hint, *play, *fps, *fps_orig, *fps_exp, *disp, *full, *win, *scale, *adv, *def, *off, *ok, *on, *xbtn, *xwarn, *sepia, *sepia_on, *sepia_off; };
 const UiText kText[] = {
     {L"afrorecomp_v" AFRO_VERSION_W L" - Launcher", L"Language:", L"Remember and don't ask again",
      L"Hold Shift at launch to show this window again.", L"Play",
-     L"Frame rate:", L"Original (30 capped)", L"Display:", L"Fullscreen", L"Window", L"Internal resolution:", L"Advanced options...", L"Default", L"Off", L"OK", L"On",
-     L"Advanced settings (experimental)...", L"Warning: these settings are experimental and not fully tested. The game runs at a fixed 30 FPS; the FPS cap may not behave as expected.",
+     L"Frame rate:", L"Original (30)", L"Experimental (60)", L"Display:", L"Fullscreen", L"Window", L"Internal resolution:", L"Advanced options...", L"Default", L"Off", L"OK", L"On",
+     L"Advanced settings (experimental)...", L"Warning: Experimental (60) is incomplete and opt-in. Intro/cinematics may run too fast; other timing may be wrong. Prefer Original (30) unless testing.",
      L"Sepia filter:", L"On (original)", L"Off"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanzador", L"Idioma:", L"Recordar y no volver a preguntar",
      L"Mant\u00e9n May\u00fas al iniciar para volver a ver esta ventana.", L"Jugar",
-     L"Fotogramas:", L"Original (30 capados)", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resoluci\u00f3n interna:", L"Opciones avanzadas...", L"Por defecto", L"Desactivado", L"Aceptar", L"Activado",
-     L"Ajustes avanzados (experimental)...", L"Atenci\u00f3n: estos ajustes son experimentales y no est\u00e1n probados del todo. El juego funciona a 30 FPS fijos; el l\u00edmite de FPS puede no comportarse como se espera.",
+     L"Fotogramas:", L"Original (30)", L"Experimental (60)", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resoluci\u00f3n interna:", L"Opciones avanzadas...", L"Por defecto", L"Desactivado", L"Aceptar", L"Activado",
+     L"Ajustes avanzados (experimental)...", L"Atenci\u00f3n: Experimental (60) est\u00e1 incompleto y es opcional. La intro/cinem\u00e1ticas pueden ir demasiado r\u00e1pido; otros tiempos pueden fallar. Prefiere Original (30) salvo para pruebas.",
      L"Filtro sepia:", L"Activado (original)", L"Desactivado"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanceur", L"Langue :", L"M\u00e9moriser et ne plus demander",
      L"Maintenez Maj au d\u00e9marrage pour revoir cette fen\u00eatre.", L"Jouer",
-     L"Images/s :", L"Original (limit\u00e9 \u00e0 30)", L"Affichage :", L"Plein \u00e9cran", L"Fen\u00eatre", L"R\u00e9solution interne :", L"Options avanc\u00e9es...", L"Par d\u00e9faut", L"D\u00e9sactiv\u00e9", L"OK", L"Activ\u00e9",
-     L"R\u00e9glages avanc\u00e9s (exp\u00e9rimental)...", L"Attention : ces r\u00e9glages sont exp\u00e9rimentaux et pas enti\u00e8rement test\u00e9s. Le jeu tourne \u00e0 30 FPS fixes ; la limite de FPS peut ne pas se comporter comme pr\u00e9vu.",
+     L"Images/s :", L"Original (30)", L"Experimental (60)", L"Affichage :", L"Plein \u00e9cran", L"Fen\u00eatre", L"R\u00e9solution interne :", L"Options avanc\u00e9es...", L"Par d\u00e9faut", L"D\u00e9sactiv\u00e9", L"OK", L"Activ\u00e9",
+     L"R\u00e9glages avanc\u00e9s (exp\u00e9rimental)...", L"Attention : Experimental (60) est incomplet et optionnel. L\u2019intro/les cin\u00e9matiques peuvent aller trop vite ; d\u2019autres timings peuvent \u00eatre incorrects. Pr\u00e9f\u00e9rez Original (30) sauf pour tester.",
      L"Filtre s\u00e9pia :", L"Activ\u00e9 (original)", L"D\u00e9sactiv\u00e9"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Avvio", L"Lingua:", L"Ricorda e non chiedere pi\u00f9",
      L"Tieni premuto Maiusc all'avvio per rivedere questa finestra.", L"Gioca",
-     L"Fotogrammi:", L"Originale (limitato a 30)", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:", L"Opzioni avanzate...", L"Predefinito", L"Disattivato", L"OK", L"Attivato",
-     L"Impostazioni avanzate (sperimentale)...", L"Attenzione: queste impostazioni sono sperimentali e non del tutto testate. Il gioco gira a 30 FPS fissi; il limite di FPS potrebbe non comportarsi come previsto.",
+     L"Fotogrammi:", L"Originale (30)", L"Sperimentale (60)", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:", L"Opzioni avanzate...", L"Predefinito", L"Disattivato", L"OK", L"Attivato",
+     L"Impostazioni avanzate (sperimentale)...", L"Attenzione: Sperimentale (60) e incompleto e opzionale. Intro/cinematiche possono andare troppo veloci; altri timing possono essere errati. Preferisci Originale (30) salvo per i test.",
      L"Filtro seppia:", L"Attivato (originale)", L"Disattivato"},
 };
 constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
@@ -158,7 +158,7 @@ constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
               kIdAdvBtn = 111, kIdXBtn = 112, kIdXWarn = 113, kIdXSepiaLbl = 114,
               kIdXSepia = 115, kIdSavesBtn = 116, kIdAdvBase = 200;
 
-constexpr int kFpsValues[] = {0, 30, 60};
+constexpr int kFpsValues[] = {0, 60};  // Original (30), Experimental (60)
 struct PickState { int sel = 0; bool remember = false; bool done = false; bool play = false; Options opt; };
 
 void FillCombo(HWND h, int id, std::initializer_list<const wchar_t*> items) {
@@ -326,7 +326,7 @@ LRESULT CALLBACK XProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   if ((m == WM_COMMAND && (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL)) || m == WM_CLOSE) {
     if (LOWORD(w) == IDOK && m == WM_COMMAND) {
       int fi = static_cast<int>(SendDlgItemMessageW(h, kIdFps, CB_GETCURSEL, 0, 0));
-      st->opt->fps = kFpsValues[std::clamp(fi, 0, 2)];
+      st->opt->fps = kFpsValues[std::clamp(fi, 0, 1)];
       st->opt->sepia = SendDlgItemMessageW(h, kIdXSepia, CB_GETCURSEL, 0, 0) == 1 ? 1 : 0;
     }
     st->done = true;
@@ -337,7 +337,7 @@ LRESULT CALLBACK XProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 }
 
 // Modal "Advanced settings (experimental)" window: user-facing, always available.
-// Only FPS cap and sepia filter; saved only when "Remember" is ticked.
+// Original (30) / Experimental (60) + sepia; saved only when "Remember" is ticked.
 void ShowExperimental(HWND owner, int sel, Options* o) {
   const UiText& t = kText[sel];
   HINSTANCE inst = GetModuleHandleW(nullptr);
@@ -375,8 +375,9 @@ void ShowExperimental(HWND owner, int sel, Options* o) {
   mk(L"STATIC", t.xwarn, SS_SUNKEN, 16, 14, 388, 68, kIdXWarn);
   mk(L"STATIC", t.fps, SS_CENTERIMAGE, 16, 98, 180, 26, 0);
   HWND fps = mk(L"COMBOBOX", L"", cbs, 204, 98, 200, 200, kIdFps);
-  for (auto* i : {t.fps_orig, L"30", L"60"}) SendMessageW(fps, CB_ADDSTRING, 0, (LPARAM)i);
-  SendMessageW(fps, CB_SETCURSEL, o->fps == 30 ? 1 : o->fps == 60 ? 2 : 0, 0);
+  SendMessageW(fps, CB_ADDSTRING, 0, (LPARAM)t.fps_orig);
+  SendMessageW(fps, CB_ADDSTRING, 0, (LPARAM)t.fps_exp);
+  SendMessageW(fps, CB_SETCURSEL, o->fps == 60 ? 1 : 0, 0);
   mk(L"STATIC", t.sepia, SS_CENTERIMAGE, 16, 136, 180, 26, kIdXSepiaLbl);
   HWND sep = mk(L"COMBOBOX", L"", cbs, 204, 136, 200, 200, kIdXSepia);
   SendMessageW(sep, CB_ADDSTRING, 0, (LPARAM)t.sepia_on);
@@ -797,11 +798,17 @@ unsigned ApplyStartupLanguage() {
     }
   }
   if (!Valid(lang)) { lang = 0; ask = true; }
+  // Pre-0.0.16: fps=30/60 was only a host cap on still-30 gameplay. Never promote
+  // those saves to Experimental (60). Only fps=60 saved under 0.0.16+ stays.
+  {
+    const bool pre_016 = seen_version.empty() || seen_version < std::string("0.0.16");
+    if (pre_016 || opt.fps != 60) opt.fps = 0;
+  }
   // Internal resolution defaults to native (1x); a saved scale is only kept
   // when "Remember" was ticked (ask=0).
   const int saved_scale = opt.scale;
   if (ask) opt.scale = 1;
-  // Same for the frame rate: default "Original (30 capped)" = no host cap.
+  // Same for the frame rate: default Original (30) = present interval 2, no host cap.
   const int saved_fps = opt.fps;
   if (ask) opt.fps = 0;
   // Without --advanced, saved diagnostic options are ignored (safe defaults).
@@ -847,9 +854,14 @@ unsigned ApplyStartupLanguage() {
 #endif
   if (!lang) lang = 1;
   // Command-line / toml values win over the launcher.
-  // Original (0) passes no override: the game keeps its own 30 FPS pacing.
-  if (opt.fps > 0 && !Explicit("afro_fps_cap"))
-    SetCvar("afro_fps_cap", std::to_string(opt.fps));
+  // Original (0): leave afro_present_interval at default 2, no host cap.
+  // Experimental (60): present interval 1 + host cap 60 (incomplete; opt-in).
+  if (opt.fps == 60) {
+    if (!Explicit("afro_present_interval"))
+      SetCvar("afro_present_interval", "1");
+    if (!Explicit("afro_fps_cap"))
+      SetCvar("afro_fps_cap", "60");
+  }
   if (opt.sepia && !Explicit("afro_fx_sepia"))
     SetCvar("afro_fx_sepia", "false");
   if (!Explicit("fullscreen"))

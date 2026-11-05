@@ -2,6 +2,26 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.0.16 – Experimental (60) FPS opt-in (incomplete)
+- Launcher Advanced settings: frame rate is now **Original (30)** (default) or
+  **Experimental (60)** only. The old host-only 30/60 cap choices and any
+  unmapped tick-mode selector are gone.
+- Experimental (60) sets `afro_present_interval=1` and a host cap of 60, and
+  enables gated guest dt / 1/30→1/60 const hooks. **Original leaves the default
+  present interval (2) and does not apply those Experimental dt/const patches.**
+- Bounded FPS/dt/present-interval log lines (~2s) to help testers; no game-data
+  dumps. `afro_fps_log` still defaults on.
+- `tools/build_win.bat` regenerates ReXGlue codegen when `afro_hooks.toml`
+  changes (needed for mid-asm hooks on update/rebuild).
+- Installer / portable source builds pick this up when the GitHub revision
+  updates (re-run `install.bat` / rebuild).
+- **Not claimed fixed:** intro and cutscenes can still run too fast at 60;
+  other gameplay / Focus / combat timing is unverified. Prefer Original (30)
+  unless you are testing. See README Known issues and the tester guide.
+- Pre-0.0.16 remembered FPS values are treated as Original (they were only a
+  host cap on still-30 gameplay). Choose Experimental (60) explicitly after
+  updating.
+
 ## 0.0.15 – one-click installer
 - New `install.bat` (+ `tools/install.ps1`): language first (en/es/fr/it), all
   questions up front, then unattended with total % progress. Portable toolchain

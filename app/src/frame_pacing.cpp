@@ -1,5 +1,6 @@
 // Guest frame counter + optional frame cap, driven by AfroSwapHook (afro_hooks.toml),
 // which runs right before the game's D3D Swap calls VdSwap (once per guest frame).
+// Present-interval / Experimental dt hooks also live here (see afro_hooks.toml).
 #include "frame_pacing.h"
 
 #include <atomic>
@@ -9,19 +10,23 @@
 
 #include <rex/cvar.h>
 #include <rex/logging.h>
+#include <rex/memory/utils.h>
+#include <rex/ppc/context.h>
 #include <rex/system/kernel_state.h>
 
 #include <cmath>
 #include <cstring>
+#include <cstdint>
 #include <string>
 
 REXCVAR_DEFINE_INT32(afro_fps_cap, 0, "Afro",
                      "Guest frame cap in FPS (0 = off, the game's own pacing)");
-REXCVAR_DEFINE_BOOL(afro_fps_log, true, "Afro", "Log guest FPS every 5 seconds");
+REXCVAR_DEFINE_BOOL(afro_fps_log, true, "Afro",
+                    "Log guest FPS / dt / present interval every ~2 seconds");
 
-// Diagnostics for the black-screen bug: the game's own debug-menu switches for
-// its fullscreen effects (found via the "Graphics|Fullscreen Effects|..." menu
-// registration at 0x826B8xxx; each setter is "stb r3,<addr>"). false = force off.
+REXCVAR_DEFINE_INT32(afro_present_interval, 2, "Afro",
+                     "Guest D3D present interval (2 = original 30 FPS, 1 = unlocked ~60)");
+
 REXCVAR_DEFINE_BOOL(afro_fx_dof, true, "Afro", "Game fullscreen effect: depth of field");
 REXCVAR_DEFINE_BOOL(afro_fx_bloom, true, "Afro", "Game fullscreen effect: bloom");
 REXCVAR_DEFINE_BOOL(afro_fx_sepia, true, "Afro", "Game fullscreen effect: sepia");
@@ -38,12 +43,50 @@ const FxFlag kFx[] = {
     {"blood", 0x828B0D1B, [] { return (bool)REXCVAR_GET(afro_fx_blood); }},
     {"focus", 0x828B0E94, [] { return (bool)REXCVAR_GET(afro_fx_focus); }},
 };
-// Blood effect runtime state (sub_826FC508): active byte, level mask, params.
 constexpr uint32_t kBloodActive = 0x828B0E8F, kBloodMask = 0x828B0EA0,
                    kBloodParams = 0x828B0D20 + 172;
+
+// Guest timing globals written by sub_826A0AE8:
+//   0x828B1C04 = primary sim dt (fixed-step feed for movement) — safe to force to 1/60
+//   0x828B1BF0 = measured frame dt — leave alone
+//   0x828B1C08 = sometimes a copy of measured dt, sometimes 1.0 time-scale — NEVER force
+constexpr uint32_t kDtAddr = 0x828B1C04;
+constexpr uint32_t kDtMeasuredAddr = 0x828B1BF0;
+constexpr uint32_t kDtScaleAddr = 0x828B1C08;
+constexpr float kDt30 = 1.f / 30.f;
+constexpr float kDt60 = 1.f / 60.f;
+
 std::string g_fx_last;
 
-uint32_t BE32(const uint8_t* p) { return (uint32_t(p[0]) << 24) | (p[1] << 16) | (p[2] << 8) | p[3]; }
+uint32_t BE32(const uint8_t* p) {
+  return (uint32_t(p[0]) << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+}
+
+float ReadGuestFloat(uint32_t addr) {
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return 0.f;
+  const uint32_t u = rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(addr));
+  float f;
+  std::memcpy(&f, &u, 4);
+  return f;
+}
+
+void WriteGuestFloat(uint32_t addr, float f) {
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  uint32_t u;
+  std::memcpy(&u, &f, 4);
+  rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(addr), u);
+}
+
+int ClampedPresentInterval() {
+  int v = REXCVAR_GET(afro_present_interval);
+  if (v < 1) v = 1;
+  if (v > 4) v = 4;
+  return v;
+}
+
+bool Experimental60() { return ClampedPresentInterval() == 1; }
 
 void FxTick() {
   if (!rex::system::kernel_state()) return;
@@ -51,7 +94,7 @@ void FxTick() {
   if (!mem) return;
   auto at = [&](uint32_t a) { return mem->TranslateVirtual<uint8_t*>(a); };
   static bool reported = false;
-  if (!reported) {  // once: which effects are forced off (launcher / command line)
+  if (!reported) {
     reported = true;
     std::string off;
     for (auto& f : kFx) if (!f.on()) off += std::string(f.name) + " ";
@@ -68,9 +111,12 @@ void FxTick() {
   bool bad = false;
   for (int i = 0; i < 13; ++i) {
     uint32_t u = BE32(at(kBloodParams + i * 4));
-    float f; std::memcpy(&f, &u, 4);
+    float f;
+    std::memcpy(&f, &u, 4);
     if (!std::isfinite(f)) bad = true;
-    char buf[24]; std::snprintf(buf, sizeof buf, "%g,", f); st += buf;
+    char buf[24];
+    std::snprintf(buf, sizeof buf, "%g,", f);
+    st += buf;
   }
   if (bad) st += " NONFINITE";
   if (REXCVAR_GET(afro_fx_log) && st != g_fx_last) {
@@ -82,22 +128,148 @@ void FxTick() {
 using clk = std::chrono::steady_clock;
 std::mutex g_mu;
 uint64_t g_frames = 0;
-clk::time_point g_next;        // limiter deadline
-clk::time_point g_win_start;   // stats window
+clk::time_point g_next;
+clk::time_point g_win_start;
 uint64_t g_win_frames = 0;
 double g_fps = 0, g_ft_ms = 0;
 clk::time_point g_last;
+std::atomic<int> g_seen_interval{-1};
+std::atomic<int> g_dt_feed_logged{0};
+// sub_82676300 timeType convert: mode0=*1/30, mode1=*1/60, mode2=passthrough, 3/4=other
+std::atomic<uint64_t> g_cine_mode_counts[5]{};
+
+// Experimental: primary sim dt at 0x828B1C04 + 1/30 const→1/60 loads.
+// feb8ba6 also forced 1BF0/1C08 (1C08 is sometimes 1.0 scale) → ~4x cutscenes.
+// 92f93d1 dropped const rewrites → intro still too fast (per-present 1/30 steps).
+void ForceExperimentalPrimaryDt() {
+  if (!Experimental60()) return;
+  if (!rex::system::kernel_state()) return;
+  WriteGuestFloat(kDtAddr, kDt60);
+  if (g_dt_feed_logged.exchange(1) == 0) {
+    REXLOG_INFO(
+        "afro dt: Experimental feed {:.6f}s (1/60) -> 0x828B1C04 only "
+        "(1BF0 measured + 1C08 scale untouched; 1/30 const loads -> 1/60 for anim/cutscene)",
+        kDt60);
+  }
+}
+
+void ForceDevicePresentInterval(uint32_t device) {
+  if (device < 0x1000) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  const int v = ClampedPresentInterval();
+  rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(device + 0x3c),
+                                        static_cast<uint32_t>(v));
+  if (v == 1) {
+    const uint32_t flags6c =
+        rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(device + 0x6c));
+    if (flags6c & 0x200)
+      rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(device + 0x6c),
+                                            flags6c & ~uint32_t(0x200));
+  }
+  const int prev = g_seen_interval.load(std::memory_order_relaxed);
+  g_seen_interval.store(v, std::memory_order_relaxed);
+  if (prev < 0) {
+    const uint32_t flags6c =
+        rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(device + 0x6c));
+    REXLOG_INFO(
+        "afro present: device+0x3c interval={} (cvar afro_present_interval={}) "
+        "device+0x6c=0x{:08X} bit0x200={} (forced each Swap)",
+        v, REXCVAR_GET(afro_present_interval), flags6c, (flags6c & 0x200) ? 1 : 0);
+  }
+}
+
+void PatchPrimaryDtStore(PPCRegister& base, PPCRegister& f, int32_t offset) {
+  if (!Experimental60()) return;
+  // Only the primary sim-dt slot (7172 == 0x1C04).
+  if (offset != 7172) return;
+  f.f64 = double(kDt60);
+  if (base.u32 < 0x1000) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  uint32_t u;
+  std::memcpy(&u, &kDt60, 4);
+  rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(base.u32 + offset), u);
+  ForceExperimentalPrimaryDt();
+}
 }  // namespace
 
-void AfroSwapHook() {
+void AfroPresentIntervalHook(PPCRegister& r11) {
+  r11.u64 = static_cast<uint64_t>(ClampedPresentInterval());
+}
+
+void AfroPresentIntervalHook2(PPCRegister& r11) {
+  r11.u64 = static_cast<uint64_t>(ClampedPresentInterval());
+}
+
+void AfroPresentBitHook(PPCRegister& r10) {
+  if (REXCVAR_GET(afro_present_interval) == 1)
+    r10.u64 = r10.u32 & ~uint32_t(0x200);
+}
+
+void AfroPresentIntervalConsumeHook(PPCRegister& r29) {
+  const int v = ClampedPresentInterval();
+  r29.u64 = static_cast<uint64_t>(v);
+  g_seen_interval.store(v, std::memory_order_relaxed);
+}
+
+void AfroDtStore1C04a(PPCRegister& r28, PPCRegister& f0) { PatchPrimaryDtStore(r28, f0, 7172); }
+void AfroDtStore1C04b(PPCRegister& r28, PPCRegister& f31) { PatchPrimaryDtStore(r28, f31, 7172); }
+void AfroDtStore1C04c(PPCRegister& r28, PPCRegister& f31) { PatchPrimaryDtStore(r28, f31, 7172); }
+
+// Constant-pool 1/30 (0x820EB774) -> 1/60 when Experimental. Anim/cutscene timelines
+// that step once per present (or convert frame counts to seconds) need this; leaving
+// them at 1/30 with interval=1 made the intro unwatchably fast after 92f93d1.
+void AfroDt30Rewrite(PPCRegister& f) {
+  if (!Experimental60()) return;
+  f.f64 = double(kDt60);
+  static bool logged = false;
+  if (!logged) {
+    logged = true;
+    REXLOG_INFO("afro dt: 1/30 const load -> 1/60 (anim/cutscene present-step scale)");
+  }
+}
+void AfroDt30_f0(PPCRegister& f0) { AfroDt30Rewrite(f0); }
+void AfroDt30_f1(PPCRegister& f1) { AfroDt30Rewrite(f1); }
+void AfroDt30_f9(PPCRegister& f9) { AfroDt30Rewrite(f9); }
+void AfroDt30_f31(PPCRegister& f31) { AfroDt30Rewrite(f31); }
+
+
+// sub_82676300 timeType converter (anim/NTG property eval).
+// mode0: *=1/30 (frameIn30hz), mode1: *=1/60, mode2: raw, 3/4: other.
+// 7fa0f73 already rewrites mode0's 1/30 load; if intro is STILL fast with that,
+// cutscene advance is likely pure frame-index / per-present (not this converter).
+void AfroCineTimeConvertHook(PPCRegister& r11, PPCRegister& f31) {
+  if (!Experimental60()) return;
+  const uint32_t mode = r11.u32;
+  if (mode <= 4)
+    g_cine_mode_counts[mode].fetch_add(1, std::memory_order_relaxed);
+  static std::atomic<int> logged_mask{0};
+  const int bit = 1 << (mode <= 4 ? int(mode) : 4);
+  int prev = logged_mask.load(std::memory_order_relaxed);
+  while ((prev & bit) == 0) {
+    if (logged_mask.compare_exchange_weak(prev, prev | bit, std::memory_order_relaxed)) {
+      static const char* kModeName[] = {
+          "*1/30(frameIn30hz)", "*1/60", "raw", "lookup", "div", "other"};
+      const char* name = mode <= 4 ? kModeName[mode] : kModeName[5];
+      REXLOG_INFO(
+          "afro cine: timeConvert mode={} ({}) in={:.6f} (once-log; counts in afro fps)",
+          mode, name, float(f31.f64));
+      break;
+    }
+  }
+}
+
+void AfroSwapHook(PPCRegister& r31) {
   FxTick();
+  ForceDevicePresentInterval(r31.u32);
+  ForceExperimentalPrimaryDt();
   const int cap = REXCVAR_GET(afro_fps_cap);
   if (cap > 0) {
     const auto period = std::chrono::duration_cast<clk::duration>(
         std::chrono::duration<double>(1.0 / cap));
     auto now = clk::now();
     if (g_next.time_since_epoch().count() == 0 || now - g_next > period * 4) g_next = now;
-    // Sleep coarse, then spin the last ~1.5 ms for accuracy.
     while (true) {
       now = clk::now();
       if (now >= g_next) break;
@@ -117,10 +289,26 @@ void AfroSwapHook() {
   if (g_win_frames == 0) g_win_start = now;
   ++g_win_frames;
   double secs = std::chrono::duration<double>(now - g_win_start).count();
-  if (secs >= 5.0) {
+  if (secs >= 2.0) {
     g_fps = (g_win_frames - 1) / secs;
-    if (REXCVAR_GET(afro_fps_log))
-      REXLOG_INFO("afro: guest {:.1f} FPS (cap {})", g_fps, cap);
+    if (REXCVAR_GET(afro_fps_log)) {
+      const float dt = ReadGuestFloat(kDtAddr);
+      const float dt_m = ReadGuestFloat(kDtMeasuredAddr);
+      const float dt_s = ReadGuestFloat(kDtScaleAddr);
+      const int seen = g_seen_interval.load(std::memory_order_relaxed);
+      const uint64_t m0 = g_cine_mode_counts[0].exchange(0, std::memory_order_relaxed);
+      const uint64_t m1 = g_cine_mode_counts[1].exchange(0, std::memory_order_relaxed);
+      const uint64_t m2 = g_cine_mode_counts[2].exchange(0, std::memory_order_relaxed);
+      const uint64_t m3 = g_cine_mode_counts[3].exchange(0, std::memory_order_relaxed);
+      const uint64_t m4 = g_cine_mode_counts[4].exchange(0, std::memory_order_relaxed);
+      REXLOG_INFO(
+          "afro fps: guest {:.1f} FPS  dt@0x828B1C04={:.6f}s  dt@0x828B1BF0={:.6f}s  "
+          "dt@0x828B1C08={:.6f}s  feed={}  present_interval cvar={} seen={}  "
+          "host_cap={}  cine_modes(2s) 0={} 1={} 2={} 3={} 4={}",
+          g_fps, dt, dt_m, dt_s, Experimental60() ? "1/60@1C04+const" : "retail",
+          REXCVAR_GET(afro_present_interval), seen < 0 ? -1 : seen, cap,
+          m0, m1, m2, m3, m4);
+    }
     g_win_frames = 0;
   } else if (g_fps == 0 && secs >= 1.0) {
     g_fps = (g_win_frames - 1) / secs;

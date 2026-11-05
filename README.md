@@ -49,7 +49,7 @@ back up, restore or delete them. Details: [Saves](#saves).
   happened and the log. **Never attach game files** (ISO, extracted files).
   More help: [Troubleshooting](#troubleshooting).
 
-This is a preview tested on one PC; expect bugs. See [Status and limitations](#status-and-limitations).
+This is a preview tested on one PC; expect bugs. **Original (30) is the default.** Experimental (60) is incomplete and opt-in. See [Status and limitations](#status-and-limitations).
 
 ---
 
@@ -66,23 +66,61 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (0.0.15). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
+Preview (**0.0.16**). Base gameplay path tested on one PC (Windows, AMD Radeon RX 9060 XT)
+at **Original (30)**. Experimental (60) is an **incomplete opt-in** for public testing
+(see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in)); do not treat it as stable.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
 - Default GPU path is **RTV** (host render targets): correct image at a stable
-  30 FPS. The black frames of earlier versions are fixed by the
-  `afro-edram-no-wrap` GPU plugin patch.
+  30 FPS with **Original (30)** (launcher default). The black frames of earlier versions
+  are fixed by the `afro-edram-no-wrap` GPU plugin patch.
 - **ROV** is still available as an optional fallback (correct image but slow,
   can drop below 15 FPS): Advanced options (`--advanced`) or
   `--render_target_path_d3d12=rov`.
 - Voices work, including all cinematic dialogue (0.0.13 `afro-xma-fix-log` and
   0.0.14 `afro-xma-frameless-chain` runtime patches).
-- Known issues: FPS drops when objects break or the camera splits;
-  if two tutorial prompts appear at once, the first one can stay
-  stuck on screen (original game behaviour; restarting the level clears it).
+- Known issues (also apply at Original unless noted):
+  - FPS can dip (including below 30 / near dual-camera stretches ~30). Cause is
+    **not proven** without profiling; do not assume a single GPU root cause.
+  - If two tutorial prompts appear at once, the first one can stay stuck on screen
+    (original game behaviour; restarting the level clears it).
+  - **Experimental (60) only:** intro and cutscenes can run too fast; other
+    gameplay / Focus / combat timing may be wrong and is largely unverified.
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
 - Expect bugs; saves and settings may change between versions.
+
+### Experimental 60 FPS (incomplete, opt-in)
+**Default remains Original (30).** Experimental (60) is for testers who want to help;
+it is **not** claimed smooth, complete, or timing-correct.
+
+**Enable:** Launcher → **Advanced settings (experimental)...** → Frame rate →
+**Experimental (60)** → Play. Tick **Remember** only if you want it sticky.
+**Revert:** same dialog → **Original (30)** (or delete the `fps=` line / set `fps=0`
+in the launcher config under `%USERPROFILE%\Documents\afrorecomp\`).
+
+What it does (high level): unlocks the guest present interval (`afro_present_interval=1`),
+applies a host 60 FPS cap, and enables gated guest dt / 1/30→1/60 constant hooks.
+Original does **not** apply those Experimental dt/const patches; present interval
+stays at the retail default (2).
+
+**Tester guide (please report):**
+1. Confirm **Original (30)** still feels like previous releases for you.
+2. Switch to **Experimental (60)** for a short session (intro + one cutscene + a bit of gameplay).
+3. Note mode, internal resolution, CPU/GPU, Windows version, cutscene/location, and whether
+   you reverted to Original.
+4. Copy `afro.log` immediately after the run (it is overwritten next launch).
+5. Open a normal GitHub issue (see the issue template). Privacy: attach the log only after
+   a quick check that it has no personal paths you must redact; **never** attach ISO,
+   `gamedata`, saves, or other game files unless a maintainer specifically asks.
+
+### Logs (where `afro.log` actually is)
+- **Installer / `game\Play.bat`:** `<install-root>\afro.log` (same folder as `install.log`).
+  `Play.bat` passes `--log_file="%~dp0..\afro.log"`.
+- **Dev `tools\run_win.bat`:** repo-adjacent log: from `tools\`, `R` is `..\..`, so
+  `--log_file="%R%\afro.log"` is the folder that contains `app\` and `tools\`
+  (the checkout / `afro360recomp`-style root), **not** next to the `.exe`.
+- Each launch **overwrites** the log; copy it right after a problem.
 
 ### Installer details
 1. Make an ISO of your own Afro Samurai (Europe) disc (see [Getting your game files](#getting-your-game-files)).
@@ -288,18 +326,22 @@ command line, e.g. `--render_target_path_d3d12=rov`.
 - **Game does not start / crashes**: look at the end of `<root>\afro.log`.
 
 #### Getting a log
-Every run writes `<root>\afro.log` (overwritten each time, so copy it right after the problem).
-Useful extra flags for `tools\run_win.bat`:
+See [Logs](#logs-where-afrolog-actually-is). Copy the file right after the problem
+(each launch overwrites it). Useful extra flags for `tools\run_win.bat` or `Play.bat`:
 - `--afro_xma_log=true` – audio (XMA) decoding details, for sound or voice problems.
 - `--afro_perf_log=true` – per-second performance counters, for FPS drops.
+- `--afro_fps_log=false` – disable the bounded ~2s FPS/dt lines if the log grows too large.
 
 #### Reporting an issue
-Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with:
-the version or commit (`git -C <root>\afrorecomp log -1 --oneline`), your Windows version,
-GPU and driver, what you did and what happened (a screenshot helps), and `afro.log`
-(and `install.log` or the build output for build problems).
+Prefer the **Experimental 60 / bug report** issue template when relevant. Include:
+reproduction steps, frame-rate mode (Original vs Experimental), internal resolution,
+CPU/GPU (+ driver), Windows version, cutscene or location, and `afro.log` as an
+**attachment** after a quick privacy review. Also useful: version or commit
+(`git log -1 --oneline` in the source checkout the installer used, when present)
+and `install.log` / build output for install problems.
 **Never attach game files**: no ISO, `default.xex`, `default.pe`, `gamedata` contents,
-`app\assets`, `app\generated` or anything else extracted from the disc.
+`app\assets`, `app\generated`, saves, or anything else extracted from the disc
+unless a maintainer specifically asks.
 
 ### Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
