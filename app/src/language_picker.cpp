@@ -172,7 +172,7 @@ void FillCombo(HWND h, int id, std::initializer_list<const wchar_t*> items) {
 // Save management (same language order as kText).
 struct SaveText {
   const wchar_t *manage, *folder, *open, *backup, *list, *restore, *del, *close, *done, *empty,
-      *fail, *pick, *restore_q, *restore_ok, *del_q, *del_ok, *running, *none;
+      *fail, *pick, *restore_q, *restore_ok, *del_q, *del_ok, *running, *none, *openbk;
 };
 const SaveText kSaveText[] = {
     {L"Manage saved games...", L"Saves folder:", L"Open saves folder", L"Back up saves",
@@ -183,7 +183,7 @@ const SaveText kSaveText[] = {
      L"Backup restored.\nA copy of the previous saves was kept in:\n%s",
      L"DELETE all save data?\n\nThis removes your saved games (the shader cache and the backups are kept). A safety backup is made first.\n\nThis cannot be undone from the game.",
      L"Save data deleted.\nA safety backup was kept in:\n%s",
-     L"Afro Samurai is running. Close the game first.", L"(no backups yet)"},
+     L"Afro Samurai is running. Close the game first.", L"(no backups yet)", L"Open backups folder"},
     {L"Gestionar partidas guardadas...", L"Carpeta de partidas:", L"Abrir carpeta de partidas", L"Copia de seguridad",
      L"Copias (la m\u00e1s reciente primero):", L"Restaurar la copia seleccionada", L"Borrar datos guardados...", L"Cerrar",
      L"Partidas copiadas en:\n%s\n\n\u00bfAbrir la carpeta de copias?", L"Todav\u00eda no hay partidas en:\n%s",
@@ -192,7 +192,7 @@ const SaveText kSaveText[] = {
      L"Copia restaurada.\nLas partidas anteriores se han guardado en:\n%s",
      L"\u00bfBORRAR todos los datos guardados?\n\nSe eliminan tus partidas (la cach\u00e9 de shaders y las copias se conservan). Antes se hace una copia de seguridad.\n\nNo se puede deshacer desde el juego.",
      L"Datos guardados borrados.\nSe ha guardado una copia de seguridad en:\n%s",
-     L"Afro Samurai se est\u00e1 ejecutando. Cierra antes el juego.", L"(todav\u00eda no hay copias)"},
+     L"Afro Samurai se est\u00e1 ejecutando. Cierra antes el juego.", L"(todav\u00eda no hay copias)", L"Abrir carpeta de copias de seguridad"},
     {L"G\u00e9rer les sauvegardes...", L"Dossier des sauvegardes :", L"Ouvrir les sauvegardes", L"Copier les sauvegardes",
      L"Copies (la plus r\u00e9cente d'abord) :", L"Restaurer la copie s\u00e9lectionn\u00e9e", L"Supprimer les sauvegardes...", L"Fermer",
      L"Sauvegardes copi\u00e9es dans :\n%s\n\nOuvrir le dossier des copies ?", L"Aucune sauvegarde pour l'instant dans :\n%s",
@@ -201,7 +201,7 @@ const SaveText kSaveText[] = {
      L"Copie restaur\u00e9e.\nLes sauvegardes pr\u00e9c\u00e9dentes ont \u00e9t\u00e9 gard\u00e9es dans :\n%s",
      L"SUPPRIMER toutes les sauvegardes ?\n\nTes parties sauvegard\u00e9es sont effac\u00e9es (le cache des shaders et les copies sont conserv\u00e9s). Une copie de s\u00e9curit\u00e9 est faite avant.\n\nImpossible d'annuler depuis le jeu.",
      L"Sauvegardes supprim\u00e9es.\nUne copie de s\u00e9curit\u00e9 a \u00e9t\u00e9 gard\u00e9e dans :\n%s",
-     L"Afro Samurai est en cours d'ex\u00e9cution. Ferme d'abord le jeu.", L"(aucune copie pour l'instant)"},
+     L"Afro Samurai est en cours d'ex\u00e9cution. Ferme d'abord le jeu.", L"(aucune copie pour l'instant)", L"Ouvrir le dossier des copies"},
     {L"Gestisci salvataggi...", L"Cartella dei salvataggi:", L"Apri cartella salvataggi", L"Backup salvataggi",
      L"Backup (il pi\u00f9 recente per primo):", L"Ripristina il backup selezionato", L"Elimina dati salvati...", L"Chiudi",
      L"Salvataggi copiati in:\n%s\n\nAprire la cartella dei backup?", L"Ancora nessun salvataggio in:\n%s",
@@ -210,10 +210,10 @@ const SaveText kSaveText[] = {
      L"Backup ripristinato.\nI salvataggi precedenti sono stati conservati in:\n%s",
      L"ELIMINARE tutti i dati salvati?\n\nI salvataggi vengono cancellati (la cache degli shader e i backup restano). Prima viene fatto un backup di sicurezza.\n\nNon si pu\u00f2 annullare dal gioco.",
      L"Dati salvati eliminati.\nUn backup di sicurezza \u00e8 stato conservato in:\n%s",
-     L"Afro Samurai \u00e8 in esecuzione. Chiudi prima il gioco.", L"(ancora nessun backup)"},
+     L"Afro Samurai \u00e8 in esecuzione. Chiudi prima il gioco.", L"(ancora nessun backup)", L"Apri cartella dei backup"},
 };
 constexpr int kIdSvFolder = 300, kIdSvOpen = 301, kIdSvBackup = 302, kIdSvList = 303,
-              kIdSvRestore = 304, kIdSvDelete = 305;
+              kIdSvRestore = 304, kIdSvDelete = 305, kIdSvOpenBk = 306;
 
 void ApplyTexts(HWND h, int sel) {
   const UiText& t = kText[sel];
@@ -574,6 +574,7 @@ LRESULT CALLBACK SavesProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     switch (LOWORD(w)) {
       case kIdSvOpen: { std::error_code ec; std::filesystem::create_directories(SaveRoot(), ec); Explore(SaveRoot()); break; }
       case kIdSvBackup: DoBackup(h, st); break;
+      case kIdSvOpenBk: { std::error_code ec; std::filesystem::create_directories(BackupBase(), ec); Explore(BackupBase()); break; }
       case kIdSvRestore: DoRestore(h, st); break;
       case kIdSvDelete: DoDelete(h, st); break;
     }
@@ -596,7 +597,7 @@ void ShowSaves(HWND owner, int sel) {
   const double sc = GetDpiForSystem() / 96.0;
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const DWORD style = WS_CAPTION | WS_SYSMENU;
-  RECT rc{0, 0, S(420), S(412)};
+  RECT rc{0, 0, S(420), S(446)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   RECT orc;
   GetWindowRect(owner, &orc);
@@ -624,8 +625,9 @@ void ShowSaves(HWND owner, int sel) {
   mk(L"LISTBOX", L"", WS_TABSTOP | WS_VSCROLL | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 16, 160, 388, 110,
      kIdSvList, WS_EX_CLIENTEDGE);
   mk(L"BUTTON", t.restore, WS_TABSTOP, 16, 276, 388, 28, kIdSvRestore);
-  mk(L"BUTTON", t.del, WS_TABSTOP, 16, 318, 388, 28, kIdSvDelete);
-  HWND close = mk(L"BUTTON", t.close, WS_TABSTOP | BS_DEFPUSHBUTTON, 150, 362, 120, 32, IDCANCEL);
+  mk(L"BUTTON", t.openbk, WS_TABSTOP, 16, 310, 388, 28, kIdSvOpenBk);
+  mk(L"BUTTON", t.del, WS_TABSTOP, 16, 352, 388, 28, kIdSvDelete);
+  HWND close = mk(L"BUTTON", t.close, WS_TABSTOP | BS_DEFPUSHBUTTON, 150, 396, 120, 32, IDCANCEL);
   FillBackups(h, &st);
   SetFocus(close);
   EnableWindow(owner, FALSE);

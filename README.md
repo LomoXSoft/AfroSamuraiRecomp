@@ -208,6 +208,7 @@ under *Advanced settings*. It opens a window with:
 - **Restore selected backup**: pick a backup from the list (newest first) and confirm.
   The current saves are first backed up automatically (`saves-...-before-restore`), then
   replaced by the chosen backup. The shader cache is kept.
+- **Open backups folder**: opens `Documents\afrorecomp-backups` in Explorer (created if missing).
 - **Delete save data...**: after a strong confirmation (default No), the current saves are
   backed up automatically (`saves-...-before-delete`) and then deleted. The shader cache
   and all backups are kept.
