@@ -8,28 +8,63 @@ Europe, title ID 4E4D07D8) to native Windows x64 using
 (or an ISO you dumped from it). No binaries are released: the executable
 contains code translated from the game, so everyone builds it from their own copy.
 
-## Contents
-- [What it is](#what-it-is)
-- [Status and limitations](#status-and-limitations)
-- [Quick start (installer)](#quick-start-installer)
-- [Requirements](#requirements)
-- [Getting your game files](#getting-your-game-files)
-- [Manual build](#manual-build)
-- [Playing](#playing) ([Controls](#controls), [Saves](#saves))
-- [Launcher and options](#launcher-and-options)
-- [Troubleshooting](#troubleshooting)
-- [Repository layout](#repository-layout)
-- [Plans](#plans)
-- [License and legal notice](#license-and-legal-notice)
+## Quick start
 
-## What it is
+**You need:**
+- Windows 10 or 11 (64-bit) and a graphics card with Direct3D 12 (current drivers).
+- An ISO of **your own** Afro Samurai disc, **Europe** version only
+  (SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`). See [Getting your game files](#getting-your-game-files).
+- About 20 GB of free disk space and an internet connection (about 4 GB is downloaded).
+- A controller (Xbox or any controller Windows/SDL recognises).
+
+**Steps:**
+1. On this page click **Code > Download ZIP** and extract the ZIP into a folder.
+   (You can also download just [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat).)
+   The installer always builds the latest version of this repository from GitHub.
+2. Double-click **`install.bat`**.
+3. Answer the questions at the start: language, install folder, your ISO,
+   the Microsoft Visual Studio license (needed for the compiler) and shortcuts.
+   After that it runs on its own.
+4. Wait. It downloads the tools and builds the game; this took about 20-30 minutes
+   on a fast PC and connection, and can take 1-2 hours on slower ones.
+   It ends with `INSTALL OK`.
+5. Play from the **desktop shortcut** (or `game\Play.bat` in the install folder).
+
+At the end the installer offers to delete the build files (default No).
+Saying Yes frees about 8 GB but a later update then needs a full new install.
+
+Nothing is installed system-wide and no admin rights are needed. To uninstall,
+delete the install folder and the shortcuts.
+
+### Your saves
+Saves are in `Documents\afrorecomp`. In the launcher (shown at start; hold
+**Shift** while starting to show it again) use **Manage saved games...** to open,
+back up, restore or delete them. Details: [Saves](#saves).
+
+### If something goes wrong
+- Run `install.bat` again: it continues where it stopped.
+- The installer log is `install.log` in the install folder; the game log is `afro.log`.
+- Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with what
+  happened and the log. **Never attach game files** (ISO, extracted files).
+  More help: [Troubleshooting](#troubleshooting).
+
+This is a preview tested on one PC; expect bugs. See [Status and limitations](#status-and-limitations).
+
+---
+
+## Advanced
+
+Everything below is for technical users: how it works, the installer options,
+the manual build and the developer options.
+
+### What it is
 The game's PowerPC executable (`default.xex`) is translated ahead of time into
 C++ by ReXGlue's code generator and compiled into a native Windows program. The
 Xbox 360 kernel, GPU and audio are provided by the ReXGlue runtime (derived from
 Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
-## Status and limitations
+### Status and limitations
 Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
 - Default GPU path is **RTV** (host render targets): correct image at a stable
@@ -48,7 +83,7 @@ Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - Windows x64 only for now (D3D12).
 - Expect bugs; saves and settings may change between versions.
 
-## Quick start (installer)
+### Installer details
 1. Make an ISO of your own Afro Samurai (Europe) disc (see [Getting your game files](#getting-your-game-files)).
 2. Download [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat)
    (right-click, *Save link as*) into an empty folder, or clone/download this repository
@@ -97,7 +132,7 @@ Command-line options (`install.bat -Option value`): `-InstallDir <dir>` (full in
 `-GameDataDir <dir>` uses an already extracted disc folder (containing `default.xex`)
 instead of an ISO.
 
-## Requirements
+### Requirements
 - Windows 10/11 x64, a GPU with Direct3D 12 and current drivers.
 - Original Afro Samurai disc (Europe) and a way to make an ISO of it.
 - About 20 GB free disk space (the finished install uses about 12-13 GB).
@@ -113,7 +148,7 @@ instead of an ISO.
 - ReXGlue SDK nightly **0.10.0.24-dev.gbd833a2** (prebuilt) and the ReXGlue
   source at the same commit.
 
-## Getting your game files
+### Getting your game files
 Only the Europe disc is supported (Redump 17884, ISO SHA-1
 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`). Make the ISO from your own disc,
 for example with a DVD drive that can read Xbox 360 discs and a disc dumping
@@ -122,7 +157,7 @@ Check the SHA-1 with `certutil -hashfile "Afro Samurai.iso" SHA1`.
 This project does not help with obtaining the game in any other way.
 Never share the ISO, the extracted files or anything generated from them.
 
-## Manual build
+### Manual build
 Folder layout (`<root>` = e.g. `C:\afro`; avoid spaces and non-ASCII characters in it):
 
     <root>\afrorecomp      this repository (any folder name works)
@@ -176,7 +211,7 @@ it is required for a correct image and voices.
 To update: `git pull` in `afrorecomp`, then run both scripts again. To rebuild
 from scratch, also delete `app\generated\default` and `app\afro_switch_tables.toml`.
 
-## Playing
+### Playing
 
     tools\run_win.bat
 
@@ -184,7 +219,7 @@ Run it from the `afrorecomp` folder (or use the installer's shortcut). It starts
 the game with `<root>\gamedata` and writes the log to `<root>\afro.log`.
 Hold **Shift** while starting to show the launcher again.
 
-### Controls
+#### Controls
 An Xbox controller or any other controller SDL recognises (XInput, DualShock/DualSense,
 etc.) works out of the box; the game was designed for a gamepad and prompts show
 Xbox buttons. Keyboard and mouse are **not** enabled by default. There is
@@ -193,7 +228,7 @@ start with `tools\run_win.bat --mnk_mode=true` (WASD = left stick, arrow keys = 
 Space = A, Backspace = B, L = X, P = Y, Q/E = triggers, 1/3 = bumpers, Enter = Start,
 Tab = Back, Shift+arrows = D-pad).
 
-### Saves
+#### Saves
 Saves are stored in your Documents folder, in `Documents\afrorecomp\` (the save
 itself is under `<profile id>\4E4D07D8\00000001\AFRO_0.SAV`; the shader cache is in
 `Documents\afrorecomp\cache`). To back them up, copy the whole
@@ -217,7 +252,7 @@ Restore and delete are refused while the game is running. Backups are plain fold
 you can also restore one by hand (close the game, copy the contents of a `saves-...`
 folder back into `Documents\afrorecomp\`).
 
-## Launcher and options
+### Launcher and options
 The launcher (shown on first run, after each update, or with Shift) offers:
 language (English, Español, Français, Italiano), fullscreen or window, internal
 resolution (1x native by default / 2x / 3x) and "remember and don't ask again".
@@ -232,7 +267,7 @@ to show the "Advanced options..." button (render path, resolve readback, game
 effect toggles, GPU diagnostics). Any ReXGlue cvar can also be passed on the
 command line, e.g. `--render_target_path_d3d12=rov`.
 
-## Troubleshooting
+### Troubleshooting
 - **`xex_to_pe.py needs pycryptodome`**: run `python -m pip install pycryptodome`
   with the same `python` the build uses (`where python`). The installer's portable Python already has it.
 - **`clang++ not found` / `cmake not found` / `ninja not found`**: the tool is neither
@@ -251,13 +286,13 @@ command line, e.g. `--render_target_path_d3d12=rov`.
   (run `build_gpu_plugin.bat` again). Check that Windows' default audio output is the device you expect.
 - **Game does not start / crashes**: look at the end of `<root>\afro.log`.
 
-### Getting a log
+#### Getting a log
 Every run writes `<root>\afro.log` (overwritten each time, so copy it right after the problem).
 Useful extra flags for `tools\run_win.bat`:
 - `--afro_xma_log=true` – audio (XMA) decoding details, for sound or voice problems.
 - `--afro_perf_log=true` – per-second performance counters, for FPS drops.
 
-### Reporting an issue
+#### Reporting an issue
 Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with:
 the version or commit (`git -C <root>\afrorecomp log -1 --oneline`), your Windows version,
 GPU and driver, what you did and what happened (a screenshot helps), and `afro.log`
@@ -265,7 +300,7 @@ GPU and driver, what you did and what happened (a screenshot helps), and `afro.l
 **Never attach game files**: no ISO, `default.xex`, `default.pe`, `gamedata` contents,
 `app\assets`, `app\generated` or anything else extracted from the disc.
 
-## Repository layout
+### Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
 - `install.bat`, `tools/install.ps1` – one-click installer.
@@ -273,11 +308,11 @@ GPU and driver, what you did and what happened (a screenshot helps), and `afro.l
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
 - `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
 
-## Plans
+### Plans
 - Performance work; controller and audio polish.
 - Possibly other game versions and Linux/Vulkan.
 
-## License and legal notice
+### License and legal notice
 The code in this repository is licensed under the **GNU GPL v3.0** (see
 `LICENSE`), except `patches/rexglue/`, which modifies ReXGlue/Xenia code and is
 under their BSD 3-Clause license.

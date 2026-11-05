@@ -285,7 +285,8 @@ Write-Host (T 'title') -ForegroundColor Yellow
 Write-Host (T 'intro')
 Write-Host ''
 $here = $PSScriptRoot
-$inRepo = Test-Path -LiteralPath (Join-Path $here 'build_win.bat')
+# A git clone of this repo (a ZIP download has no .git: it fetches the source from GitHub instead).
+$inRepo = (Test-Path -LiteralPath (Join-Path $here 'build_win.bat')) -and (Test-Path -LiteralPath (Join-Path (Split-Path $here -Parent) '.git'))
 function PickFolder($start) {
   try {
     Add-Type -AssemblyName System.Windows.Forms
