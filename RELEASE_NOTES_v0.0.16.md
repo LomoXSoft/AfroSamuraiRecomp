@@ -25,8 +25,8 @@ Source-only prerelease. **No binaries or game files.** Build from your own Europ
 Use `install.bat` (fetches this revision from GitHub after publish) or a source checkout + `tools\build_gpu_plugin.bat` then `tools\build_win.bat`. See README. Requires your own Europe disc/ISO.
 
 ## Tested on
-- **Confirmed earlier (prior releases / Original path):** boots, menus, gameplay, voices, RTV black-frame fix on one Windows PC (AMD Radeon RX 9060 XT) at Original-style 30 FPS pacing.
-- **This candidate (0.0.16 rollback tree):** sources prepared from the post-crash diagnostic rollback (`e1f0a91` / 4c08751-class timing). A Windows **compile** of that rollback succeeded; **that build was not launched** in the rollback session. Static/gating audit only for this tag candidate — **not** a substitute for gameplay verification. Please smoke-test Original and a short Experimental session before relying on it.
+- **Original (30):** exercised repeatedly on one Windows PC (AMD Radeon RX 9060 XT) after the 0.0.16 timing rollback — boots, menus, gameplay, voices, and the RTV path without the problems seen on Experimental (60). Recommended default.
+- **Experimental (60):** incomplete. Expect accelerated intro/cinematics and possible other timing issues; performance dips (including below 30 / dual-camera ~30) still occur and are **not** claimed fixed. Opt-in for tester logs only — not a stable 60 FPS mode.
 
 ## Legal
 Fan project, not affiliated with Namco Bandai, GONZO, Microsoft, or rights holders. No game code/assets distributed. GPL-3.0 for this repo except `patches/rexglue/` (BSD-3). Own the original game.

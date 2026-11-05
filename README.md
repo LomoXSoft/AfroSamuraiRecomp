@@ -66,9 +66,10 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.0.16**). Base gameplay path tested on one PC (Windows, AMD Radeon RX 9060 XT)
-at **Original (30)**. Experimental (60) is an **incomplete opt-in** for public testing
-(see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in)); do not treat it as stable.
+Preview (**0.0.16**). **Original (30)** has been played repeatedly on one PC (Windows, AMD
+Radeon RX 9060 XT) without the Experimental-60 problems. Experimental (60) is an
+**incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
+do not treat it as stable — cinematics can run fast and performance dips remain.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
 - Default GPU path is **RTV** (host render targets): correct image at a stable
   30 FPS with **Original (30)** (launcher default). The black frames of earlier versions
