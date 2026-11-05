@@ -2,6 +2,20 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.0.15 – one-click installer
+- New `install.bat` (+ `tools/install.ps1`): language first (en/es/fr/it), all
+  questions up front, then unattended with total % progress. Portable toolchain
+  (no admin, PATH or registry changes), SHA-256-pinned downloads, ISO SHA-1
+  check, fast tar extraction, light ReXGlue clone, resumable, refreshes the
+  source and rebuilds on re-run, self-contained `game\` folder + shortcuts,
+  optional cleanup of build files (~8 GB).
+- Launcher: "Manage saved games..." (open saves folder, back up, restore,
+  open backups folder, delete; safety backups before restore/delete).
+- Launcher: closing the window (X/Esc/Alt+F4) no longer starts the game;
+  layout gap fixed.
+- README rewritten: simple Quick start for new players, technical content
+  under Advanced.
+
 ## 0.0.14 – all cutscene voices fixed, experimental advanced settings
 - Fixed: cutscene lines silent after a camera cut, and everything after them
   (e.g. the second boss cutscene). Cause: when a stream's next packet holds no

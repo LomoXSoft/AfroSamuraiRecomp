@@ -18,15 +18,16 @@ contains code translated from the game, so everyone builds it from their own cop
 - A controller (Xbox or any controller Windows/SDL recognises).
 
 **Steps:**
-1. On this page click **Code > Download ZIP** and extract the ZIP into a folder.
+1. On this page click **Code > Download ZIP** and extract the ZIP into a folder
+   (it creates an `AfroSamuraiRecomp-main` folder; `install.bat` is inside it).
    (You can also download just [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat).)
    The installer always builds the latest version of this repository from GitHub.
 2. Double-click **`install.bat`**.
 3. Answer the questions at the start: language, install folder, your ISO,
    the Microsoft Visual Studio license (needed for the compiler) and shortcuts.
    After that it runs on its own.
-4. Wait. It downloads the tools and builds the game; this took about 20-30 minutes
-   on a fast PC and connection, and can take 1-2 hours on slower ones.
+4. Wait. It downloads the tools and builds the game; it takes about 20-30 minutes
+   (17-19 minutes in our tests), up to about 1 hour on slower PCs.
    It ends with `INSTALL OK`.
 5. Play from the **desktop shortcut** (or `game\Play.bat` in the install folder).
 
@@ -65,7 +66,7 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (0.0.14). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
+Preview (0.0.15). Tested on one PC (Windows, AMD Radeon RX 9060 XT).
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
 - Default GPU path is **RTV** (host render targets): correct image at a stable
   30 FPS. The black frames of earlier versions are fixed by the
@@ -120,8 +121,8 @@ No admin rights needed; nothing is installed system-wide (no PATH, registry or
 Visual Studio installer changes) and nothing is uploaded. Downloads are about
 1 GB of archives (LLVM alone is 900 MB), about 1 GB of MSVC/Windows SDK packages
 and about 2 GB of ReXGlue source; the whole folder ends up around 12-13 GB
-(`<root>\downloads` can be deleted afterwards). A full run took about 30 minutes on
-a fast connection with a modern CPU; expect up to 1-2 hours on slower ones.
+(`<root>\downloads` can be deleted afterwards). A full run takes about 20-30 minutes on
+a fast connection with a modern CPU; expect up to about 1 hour on slower ones.
 It shows the overall progress (e.g. `[ 42%] Step 5/14: LLVM/Clang ... (downloading ...: 312/896 MB)`)
 in the console, the window title and the log. Re-running it skips finished steps, so after an error just fix the cause and run it again.
 The log is `<root>\install.log`. To uninstall, delete the install folder (and
