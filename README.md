@@ -13,48 +13,45 @@ The only program attached to a release is `afrosetup.exe`, the setup installer.
 
 **You need:**
 - Windows 10 or 11 (64-bit) and a graphics card with Direct3D 12 (current drivers).
-- An ISO of **your own** Afro Samurai disc, **Europe** version only
-  (SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`). See [Getting your game files](#getting-your-game-files).
-- About 20 GB of free disk space and an internet connection (about 4 GB is downloaded).
+- **Your own** Afro Samurai disc, **Europe** version only: an ISO
+  (SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) or a folder you already
+  extracted that contains `default.xex`. See [Getting your game files](#getting-your-game-files).
+- About 20 GB of free disk space and an internet connection (the build tools are downloaded).
 - A controller (Xbox or any controller Windows/SDL recognises).
 
 **Steps:**
-1. Download **`afrosetup.exe`** from the
-   [v0.1.0 release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/tag/v0.1.0)
-   and run it. It is the setup program, not the game. It already contains this
-   0.1.0 source and builds the game from your Europe disc.
-   The console installer is still there: **Code > Download ZIP** (folder
-   `AfroSamuraiRecomp-main`, with `install.bat` inside) or just
-   [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat).
-   `install.bat` builds the latest version of this repository from GitHub.
-2. Double-click **`afrosetup.exe`**, or **`install.bat`** if you used the ZIP.
-3. Answer the questions at the start: language, install folder, your ISO,
-   the Microsoft Visual Studio license (needed for the compiler) and shortcuts.
-   After that it runs on its own.
-4. Wait. It downloads the tools and builds the game; it takes about 20-30 minutes
-   (17-19 minutes in our tests), up to about 1 hour on slower PCs.
-   It ends with `INSTALL OK`.
-5. Play from the **desktop shortcut** (or `game\Play.bat` in the install folder).
-
-At the end the installer offers to delete the build files (default No).
-Saying Yes frees about 8 GB but a later update then needs a full new install.
+1. Download **[`afrosetup.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/download/v0.1.0/afrosetup.exe)**
+   from the [v0.1.0 release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/tag/v0.1.0).
+   That file is the setup program, not the game. It contains the 0.1.0 source and
+   builds the game on your PC. Use this pinned release.
+   `https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest` skips prereleases,
+   so it does not point at v0.1.0.
+2. Run `afrosetup.exe`. Choose a language, then **Install** or **Update**.
+   - **Install:** choose a folder, then your Europe ISO or the extracted game folder (`default.xex` must be inside it).
+   - **Update:** choose the existing installation folder, the one that contains `game\Play.bat`. Close the game first. If `gamedata\default.xex` is already there, the ISO is not asked for again. Tools still on disk are reused, and only missing tools are downloaded again. The extracted game, your saves, and `game\afro_language.cfg` stay. The program files are rebuilt and replaced only after that build succeeds, including when the folder is already 0.1.0.
+3. Accept the Microsoft Visual Studio Build Tools license if it is not already recorded (the box starts unchecked). Shortcuts are optional. You can keep the downloaded tools or delete them when setup finishes. Deleting them does not remove `game`, the extracted game, the logs, your ISO, or your saves. A later **Update** downloads again only the tools that are missing.
+4. The window says this takes several minutes. It does not promise a fixed duration.
+5. On success the window says **Installation finished** and shows **Play**. **Play** starts `game\Play.bat` in that folder, and only when you click it. **Finish** and closing the window do not start the game. A shortcut, if you asked for one, also starts that `Play.bat`.
 
 Nothing is installed system-wide and no admin rights are needed. To uninstall,
-delete the install folder and the shortcuts.
+delete the install folder and the shortcuts. Saves are not in that folder.
 
 ### Your saves
-Saves are in `Documents\afrorecomp`. In the launcher (shown at start; hold
-**Shift** while starting to show it again) use **Manage saved games...** to open,
-back up, restore or delete them. Details: [Saves](#saves).
+Saves are in your Documents folder, `Documents\afrorecomp`. That folder is not
+the launcher config. Launcher settings are `afro_language.cfg` next to the
+executable (`game\afro_language.cfg` after setup). In the launcher (shown at
+start; hold **Shift** while starting to show it again) use **Manage saved games...**
+to open, back up, restore or delete them. Details: [Saves](#saves).
 
 ### If something goes wrong
-- Run `install.bat` again: it continues where it stopped.
-- The installer log is `install.log` in the install folder; the game log is `afro.log`.
+- If the window says **Installation did not finish**, use **Show details** and read `install.log` in the install folder. Run `afrosetup.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
+- [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat) is a separate console fallback. See [Console installer](#console-installer). Without `-Ref` it builds `main`, not this pinned release.
+- The game log is `afro.log` in the install folder.
 - Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with what
   happened and the log. **Never attach game files** (ISO, extracted files).
   More help: [Troubleshooting](#troubleshooting).
 
-This is a preview tested on one PC; expect bugs. **Original (30) is the default.** Experimental (60) is incomplete and opt-in. See [Status and limitations](#status-and-limitations).
+This is a preview. **30 (original)** is the default. **60 (experimental)** is incomplete and opt-in. See [Status and limitations](#status-and-limitations).
 
 ---
 
@@ -71,19 +68,18 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.1.0**). **Original (30)** remains the default. On the author's Windows PC,
-a clean install with the first 0.1.0 setup started the game, and a same-version
-update started it from Jugar. That is the author's use, not an independent
-playthrough of the whole game. The Cheats warning and the shorter setup progress
-line were not run again on Windows after they were added. Experimental (60) is an
+Preview (**0.1.0**). **30 (original)** remains the default. On the author's Windows PC,
+a clean install with the 0.1.0 setup started the game, and an update of that
+folder started it from Play. That is the author's report, not an independent
+playthrough of the whole game. **60 (experimental)** is an
 **incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
 do not treat it as stable — cinematics can run fast and performance dips remain.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
-- Default GPU path is **RTV** (host render targets): correct image at a stable
-  30 FPS with **Original (30)** (launcher default). The black frames of earlier versions
+- Default GPU path is **RTV (original)** (host render targets): correct image at a stable
+  30 FPS with **30 (original)** (launcher default). The black frames of earlier versions
   are fixed by the `afro-edram-no-wrap` GPU plugin patch.
-- **ROV** is still available as an optional fallback (correct image but slow,
-  can drop below 15 FPS): Advanced options (`--advanced`) or
+- **ROV (experimental)** is still available as an optional fallback (correct image but slow,
+  can drop below 15 FPS): **Advanced settings...** or
   `--render_target_path_d3d12=rov`.
 - Voices work, including all cinematic dialogue (0.0.13 `afro-xma-fix-log` and
   0.0.14 `afro-xma-frameless-chain` runtime patches).
@@ -108,10 +104,12 @@ do not treat it as stable — cinematics can run fast and performance dips remai
 **Default remains Original (30).** Experimental (60) is for testers who want to help;
 it is **not** claimed smooth, complete, or timing-correct.
 
-**Enable:** Launcher → **Advanced settings (experimental)...** → Frame rate →
-**Experimental (60)** → Play. Tick **Remember** only if you want it sticky.
-**Revert:** same dialog → **Original (30)** (or delete the `fps=` line / set `fps=0`
-in the launcher config under `%USERPROFILE%\Documents\afrorecomp\`).
+**Enable:** Launcher → **Advanced settings...** → Frame rate →
+**60 (experimental)** → OK, then Play. Tick **Remember** only if you want that
+choice kept.
+**Revert:** same dialog → **30 (original)**. The `fps=` line is in
+`afro_language.cfg` next to the executable (`game\afro_language.cfg` after setup),
+not in `Documents\afrorecomp`.
 
 What it does (high level): unlocks the guest present interval (`afro_present_interval=1`),
 applies a host 60 FPS cap, and enables gated guest dt / 1/30→1/60 constant hooks.
@@ -136,24 +134,31 @@ stays at the retail default (2).
   (the checkout / `afro360recomp`-style root), **not** next to the `.exe`.
 - Each launch **overwrites** the log; copy it right after a problem.
 
-### Installer details
-1. Make an ISO of your own Afro Samurai (Europe) disc (see [Getting your game files](#getting-your-game-files)).
-2. Download [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat)
-   (right-click, *Save link as*) into an empty folder, or clone/download this repository
-   and use the `install.bat` at its root.
-3. Double-click `install.bat`. It opens a folder picker (a new `AfroSamuraiRecomp` folder is
-   created inside the folder you choose) and a file picker for your ISO,
-   then does everything else. Started from a clone, it builds that checkout and
-   proposes `AfroSamuraiRecomp-install` next to it as the install folder.
-4. It first asks the language (English, Espanol, Francais, Italiano; your Windows
-   language is preselected). The installer messages are shown in it, and the launcher
-   and the game start in it too (you can still change it in the launcher).
-   All other questions (install folder, ISO, Microsoft license, shortcuts) come next;
-   then it runs to the end without stopping. When it says `INSTALL OK`, play with the
-   desktop shortcut or `<root>\game\Play.bat`.
-5. Finally it offers (default No) to delete what is only needed for building
-   (toolchain, ReXGlue SDK/source, build files, downloads) and keep just `<root>\game`,
-   `<root>\gamedata` and the logs. Updating later then needs a full new install.
+### Console installer
+`install.bat` is a fallback for a source checkout. The program players download
+is [`afrosetup.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/download/v0.1.0/afrosetup.exe)
+from the [v0.1.0 release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/tag/v0.1.0).
+That setup builds the 0.1.0 source stored inside the file. It does not clone public `main`.
+
+`install.bat` with no `-Ref` builds the `main` branch. `main` moves after a release.
+Because v0.1.0 is a prerelease, `/releases/latest` does not select it. To build the
+tagged source from the console installer, pass `-Ref v0.1.0`.
+
+1. Make an ISO of your own Afro Samurai (Europe) disc, or use an extracted folder
+   that contains `default.xex` (see [Getting your game files](#getting-your-game-files)).
+2. Use `install.bat` from a checkout, or download
+   [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat)
+   (right-click, *Save link as*). A lone `install.bat` then downloads `tools/install.ps1` from `main`.
+3. Double-click `install.bat`. It asks for a folder and your ISO (`-GameDataDir` takes
+   an extracted folder instead). When it says `INSTALL OK`, play with the shortcut or
+   `<root>\game\Play.bat`.
+4. It asks the language first (English, Espanol, Francais, Italiano; your Windows
+   language is preselected). The installer messages are shown in it, and a new install
+   records that language in `game\afro_language.cfg`.
+5. At the end it can delete the toolchain, ReXGlue SDK and source, build files, and
+   downloads, and keep `<root>\game`, `<root>\gamedata`, and the logs. Your ISO and
+   your saves are not part of that delete. A later **Update** in `afrosetup.exe`
+   downloads again only the tools that are missing and keeps the extracted game.
 
 What the installer does (`tools/install.ps1`, run with the PowerShell execution
 policy bypassed for that process only):
@@ -173,12 +178,13 @@ No admin rights needed; nothing is installed system-wide (no PATH, registry or
 Visual Studio installer changes) and nothing is uploaded. Downloads are about
 1 GB of archives (LLVM alone is 900 MB), about 1 GB of MSVC/Windows SDK packages
 and about 2 GB of ReXGlue source; the whole folder ends up around 12-13 GB
-(`<root>\downloads` can be deleted afterwards). A full run takes about 20-30 minutes on
-a fast connection with a modern CPU; expect up to about 1 hour on slower ones.
-It shows the overall progress (e.g. `[ 42%] Step 5/14: LLVM/Clang ... (downloading ...: 312/896 MB)`)
-in the console, the window title and the log. Re-running it skips finished steps, so after an error just fix the cause and run it again.
-The log is `<root>\install.log`. To uninstall, delete the install folder (and
-the shortcuts; saves are separate, see [Saves](#saves)).
+(`<root>\downloads` can be deleted afterwards). A run takes several minutes; there is
+no fixed duration. The console shows its own progress lines. A normal console re-run
+skips steps already stamped in `<root>\.install`. **Update** in `afrosetup.exe` clears
+the compile stamps and rebuilds the program. Neither path promises that an interrupted
+download always resumes. The log is `<root>\install.log`. To uninstall, delete the
+install folder and the shortcuts. Saves stay in `Documents\afrorecomp`
+(see [Saves](#saves)).
 
 Command-line options (`install.bat -Option value`): `-InstallDir <dir>` (full install folder, skips the folder picker), `-Iso <file>`,
 `-AcceptMsvcLicense`, `-Shortcut yes|no`, `-CleanupAfterInstall` / `-KeepBuildFiles`, `-Language en|es|fr|it`, `-Ref <branch|tag>`. Advanced:
@@ -289,7 +295,7 @@ itself is under `<profile id>\4E4D07D8\00000001\AFRO_0.SAV`; the shader cache is
 Deleting or rebuilding the install folder does not touch your saves.
 
 The launcher (shown at start, or hold Shift) has a **Manage saved games...** button
-under *Advanced settings*. It opens a window with:
+on that window, next to **Advanced settings...**. It opens a window with:
 - **Open saves folder**: opens `Documents\afrorecomp` in Explorer (created if missing).
 - **Back up saves**: copies the saves (not the shader `cache`) to a new
   `Documents\afrorecomp-backups\saves-YYYYMMDD-HHMMSS\` folder. Never overwrites anything.
@@ -309,11 +315,15 @@ folder back into `Documents\afrorecomp\`).
 The launcher (shown on first run, after each update, or with Shift) offers:
 language (English, Español, Français, Italiano), fullscreen or window, internal
 resolution (1x native by default / 2x / 3x) and "remember and don't ask again".
-The **Advanced settings (experimental)** button opens the frame-rate cap
-(default "Original (30 capped)": the game's own 30 FPS pacing, no override;
-30 / 60 are experimental) and the sepia filter toggle.
-Settings are stored in `afro_language.cfg` next to the exe; without "remember",
-resolution, frame rate and sepia go back to their defaults on the next start.
+**Advanced settings...** opens frame rate (**30 (original)** or **60 (experimental)**),
+render path (**RTV (original)** or **ROV (experimental)**), the sepia filter, and
+**Cheats...**. The Cheats checkbox is **Invulnerability (experimental)**. It starts
+off, lasts for that launch only, and is not written to `afro_language.cfg`. It does
+not currently prevent death.
+Settings you keep with Remember are stored in `afro_language.cfg` next to the exe
+(`game\afro_language.cfg` after setup). Without Remember, the next start uses
+**30 (original)** and 1x resolution. A render-path change is written only when
+Remember is ticked. Saves are not in that file; they are in `Documents\afrorecomp`.
 
 Developer options: start with `--advanced` (e.g. `tools\run_win.bat --advanced`)
 to show the "Advanced options..." button (render path, resolve readback, game
