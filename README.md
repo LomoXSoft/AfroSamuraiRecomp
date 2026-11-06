@@ -11,7 +11,7 @@ The only program attached to a release is `afrosetup.exe`, the setup installer.
 
 ## Quick start
 
-**You need:**
+### Prerequisites
 - Windows 10 or 11 (64-bit) and a graphics card with Direct3D 12 (current drivers).
 - **Your own** Afro Samurai disc, **Europe** version only: an ISO
   (SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) or a folder you already
@@ -19,33 +19,41 @@ The only program attached to a release is `afrosetup.exe`, the setup installer.
 - About 20 GB of free disk space and an internet connection (the build tools are downloaded).
 - A controller (Xbox or any controller Windows/SDL recognises).
 
-**Steps:**
-1. Download **[`afrosetup.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/download/v0.1.0/afrosetup.exe)**
-   from the [v0.1.0 release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/tag/v0.1.0).
-   That file is the setup program, not the game. It contains the 0.1.0 source and
-   builds the game on your PC. Use this pinned release.
-   `https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest` skips prereleases,
-   so it does not point at v0.1.0.
-2. Run `afrosetup.exe`. Choose a language, then **Install** or **Update**.
-   - **Install:** choose a folder, then your Europe ISO or the extracted game folder (`default.xex` must be inside it).
-   - **Update:** choose the existing installation folder, the one that contains `game\Play.bat`. Close the game first. If `gamedata\default.xex` is already there, the ISO is not asked for again. Tools still on disk are reused, and only missing tools are downloaded again. The extracted game, your saves, and `game\afro_language.cfg` stay. The program files are rebuilt and replaced only after that build succeeds, including when the folder is already 0.1.0.
-3. Accept the Microsoft Visual Studio Build Tools license if it is not already recorded (the box starts unchecked). Shortcuts are optional. You can keep the downloaded tools or delete them when setup finishes. Deleting them does not remove `game`, the extracted game, the logs, your ISO, or your saves. A later **Update** downloads again only the tools that are missing.
-4. The window says this takes several minutes. It does not promise a fixed duration.
-5. On success the window says **Installation finished** and shows **Play**. **Play** starts `game\Play.bat` in that folder, and only when you click it. **Finish** and closing the window do not start the game. A shortcut, if you asked for one, also starts that `Play.bat`.
+### Install
+1. Download **[`afrosetup.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup.exe)**
+   from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
+   That file is the setup program, not the game. It builds the game on your PC from your disc.
+2. Run `afrosetup.exe`. Choose a language, then **Install**.
+3. Choose a folder, then your Europe ISO or the extracted game folder (`default.xex` must be inside it).
+4. Accept the Microsoft Visual Studio Build Tools license (the box starts unchecked). Shortcuts are optional. You can keep the downloaded tools or delete them when setup finishes. Deleting them does not remove `game`, the extracted game, the logs, your ISO, or your saves.
+5. The window says this takes several minutes. It does not promise a fixed duration.
+6. On success the window says **Installation finished** and shows **Play**. **Play** starts `game\Play.bat` in that folder, and only when you click it. **Finish** and closing the window do not start the game. A shortcut, if you asked for one, also starts that `Play.bat`.
 
 Nothing is installed system-wide and no admin rights are needed. To uninstall,
 delete the install folder and the shortcuts. Saves are not in that folder.
 
+### Update
+Run `afrosetup.exe` again, choose **Update**, and select the existing installation
+folder (the one that contains `game\Play.bat`). Close the game first. If
+`gamedata\default.xex` is already there, the ISO is not asked for again. Tools
+still on disk are reused, and only missing tools are downloaded again. The
+extracted game, your saves, and `game\afro_language.cfg` stay. The program files
+are rebuilt and replaced only after that build succeeds, including when the
+folder is already 0.1.0.
+
 ### Your saves
-Saves are in your Documents folder, `Documents\afrorecomp`. That folder is not
-the launcher config. Launcher settings are `afro_language.cfg` next to the
-executable (`game\afro_language.cfg` after setup). In the launcher (shown at
-start; hold **Shift** while starting to show it again) use **Manage saved games...**
-to open, back up, restore or delete them. Details: [Saves](#saves).
+Paste this into File Explorer:
+
+`%USERPROFILE%\Documents\afrorecomp`
+
+If Windows has redirected your Documents folder, the saves are in that Documents
+folder instead. In the launcher (shown at start; hold **Shift** while starting
+to show it again) use **Manage saved games...** to open, back up, restore or
+delete them. Details: [Saves](#saves).
 
 ### If something goes wrong
 - If the window says **Installation did not finish**, use **Show details** and read `install.log` in the install folder. Run `afrosetup.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
-- [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat) is a separate console fallback. See [Console installer](#console-installer). Without `-Ref` it builds `main`, not this pinned release.
+- [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat) is a separate console fallback. See [Console installer](#console-installer). Without `-Ref` it builds `main`.
 - The game log is `afro.log` in the install folder.
 - Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with what
   happened and the log. **Never attach game files** (ISO, extracted files).
@@ -136,13 +144,12 @@ stays at the retail default (2).
 
 ### Console installer
 `install.bat` is a fallback for a source checkout. The program players download
-is [`afrosetup.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/download/v0.1.0/afrosetup.exe)
-from the [v0.1.0 release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/tag/v0.1.0).
-That setup builds the 0.1.0 source stored inside the file. It does not clone public `main`.
+is [`afrosetup.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup.exe)
+from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
+That setup builds the source stored inside the file. It does not clone public `main`.
 
-`install.bat` with no `-Ref` builds the `main` branch. `main` moves after a release.
-Because v0.1.0 is a prerelease, `/releases/latest` does not select it. To build the
-tagged source from the console installer, pass `-Ref v0.1.0`.
+`install.bat` with no `-Ref` builds the `main` branch. To build the tagged 0.1.0
+source from the console installer, pass `-Ref v0.1.0`.
 
 1. Make an ISO of your own Afro Samurai (Europe) disc, or use an extracted folder
    that contains `default.xex` (see [Getting your game files](#getting-your-game-files)).
@@ -288,7 +295,7 @@ Space = A, Backspace = B, L = X, P = Y, Q/E = triggers, 1/3 = bumpers, Enter = S
 Tab = Back, Shift+arrows = D-pad).
 
 #### Saves
-Saves are stored in your Documents folder, in `Documents\afrorecomp\` (the save
+Saves are stored in `%USERPROFILE%\Documents\afrorecomp` (the save
 itself is under `<profile id>\4E4D07D8\00000001\AFRO_0.SAV`; the shader cache is in
 `Documents\afrorecomp\cache`). To back them up, copy the whole
 `Documents\afrorecomp` folder while the game is closed; to restore, copy it back.
