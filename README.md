@@ -5,8 +5,9 @@ Europe, title ID 4E4D07D8) to native Windows x64 using
 [ReXGlue](https://github.com/rexglue/rexglue-sdk).
 
 **This repository contains no game files.** You need your own original disc
-(or an ISO you dumped from it). No binaries are released: the executable
+(or an ISO you dumped from it). The game executable is not released: it
 contains code translated from the game, so everyone builds it from their own copy.
+The only program attached to a release is `afrosetup.exe`, the setup installer.
 
 ## Quick start
 
@@ -18,11 +19,15 @@ contains code translated from the game, so everyone builds it from their own cop
 - A controller (Xbox or any controller Windows/SDL recognises).
 
 **Steps:**
-1. On this page click **Code > Download ZIP** and extract the ZIP into a folder
-   (it creates an `AfroSamuraiRecomp-main` folder; `install.bat` is inside it).
-   (You can also download just [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat).)
-   The installer always builds the latest version of this repository from GitHub.
-2. Double-click **`install.bat`**.
+1. Download **`afrosetup.exe`** from the
+   [v0.1.0 release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/tag/v0.1.0)
+   and run it. It is the setup program, not the game. It already contains this
+   0.1.0 source and builds the game from your Europe disc.
+   The console installer is still there: **Code > Download ZIP** (folder
+   `AfroSamuraiRecomp-main`, with `install.bat` inside) or just
+   [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat).
+   `install.bat` builds the latest version of this repository from GitHub.
+2. Double-click **`afrosetup.exe`**, or **`install.bat`** if you used the ZIP.
 3. Answer the questions at the start: language, install folder, your ISO,
    the Microsoft Visual Studio license (needed for the compiler) and shortcuts.
    After that it runs on its own.
@@ -66,8 +71,11 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.0.16**). **Original (30)** has been played repeatedly on one PC (Windows, AMD
-Radeon RX 9060 XT) without the Experimental-60 problems. Experimental (60) is an
+Preview (**0.1.0**). **Original (30)** remains the default. On the author's Windows PC,
+a clean install with the first 0.1.0 setup started the game, and a same-version
+update started it from Jugar. That is the author's use, not an independent
+playthrough of the whole game. The Cheats warning and the shorter setup progress
+line were not run again on Windows after they were added. Experimental (60) is an
 **incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
 do not treat it as stable — cinematics can run fast and performance dips remain.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
@@ -80,12 +88,17 @@ do not treat it as stable — cinematics can run fast and performance dips remai
 - Voices work, including all cinematic dialogue (0.0.13 `afro-xma-fix-log` and
   0.0.14 `afro-xma-frameless-chain` runtime patches).
 - Known issues (also apply at Original unless noted):
-  - FPS can dip (including below 30 / near dual-camera stretches ~30). Cause is
-    **not proven** without profiling; do not assume a single GPU root cause.
+  - FPS can dip, including below 30 and especially above native internal resolution.
+    Cause is **not proven** without profiling; do not assume a single GPU root cause.
+  - Black textures, including the headband.
+  - Occasional odd audio.
   - If two tutorial prompts appear at once, the first one can stay stuck on screen
     (original game behaviour; restarting the level clears it).
-  - **Experimental (60) only:** intro and cutscenes can run too fast; other
-    gameplay / Focus / combat timing may be wrong and is largely unverified.
+  - **Experimental (60) only:** intro and cutscenes can run too fast and frames
+    can still drop. Other gameplay / Focus / combat timing may be wrong and is
+    largely unverified. Not a finished 60 FPS mode.
+  - **Invulnerability (experimental)** does not currently prevent death. It is
+    off by default, lasts for that launch only, and is not saved.
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -347,7 +360,7 @@ unless a maintainer specifically asks.
 ### Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
-- `install.bat`, `tools/install.ps1` – one-click installer.
+- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup; the exe is a release asset, not committed.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
 - `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).

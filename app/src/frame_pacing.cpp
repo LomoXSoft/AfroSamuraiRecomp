@@ -2,6 +2,7 @@
 // which runs right before the game's D3D Swap calls VdSwap (once per guest frame).
 // Present-interval / Experimental dt hooks also live here (see afro_hooks.toml).
 #include "frame_pacing.h"
+#include "player_hp_invuln.h"
 
 #include <atomic>
 #include <chrono>
@@ -27,12 +28,20 @@ REXCVAR_DEFINE_BOOL(afro_fps_log, true, "Afro",
 REXCVAR_DEFINE_INT32(afro_present_interval, 2, "Afro",
                      "Guest D3D present interval (2 = original 30 FPS, 1 = unlocked ~60)");
 
+REXCVAR_DEFINE_STRING(afro_tick_mode, "original", "Afro",
+                      "Tick mode request: original|force30|force60|varying (flags unmapped)");
+
 REXCVAR_DEFINE_BOOL(afro_fx_dof, true, "Afro", "Game fullscreen effect: depth of field");
 REXCVAR_DEFINE_BOOL(afro_fx_bloom, true, "Afro", "Game fullscreen effect: bloom");
 REXCVAR_DEFINE_BOOL(afro_fx_sepia, true, "Afro", "Game fullscreen effect: sepia");
 REXCVAR_DEFINE_BOOL(afro_fx_blood, true, "Afro", "Game fullscreen effect: blood shader");
 REXCVAR_DEFINE_BOOL(afro_fx_focus, true, "Afro", "Game fullscreen effect: focus (slow-mo)");
 REXCVAR_DEFINE_BOOL(afro_fx_log, false, "Afro", "Log fullscreen effect state changes");
+
+// Session test aid: block protagonist char-HP loss only. Default OFF.
+// Not saved. Enemies are not affected. See docs/PLAYER_INVULN_v0017.md.
+REXCVAR_DEFINE_BOOL(afro_player_invuln, false, "Afro",
+                    "Test: player char HP does not decrease (session; not a full god-mode)");
 
 namespace {
 struct FxFlag { const char* name; uint32_t addr; bool (*on)(); };
@@ -53,6 +62,30 @@ constexpr uint32_t kBloodActive = 0x828B0E8F, kBloodMask = 0x828B0EA0,
 constexpr uint32_t kDtAddr = 0x828B1C04;
 constexpr uint32_t kDtMeasuredAddr = 0x828B1BF0;
 constexpr uint32_t kDtScaleAddr = 0x828B1C08;
+
+// Player singleton + the combat HP writer (see docs/PLAYER_INVULN_v0017.md):
+//   *(uint32*)0x828E629C = player character
+//   player+0x280 = char HP float stored by sub_82666218 at 0x826662D8 and 0x82666308
+//   player+0x284 = max HP (ceiling for restores; never written by this code)
+//   player+0x7D4 = HP meter object; meter+0x4 is secondary (not the restore target)
+//   meter+0x3C = retail "block set-when-new<=0" flag (not sufficient on its own)
+// sub_82674030 / VA 0x826740D8 is a codegen label collision, not this writer.
+constexpr uint32_t kPlayerPtr = 0x828E629C;
+constexpr uint32_t kPlayerHpMeterOff = 0x7D4;
+constexpr uint32_t kPlayerHpFloatOff = 0x280;
+constexpr uint32_t kPlayerHpMaxOff = 0x284;
+constexpr uint32_t kMeterCurOff = 0x4;
+constexpr uint32_t kMeterBlockLethalOff = 0x3C;
+constexpr uint32_t kHpStoreA = 0x826662D8;
+constexpr uint32_t kHpStoreB = 0x82666308;
+// bl sub_82663180: the generated LR is 0x82666318, so the bl is the previous word.
+constexpr uint32_t kMeterDeathCall = 0x82666314;
+// Function entry. r3 is still the meter argument, before lfs/fcmpu/ble.
+constexpr uint32_t kMeterDeathEntry = 0x82663180;
+constexpr uint32_t kMeterHp0 = 0;       // float compared with 0
+constexpr uint32_t kMeterFlag60 = 60;   // byte cleared on the lethal path
+constexpr uint32_t kMeterFlag63 = 63;   // byte set on the lethal path
+constexpr uint32_t kInvulnDetailCap = 8;
 constexpr float kDt30 = 1.f / 30.f;
 constexpr float kDt60 = 1.f / 60.f;
 
@@ -87,6 +120,152 @@ int ClampedPresentInterval() {
 }
 
 bool Experimental60() { return ClampedPresentInterval() == 1; }
+
+const char* TickModeName() {
+  const std::string& m = REXCVAR_GET(afro_tick_mode);
+  if (m == "force30") return "force30";
+  if (m == "force60") return "force60";
+  if (m == "varying") return "varying";
+  return "original";
+}
+
+void TickModeOnce() {
+  static bool reported = false;
+  if (reported) return;
+  reported = true;
+  const char* mode = TickModeName();
+  if (std::strcmp(mode, "original") == 0) {
+    REXLOG_INFO("afro tick_mode=original (guest Force*/AllowVaryingTick flags untouched)");
+    return;
+  }
+  REXLOG_WARN(
+      "afro tick_mode={}: Force60HzTick byte mapped at 0x828E63A3 but only a debug-draw "
+      "consumer found so far; Force30/Varying/Allow still soft-unmapped. No guest flags "
+      "written; only afro_present_interval applies.",
+      mode);
+}
+
+bool GuestPtrPlausible(uint32_t p) {
+  // Guest heap/code window used by this title; reject null / low / clearly wild.
+  return p >= 0x10000 && p < 0x90000000;
+}
+
+afro_invuln::Hold g_inv_hold;
+uint32_t g_inv_clamps = 0;
+uint32_t g_inv_restores = 0;
+uint32_t g_inv_meter = 0;
+uint32_t g_inv_detail = 0;
+bool g_inv_suppress = false;
+bool g_inv_logged_on = false;
+bool g_inv_logged_off = false;
+bool g_inv_logged_ready = false;
+bool g_inv_logged_miss = false;
+bool g_inv_logged_meter = false;
+
+bool InvulnAllowDetail() {
+  if (g_inv_detail < kInvulnDetailCap) {
+    ++g_inv_detail;
+    return true;
+  }
+  if (!g_inv_suppress) {
+    g_inv_suppress = true;
+    REXLOG_INFO(
+        "afro invuln: further detail suppressed (cap {}); "
+        "clamps/restores stay on the ~2s fps line",
+        kInvulnDetailCap);
+  }
+  return false;
+}
+
+void InvulnResetSession() {
+  g_inv_hold = {};
+  g_inv_logged_ready = false;
+  g_inv_logged_miss = false;
+  g_inv_logged_meter = false;
+}
+
+std::string InvulnFpsSuffix() {
+  const bool on = (bool)REXCVAR_GET(afro_player_invuln);
+  if (!on && g_inv_clamps == 0 && g_inv_restores == 0 && g_inv_meter == 0) return {};
+  return "  invuln=" + std::string(on ? "on" : "off") +
+         " clamps=" + std::to_string(g_inv_clamps) +
+         " restores=" + std::to_string(g_inv_restores) +
+         " meter_guards=" + std::to_string(g_inv_meter);
+}
+
+void PlayerInvulnTick() {
+  const bool on = (bool)REXCVAR_GET(afro_player_invuln);
+  if (!on) {
+    if (g_inv_logged_on && !g_inv_logged_off && InvulnAllowDetail())
+      REXLOG_INFO("afro invuln: disabled (player HP store hook off)");
+    g_inv_logged_off = g_inv_logged_on;
+    g_inv_logged_on = false;
+    InvulnResetSession();
+    return;
+  }
+  if (!g_inv_logged_on) {
+    g_inv_logged_on = true;
+    g_inv_logged_off = false;
+    if (InvulnAllowDetail())
+      REXLOG_INFO(
+          "afro invuln: cvar ON — char stfs @0x{:08X}/@0x{:08X}; "
+          "meter+0 guard before bl @0x{:08X} and at sub_82663180 entry @0x{:08X}. "
+          "Death test is meter+0<=0, not f1. Enemies unchanged.",
+          kHpStoreA, kHpStoreB, kMeterDeathCall, kMeterDeathEntry);
+  }
+  if (!rex::system::kernel_state()) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+
+  const uint32_t player =
+      rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kPlayerPtr));
+  if (!GuestPtrPlausible(player)) {
+    if (!g_inv_logged_miss) {
+      g_inv_logged_miss = true;
+      if (InvulnAllowDetail())
+        REXLOG_INFO("afro invuln: player ptr not ready (0x{:08X})", player);
+    }
+    return;
+  }
+  const uint32_t meter = rex::memory::load_and_swap<uint32_t>(
+      mem->TranslateVirtual(player + kPlayerHpMeterOff));
+  // Secondary retail gate only. The combat writer does not honor it.
+  if (GuestPtrPlausible(meter)) {
+    *mem->TranslateVirtual<uint8_t*>(meter + kMeterBlockLethalOff) = 1;
+  } else if (!g_inv_logged_meter) {
+    g_inv_logged_meter = true;
+    if (InvulnAllowDetail())
+      REXLOG_INFO("afro invuln: meter ptr bad (player=0x{:08X} meter=0x{:08X})",
+                  player, meter);
+  }
+
+  const float cur = ReadGuestFloat(player + kPlayerHpFloatOff);
+  const float hp_max = ReadGuestFloat(player + kPlayerHpMaxOff);
+  const float meter_hp =
+      GuestPtrPlausible(meter) ? ReadGuestFloat(meter + kMeterCurOff) : 0.f;
+  const afro_invuln::FallbackDecision decision =
+      afro_invuln::DecideFallback(g_inv_hold, cur, hp_max);
+
+  if (!g_inv_logged_ready && g_inv_hold.value >= 0.f) {
+    g_inv_logged_ready = true;
+    if (InvulnAllowDetail())
+      REXLOG_INFO(
+          "afro invuln: player=0x{:08X} hp_char={:.1f} hp_max={:.1f} hold={:.1f} "
+          "meter={:.1f} (char HP is the restore source; meter/+0x{:X} is secondary)",
+          player, cur, hp_max, g_inv_hold.value, meter_hp, kMeterBlockLethalOff);
+  }
+
+  if (decision.action != afro_invuln::FallbackAction::kWriteChar) return;
+  if (!std::isfinite(decision.value)) return;
+  // Char HP only. Do not write the meter and do not raise player+0x284.
+  WriteGuestFloat(player + kPlayerHpFloatOff, decision.value);
+  ++g_inv_restores;
+  if (InvulnAllowDetail())
+    REXLOG_INFO(
+        "afro invuln: player HP fallback {:.1f} -> {:.1f} "
+        "(hp_max {:.1f} player=0x{:08X})",
+        cur, decision.value, hp_max, player);
+}
 
 void FxTick() {
   if (!rex::system::kernel_state()) return;
@@ -211,6 +390,87 @@ void AfroPresentIntervalConsumeHook(PPCRegister& r29) {
   const int v = ClampedPresentInterval();
   r29.u64 = static_cast<uint64_t>(v);
   g_seen_interval.store(v, std::memory_order_relaxed);
+  PlayerInvulnTick();
+}
+
+// sub_82666218 stfs f0,640(r31) at 0x826662D8 and 0x82666308 (char HP, +0x280).
+// afro_hooks.toml omits after_instruction, so this runs BEFORE the store and
+// f0 is what stfs writes. Same symbol at both sites. Not sub_82674030.
+void AfroPlayerHpStoreHook(PPCRegister& r31, PPCRegister& f0) {
+  if (!(bool)REXCVAR_GET(afro_player_invuln)) return;
+  if (!rex::system::kernel_state()) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  const uint32_t player =
+      rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kPlayerPtr));
+  // Any other entity, including enemies, keeps the guest f0.
+  if (!GuestPtrPlausible(player) || r31.u32 != player) return;
+
+  const float cur = ReadGuestFloat(player + kPlayerHpFloatOff);
+  const float hp_max = ReadGuestFloat(player + kPlayerHpMaxOff);
+  const float incoming = static_cast<float>(f0.f64);
+  const afro_invuln::StoreDecision decision =
+      afro_invuln::DecideStore(g_inv_hold, incoming, cur, hp_max);
+  if (decision.action != afro_invuln::StoreAction::kReplace) return;
+  if (!std::isfinite(decision.value)) return;
+  f0.f64 = static_cast<double>(decision.value);
+  ++g_inv_clamps;
+  if (InvulnAllowDetail())
+    REXLOG_INFO(
+        "afro invuln: player HP store {:.1f} -> {:.1f} "
+        "(char {:.1f} hp_max {:.1f} hold {:.1f} player=0x{:08X})",
+        incoming, decision.value, cur, hp_max, g_inv_hold.value, player);
+}
+
+// Writes player meter+0 only. f1 is intentionally not a parameter: sub_82663180
+// compares the loaded meter+0 (f0) with 0, then ble to the lethal block.
+void GuardPlayerMeter(uint32_t meter, uint32_t player) {
+  if (!GuestPtrPlausible(meter) || !GuestPtrPlausible(player)) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  const uint32_t player_meter = rex::memory::load_and_swap<uint32_t>(
+      mem->TranslateVirtual(player + kPlayerHpMeterOff));
+  if (meter != player_meter) return;
+  const float meter0 = ReadGuestFloat(meter + kMeterHp0);
+  const float hp_max = ReadGuestFloat(player + kPlayerHpMaxOff);
+  const float char_hp = ReadGuestFloat(player + kPlayerHpFloatOff);
+  const afro_invuln::MeterDecision decision =
+      afro_invuln::DecideMeter(g_inv_hold, meter0, char_hp, hp_max);
+  if (!decision.write || !std::isfinite(decision.value) || !(decision.value > 0.f)) return;
+  WriteGuestFloat(meter + kMeterHp0, decision.value);
+  ++g_inv_meter;
+  if (InvulnAllowDetail()) {
+    const uint8_t flag60 = *mem->TranslateVirtual<uint8_t*>(meter + kMeterFlag60);
+    const uint8_t flag63 = *mem->TranslateVirtual<uint8_t*>(meter + kMeterFlag63);
+    REXLOG_INFO(
+        "afro invuln: meter+0 {:.1f} -> {:.1f} lethal_skip={} "
+        "meter+60={} meter+63={} player=0x{:08X}",
+        meter0, decision.value, decision.lethal ? 1 : 0, flag60, flag63, player);
+  }
+}
+
+uint32_t LoadPlayerSingleton() {
+  if (!rex::system::kernel_state()) return 0;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return 0;
+  return rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kPlayerPtr));
+}
+
+// Before bl 0x82663180 in sub_82666218. r31 is the entity, r3 is the meter.
+void AfroPlayerMeterBeforeDeathCall(PPCRegister& r31, PPCRegister& r3) {
+  if (!(bool)REXCVAR_GET(afro_player_invuln)) return;
+  const uint32_t player = LoadPlayerSingleton();
+  if (!GuestPtrPlausible(player) || r31.u32 != player) return;
+  GuardPlayerMeter(r3.u32, player);
+}
+
+// First instruction of sub_82663180. r3 is the meter argument. Memory is
+// repaired before lfs f0,0(r31) / fcmpu / ble loc_8266320C.
+void AfroPlayerMeterDeathGate(PPCRegister& r3) {
+  if (!(bool)REXCVAR_GET(afro_player_invuln)) return;
+  const uint32_t player = LoadPlayerSingleton();
+  if (!GuestPtrPlausible(player)) return;
+  GuardPlayerMeter(r3.u32, player);
 }
 
 void AfroDtStore1C04a(PPCRegister& r28, PPCRegister& f0) { PatchPrimaryDtStore(r28, f0, 7172); }
@@ -261,7 +521,9 @@ void AfroCineTimeConvertHook(PPCRegister& r11, PPCRegister& f31) {
 }
 
 void AfroSwapHook(PPCRegister& r31) {
+  TickModeOnce();
   FxTick();
+  PlayerInvulnTick();
   ForceDevicePresentInterval(r31.u32);
   ForceExperimentalPrimaryDt();
   const int cap = REXCVAR_GET(afro_fps_cap);
@@ -304,10 +566,10 @@ void AfroSwapHook(PPCRegister& r31) {
       REXLOG_INFO(
           "afro fps: guest {:.1f} FPS  dt@0x828B1C04={:.6f}s  dt@0x828B1BF0={:.6f}s  "
           "dt@0x828B1C08={:.6f}s  feed={}  present_interval cvar={} seen={}  "
-          "host_cap={}  cine_modes(2s) 0={} 1={} 2={} 3={} 4={}",
+          "tick_mode={}  host_cap={}  cine_modes(2s) 0={} 1={} 2={} 3={} 4={}{}",
           g_fps, dt, dt_m, dt_s, Experimental60() ? "1/60@1C04+const" : "retail",
-          REXCVAR_GET(afro_present_interval), seen < 0 ? -1 : seen, cap,
-          m0, m1, m2, m3, m4);
+          REXCVAR_GET(afro_present_interval), seen < 0 ? -1 : seen, TickModeName(), cap,
+          m0, m1, m2, m3, m4, InvulnFpsSuffix());
     }
     g_win_frames = 0;
   } else if (g_fps == 0 && secs >= 1.0) {

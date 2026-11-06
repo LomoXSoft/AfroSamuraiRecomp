@@ -19,6 +19,10 @@ Options (all optional; anything missing is asked interactively):
   -Shortcut yes|no       create desktop + Start menu shortcuts
   -Ref <branch|tag>      repository revision to build (default: main)
   -RepoUrl <url|path>    repository to clone (default: the GitHub repo)
+  -LocalTree <dir>       copy this prepared source tree instead of cloning.
+                         The graphical setup uses this for unpublished 0.1.0.
+                         It does not fetch public main.
+  -NonInteractive        fail instead of prompting. Requires the other answers.
   -CleanupAfterInstall   at the end, delete everything not needed to play (no question)
   -KeepBuildFiles        at the end, keep the toolchain and build files (no question)
   -Language en|es|fr|it  installer + launcher/game language (default: asked, Windows language preselected)
@@ -33,6 +37,9 @@ param(
   [string]$Ref = 'main',
   [string]$RepoUrl = 'https://github.com/LomoXSoft/AfroSamuraiRecomp.git',
   [string]$GameDataDir,
+  [string]$LocalTree = '',
+  [switch]$NonInteractive,
+  [switch]$Update,
   [switch]$CleanupAfterInstall, [switch]$KeepBuildFiles,
   [ValidateSet('', 'en', 'es', 'fr', 'it')][string]$Language = ''
 )
@@ -42,6 +49,8 @@ $script:DLSHARE = 0.9   # share of a download+extract step spent downloading
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $ISO_SHA1 = '29394DB1854DFC59C767D768C8D35E0A08ACB73D'
+# Graphical setup for the unpublished 0.1.0 tree passes -LocalTree and checks this.
+$LOCAL_TREE_VERSION = '0.1.0'
 $NEED_GB = 20
 # Pinned downloads (official sources) with SHA-256.
 $DL = @{
@@ -270,6 +279,7 @@ function Git([string[]]$a, $wd = $null) { Run (Join-Path $TOOLS 'git\cmd\git.exe
 # Language first (before anything else). Default: Windows UI language if supported.
 $ui = try { (Get-UICulture).TwoLetterISOLanguageName } catch { 'en' }
 $script:LI = [math]::Max(0, $LANGS.IndexOf($ui))
+if ($NonInteractive -and -not $Language) { throw 'NonInteractive requires -Language en, es, fr, or it.' }
 if ($Language) { $script:LI = $LANGS.IndexOf($Language) }
 else {
   Write-Host ''
@@ -308,6 +318,7 @@ function CheckPath($p) {
   $w | ForEach-Object { Write-Host "$(T 'warning'): $_" -ForegroundColor Yellow }
 }
 $NAME = if ($inRepo) { 'AfroSamuraiRecomp-install' } else { 'AfroSamuraiRecomp' }
+if ($NonInteractive -and -not $InstallDir) { throw 'NonInteractive requires -InstallDir.' }
 $Root = $InstallDir
 while (-not $Root) {
   $start = if ($inRepo) { Split-Path (Split-Path $here -Parent) -Parent } else { $here }
@@ -334,12 +345,82 @@ $t0 = Get-Date
 Say (T 'install_folder' $Root)
 Say (T 'log_file' $LOG)
 
+function Test-AfroRunning {
+  $procs = @(Get-Process -Name 'afrorecomp' -ErrorAction SilentlyContinue)
+  if ($procs.Count -gt 0) {
+    throw 'afrorecomp.exe is running. Close the game. This installer will not stop it.'
+  }
+}
+# Files that mean a previous download is still usable. Build stamps are not here:
+# an update always clears those so the same version number is compiled again.
+$UPDATE_REUSE = @{
+  'git' = 'tools\git\cmd\git.exe'
+  'cmake' = 'tools\cmake\bin\cmake.exe'
+  'ninja' = 'tools\ninja\ninja.exe'
+  'python' = 'tools\python\python.exe'
+  'llvm' = 'tools\llvm\bin\clang++.exe'
+  'msvc' = 'tools\msvc\setup_x64.bat'
+  'sdk' = 'sdk\win-amd64\bin\rexglue.exe'
+  'rexglue-src' = 'rexglue-sdk\.git'
+  'gamedata' = 'gamedata\default.xex'
+}
+$UPDATE_REBUILD = @('build-app', 'build-gpu', 'build')
+function Repair-UpdateStamps {
+  foreach ($name in @($UPDATE_REUSE.Keys)) {
+    $stamp = Join-Path $STAMPS "$name.done"
+    $target = Join-Path $Root $UPDATE_REUSE[$name]
+    $exists = Test-Path -LiteralPath $target
+    $marked = Test-Path -LiteralPath $stamp
+    if ($exists -and -not $marked) {
+      New-Item -ItemType File -Force -Path $stamp | Out-Null
+      Say "    reuse existing $name"
+    } elseif ($marked -and -not $exists) {
+      Remove-Item -LiteralPath $stamp -Force
+      Say "    ${name} is missing and will be downloaded again"
+    }
+  }
+  if ((Test-Path -LiteralPath (Join-Path $Root 'gamedata\default.xex')) -and -not (Test-Path -LiteralPath (Join-Path $STAMPS 'iso-hash.done'))) {
+    New-Item -ItemType File -Force -Path (Join-Path $STAMPS 'iso-hash.done') | Out-Null
+    Say '    extracted game already present; ISO will not be requested'
+  }
+  foreach ($name in $UPDATE_REBUILD) {
+    Remove-Item -LiteralPath (Join-Path $STAMPS "$name.done") -Force -ErrorAction SilentlyContinue
+  }
+  Remove-Item -LiteralPath (Join-Path $STAMPS 'build.rev') -Force -ErrorAction SilentlyContinue
+  Say '    same-version refresh: compile stamps cleared; embedded source will be built'
+}
 try {
+  if ($Update) {
+    Test-AfroRunning
+    $play = Test-Path -LiteralPath (Join-Path $Root 'game\Play.bat')
+    $bin = Test-Path -LiteralPath (Join-Path $Root 'game\afrorecomp.exe')
+    if (-not $play -and -not $bin) { throw 'This folder is not an AfroSamuraiRecomp installation (game\Play.bat is missing).' }
+    $installedVer = ''
+    $verFile = Join-Path $Root 'afrorecomp\app\VERSION'
+    if (Test-Path -LiteralPath $verFile) { $installedVer = (Get-Content -LiteralPath $verFile -Raw).Trim() }
+    elseif (Test-Path -LiteralPath (Join-Path $STAMPS 'build.rev')) {
+      $rev = (Get-Content -LiteralPath (Join-Path $STAMPS 'build.rev') -Raw).Trim()
+      if ($rev.StartsWith('local-')) {
+        $rest = $rev.Substring(6)
+        $dash = $rest.IndexOf('-')
+        $installedVer = if ($dash -ge 0) { $rest.Substring(0, $dash) } else { $rest }
+      }
+    }
+    if (-not $installedVer) { $installedVer = 'not recorded' }
+    Repair-UpdateStamps
+    Say "    update $installedVer -> $LOCAL_TREE_VERSION"
+    if ($installedVer -eq $LOCAL_TREE_VERSION) {
+      Say '    same version: program files are rebuilt and replaced only after the build succeeds'
+    }
+  }
   # ------------------------------------------------------- questions -------
   # Every question is asked here, before any download, so the rest runs unattended.
   Write-Host ''; Write-Host (T 'all_q') -ForegroundColor Cyan
   $script:STEP = 'choose game data'
   $haveGame = Test-Path -LiteralPath (Join-Path $Root 'gamedata\default.xex')
+  if ($NonInteractive -and -not $haveGame -and -not $GameDataDir -and -not $Iso) {
+    throw 'NonInteractive requires -Iso or -GameDataDir.'
+  }
   if (-not $haveGame -and -not $GameDataDir -and -not $Iso) {
     Say (T 'sel_iso')
     try {
@@ -372,6 +453,7 @@ try {
     else {
       Say (T 'iso_bad' $h $ISO_SHA1) Yellow
       Say (T 'iso_only') Yellow
+      if ($NonInteractive) { throw (T 'iso_nomatch') }
       if (-not (YesNo (T 'cont') 'n')) { throw (T 'iso_nomatch') }
     }
   }
@@ -380,6 +462,7 @@ try {
   # Microsoft license for the portable MSVC compiler + Windows SDK (only if not installed yet).
   $script:STEP = 'Microsoft license'
   $needMsvc = -not (Done 'msvc')
+  if ($needMsvc -and $NonInteractive -and -not $AcceptMsvcLicense) { throw (T 'lic_no') }
   if ($needMsvc -and -not $AcceptMsvcLicense) {
     $lic = 'https://go.microsoft.com/fwlink/?LinkId=2327714'
     try {
@@ -401,7 +484,10 @@ try {
   $script:STEP = 'shortcuts question'
   $scFile = Join-Path $STAMPS 'shortcut.answer'
   if (-not $Shortcut -and (Test-Path -LiteralPath $scFile)) { $Shortcut = (Get-Content -LiteralPath $scFile -Raw).Trim() }
-  if (-not $Shortcut) { $Shortcut = if (YesNo (T 'sc_q') 'y') { 'yes' } else { 'no' } }
+  if (-not $Shortcut) {
+    if ($NonInteractive) { throw 'NonInteractive requires -Shortcut yes or -Shortcut no.' }
+    $Shortcut = if (YesNo (T 'sc_q') 'y') { 'yes' } else { 'no' }
+  }
   Set-Content -LiteralPath $scFile -Value $Shortcut
 
   Write-Host ''
@@ -440,19 +526,69 @@ try {
   # ------------------------------------------------------- sources ---------
   # The source step always runs (no stamp), so a re-run picks up new commits.
   Remove-Item -LiteralPath (Join-Path $STAMPS 'repo.done') -Force -ErrorAction SilentlyContinue
-  Step 'repo' (T 't_repo' $Ref) {
-    if (-not (Test-Path -LiteralPath (Join-Path $REPO '.git'))) {
-      if (Test-Path -LiteralPath $REPO) { Remove-Item -LiteralPath $REPO -Recurse -Force }
-      Git @('clone', $RepoUrl, $REPO)
+  $REV = $null
+  if ($LocalTree) {
+    $LocalTree = [IO.Path]::GetFullPath($LocalTree.Trim().Trim('"'))
+    $verFile = Join-Path $LocalTree 'app\VERSION'
+    if (-not (Test-Path -LiteralPath (Join-Path $LocalTree 'tools\build_win.bat'))) {
+      throw "Local source is missing tools\build_win.bat: $LocalTree"
     }
-    if ($REPO -ne $here2) {
-      Git @('-C', $REPO, 'fetch', '--tags', $RepoUrl, $Ref)
-      Git @('-C', $REPO, 'checkout', '--detach', 'FETCH_HEAD')
+    if (-not (Test-Path -LiteralPath $verFile)) { throw "Local source is missing app\VERSION: $LocalTree" }
+    $localVer = (Get-Content -LiteralPath $verFile -Raw).Trim()
+    if ($NonInteractive -and $localVer -ne $LOCAL_TREE_VERSION) {
+      throw "Local source app/VERSION is '$localVer', expected $LOCAL_TREE_VERSION. Refusing to build public main instead."
     }
+    Say "    local source: $LocalTree"
+    Say "    app/VERSION: $localVer"
+    Say '    not cloning GitHub and not checking out public main'
+    Step 'repo' (T 't_repo' "local $localVer") {
+      $dest = [IO.Path]::GetFullPath($REPO)
+      $src = [IO.Path]::GetFullPath($LocalTree)
+      if ($dest -ne $src) {
+        if ($src.StartsWith($dest + '\', [StringComparison]::OrdinalIgnoreCase)) {
+          throw 'Install folder is inside the local source. Choose a different install folder.'
+        }
+        # The copy replaces afrorecomp, including any previous build output.
+        # Drop compile stamps so a repeat install of the same VERSION rebuilds.
+        foreach ($n in 'build-app', 'build-gpu', 'build') {
+          Remove-Item -LiteralPath (Join-Path $STAMPS "$n.done") -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Item -LiteralPath (Join-Path $STAMPS 'build.rev') -Force -ErrorAction SilentlyContinue
+        if ($Update) { Test-AfroRunning }
+        if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path $dest | Out-Null
+        & "$env:SystemRoot\System32\robocopy.exe" $src $dest /E /NFL /NDL /NJH /NP /XJ /XD .git /XF *.iso *.xex *.pe | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "robocopy of local source failed ($LASTEXITCODE)" }
+      }
+    }
+    $REV = "local-$localVer"
+    if (Test-Path -LiteralPath (Join-Path $REPO '.git')) {
+      try {
+        $head = (& (Join-Path $TOOLS 'git\cmd\git.exe') -C $REPO rev-parse HEAD).Trim()
+        if ($head) { $REV = "local-$localVer-$head" }
+      } catch { }
+    }
+  } else {
+    if ($NonInteractive -and -not $PSBoundParameters.ContainsKey('Ref')) {
+      throw 'Refusing to build the default branch main. Pass -LocalTree with the 0.1.0 source, or an explicit -Ref that is not public main.'
+    }
+    if ($NonInteractive -and $Ref -eq 'main') {
+      throw 'Refusing -Ref main. Public main is not the unpublished 0.1.0 source.'
+    }
+    Step 'repo' (T 't_repo' $Ref) {
+      if (-not (Test-Path -LiteralPath (Join-Path $REPO '.git'))) {
+        if (Test-Path -LiteralPath $REPO) { Remove-Item -LiteralPath $REPO -Recurse -Force }
+        Git @('clone', $RepoUrl, $REPO)
+      }
+      if ($REPO -ne $here2) {
+        Git @('-C', $REPO, 'fetch', '--tags', $RepoUrl, $Ref)
+        Git @('-C', $REPO, 'checkout', '--detach', 'FETCH_HEAD')
+      }
+    }
+    $REV = (& (Join-Path $TOOLS 'git\cmd\git.exe') -C $REPO rev-parse HEAD).Trim()
   }
   # Build stamps are only valid for the source revision they were built from:
   # a new commit makes build-app / build-gpu run again (incremental build).
-  $REV = (& (Join-Path $TOOLS 'git\cmd\git.exe') -C $REPO rev-parse HEAD).Trim()
   $revFile = Join-Path $STAMPS 'build.rev'
   $oldRev = if (Test-Path -LiteralPath $revFile) { (Get-Content -LiteralPath $revFile -Raw).Trim() } else { '' }
   if ($oldRev -ne $REV) {
@@ -520,23 +656,72 @@ try {
   $script:STEP = 'game folder'
   $GAME = Join-Path $Root 'game'
   New-Item -ItemType Directory -Force -Path $GAME | Out-Null
-  Get-ChildItem -LiteralPath $out -File | Where-Object {
+  $built = @(Get-ChildItem -LiteralPath $out -File | Where-Object {
     $_.Name -notmatch '\.(stock|pdb|ilk|lib|exp|ninja|cmake|log)$' -and $_.Name -notmatch '^(CMakeCache\.txt|\.ninja_.*|compile_commands\.json)$'
-  } | ForEach-Object { Copy-Item -LiteralPath $_.FullName (Join-Path $GAME $_.Name) -Force }
-  $ico = Join-Path $REPO 'app\afro_icon.ico'; if (Test-Path -LiteralPath $ico) { Copy-Item -LiteralPath $ico (Join-Path $GAME 'afro_icon.ico') -Force }
-  # Same options as tools\run_win.bat.
-  @('@echo off', 'rem Start Afro Samurai Recomp. Log: ..\afro.log. Hold Shift at start for the launcher.', 'cd /d "%~dp0"',
-    'afrorecomp.exe --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --readback_resolve=fast --log_file="%~dp0..\afro.log" %*') |
-    Set-Content -LiteralPath (Join-Path $GAME 'Play.bat') -Encoding ASCII
+  })
+  if ($Update) {
+    Test-AfroRunning
+    # Stage the new program files, then swap. The previous exe stays until every
+    # new file is in the staging folder. On a failed swap, moved files are put back.
+    # This is only that swap. A finished update is not rolled back afterwards.
+    $stage = Join-Path $GAME '.update-staging'
+    $prev = Join-Path $GAME '.update-prev'
+    if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $stage | Out-Null
+    foreach ($file in $built) { Copy-Item -LiteralPath $file.FullName (Join-Path $stage $file.Name) -Force }
+    foreach ($n in 'afrorecomp.exe', 'rexruntime.dll', 'rexgpu-xenos.dll') {
+      if (-not (Test-Path -LiteralPath (Join-Path $stage $n))) {
+        Remove-Item -LiteralPath $stage -Recurse -Force
+        throw "New build is missing $n. The installed game folder was not changed."
+      }
+    }
+    if (Test-Path -LiteralPath $prev) { Remove-Item -LiteralPath $prev -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $prev | Out-Null
+    $moved = @()
+    try {
+      foreach ($file in (Get-ChildItem -LiteralPath $stage -File)) {
+        $dest = Join-Path $GAME $file.Name
+        if (Test-Path -LiteralPath $dest) {
+          Move-Item -LiteralPath $dest (Join-Path $prev $file.Name) -Force
+          $moved += $file.Name
+        }
+        Move-Item -LiteralPath $file.FullName $dest -Force
+      }
+    } catch {
+      foreach ($name in $moved) {
+        $back = Join-Path $prev $name
+        if (Test-Path -LiteralPath $back) { Move-Item -LiteralPath $back (Join-Path $GAME $name) -Force }
+      }
+      throw "Replacing program files failed. Previous program files were put back. $($_.Exception.Message)"
+    }
+    Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $prev -Recurse -Force -ErrorAction SilentlyContinue
+    Say '    program files replaced after the build succeeded; saves and launcher settings were not changed'
+  } else {
+    foreach ($file in $built) { Copy-Item -LiteralPath $file.FullName (Join-Path $GAME $file.Name) -Force }
+  }
+  $ico = Join-Path $REPO 'app\afro_icon.ico'
+  if ((Test-Path -LiteralPath $ico) -and (-not $Update -or -not (Test-Path -LiteralPath (Join-Path $GAME 'afro_icon.ico')))) {
+    Copy-Item -LiteralPath $ico (Join-Path $GAME 'afro_icon.ico') -Force
+  }
+  $playBat = Join-Path $GAME 'Play.bat'
+  if (-not $Update -or -not (Test-Path -LiteralPath $playBat)) {
+    # Same options as tools\run_win.bat.
+    @('@echo off', 'rem Start Afro Samurai Recomp. Log: ..\afro.log. Hold Shift at start for the launcher.', 'cd /d "%~dp0"',
+      'afrorecomp.exe --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --readback_resolve=fast --log_file="%~dp0..\afro.log" %*') |
+      Set-Content -LiteralPath $playBat -Encoding ASCII
+  }
   foreach ($n in 'afrorecomp.exe', 'rexruntime.dll', 'rexgpu-xenos.dll') { if (-not (Test-Path -LiteralPath (Join-Path $GAME $n))) { throw (T 'missing' $n $GAME) } }
   Say (T 'game_folder' $GAME)
-  # Preset the launcher language (afro_language.cfg next to afrorecomp.exe, which is
-  # where the launcher reads it). Only the language= line is set; ask= stays 1 (or
-  # whatever the user saved), so the launcher still opens and Remember works as before.
-  $cfg = Join-Path $GAME 'afro_language.cfg'
-  $lines = @(if (Test-Path -LiteralPath $cfg) { Get-Content -LiteralPath $cfg | Where-Object { $_ -notmatch '^language=' } } else { 'ask=1' })
-  @("language=$($LANG_XID[$script:LI])") + $lines | Set-Content -LiteralPath $cfg -Encoding ASCII
-  Say (T 'lang_cfg' $LANG_NAMES[$script:LI])
+  # A new install records the chosen language. An update leaves afro_language.cfg alone.
+  if (-not $Update) {
+    $cfg = Join-Path $GAME 'afro_language.cfg'
+    $lines = @(if (Test-Path -LiteralPath $cfg) { Get-Content -LiteralPath $cfg | Where-Object { $_ -notmatch '^language=' } } else { 'ask=1' })
+    @("language=$($LANG_XID[$script:LI])") + $lines | Set-Content -LiteralPath $cfg -Encoding ASCII
+    Say (T 'lang_cfg' $LANG_NAMES[$script:LI])
+  } else {
+    Say '    launcher settings kept (afro_language.cfg not rewritten)'
+  }
 
   # ------------------------------------------------------- shortcut --------
   $script:STEP = 'shortcuts'
@@ -563,6 +748,9 @@ try {
   # ------------------------------------------------------- optional cleanup ---
   # Only folders INSIDE the install root; never the ISO, gamedata, game, logs or saves.
   $script:STEP = 'cleanup'
+  if ($NonInteractive -and -not $KeepBuildFiles -and -not $CleanupAfterInstall) {
+    throw 'NonInteractive requires -KeepBuildFiles or -CleanupAfterInstall.'
+  }
   $junk = @('tools', 'downloads', 'rexglue-sdk', 'sdk', 'afrorecomp', '.install') | ForEach-Object { Join-Path $Root $_ } |
     Where-Object { (Test-Path -LiteralPath $_) -and ([IO.Path]::GetFullPath($_)).StartsWith($Root + '\', [StringComparison]::OrdinalIgnoreCase) }
   if ($inRepo) { $junk = @($junk | Where-Object { $_ -ne $here2 }) }   # never delete the checkout the installer runs from

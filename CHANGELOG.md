@@ -2,6 +2,24 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.1.0 – Fully playable
+- Graphical setup program (`afrosetup.exe` on the release, not in git). It
+  installs or updates, in English, Español, Français, and Italiano, without
+  administrator rights. `install.bat` remains the console installer.
+- Update keeps the extracted game, saves, and launcher settings, and rebuilds
+  even when the folder is already 0.1.0.
+- Launcher labels: `30 (original)`, `60 (experimental)`, `RTV (original)`,
+  `ROV (experimental)`. Cheats are a separate dialog.
+- Invulnerability (experimental) is off by default and is not saved. It does
+  not currently prevent death.
+- Known issues: FPS dips especially above native resolution, black textures
+  including the headband, occasional odd audio, Experimental (60) can accelerate
+  cutscenes and drop frames.
+- The author's Windows PC: a clean install with the first 0.1.0 setup started
+  the game, and a same-version update started it from Jugar. Not an independent
+  full playthrough. The Cheats warning and the shorter progress line were not
+  run again on Windows after they were added.
+
 ## 0.0.16 – Experimental (60) FPS opt-in (incomplete)
 - Launcher Advanced settings: frame rate is now **Original (30)** (default) or
   **Experimental (60)** only. The old host-only 30/60 cap choices and any

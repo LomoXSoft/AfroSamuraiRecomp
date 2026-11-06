@@ -156,3 +156,31 @@ address = 0x82676314
 name = "AfroCineTimeConvertHook"
 registers = ["r11", "f31"]
 after_instruction = true
+
+# Player char HP in sub_82666218: stfs f0,640(r31) which is entity+0x280.
+# after_instruction omitted (default false) so the hook runs BEFORE the store
+# and a rewritten f0 is what stfs writes. Same host function, two sites.
+# Do not point these at sub_82674030 / 0x826740D8 (codegen label collision).
+[[midasm_hook]]
+address = 0x826662D8
+name = "AfroPlayerHpStoreHook"
+registers = ["r31", "f0"]
+
+[[midasm_hook]]
+address = 0x82666308
+name = "AfroPlayerHpStoreHook"
+registers = ["r31", "f0"]
+
+# Before bl sub_82663180 (LR written as 0x82666318, so the bl is 0x82666314).
+# r31 = entity, r3 = meter. Repairs meter+0. Does not take f1: f1 is not the
+# <=0 predicate. Do not move the existing AfroDt30_f1 at 0x82663264.
+[[midasm_hook]]
+address = 0x82666314
+name = "AfroPlayerMeterBeforeDeathCall"
+registers = ["r31", "r3"]
+
+# Entry of sub_82663180, before lfs/fcmpu/ble to loc_8266320C. r3 = meter.
+[[midasm_hook]]
+address = 0x82663180
+name = "AfroPlayerMeterDeathGate"
+registers = ["r3"]
