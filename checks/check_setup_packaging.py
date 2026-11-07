@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Packaging checks for tools/afrosetup.exe. No Windows install is performed."""
+"""Packaging checks for tools/afrosetup-v<VERSION>.exe. No Windows install is performed."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ import struct
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXE = ROOT / "tools" / "afrosetup.exe"
+VERSION = (ROOT / "app" / "VERSION").read_text(encoding="utf-8").strip()
+EXE = ROOT / "tools" / f"afrosetup-v{VERSION}.exe"
 MAGIC = b"AFSTP001"
 
 

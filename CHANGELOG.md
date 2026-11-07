@@ -3,7 +3,7 @@
 Newest first. Versions are in `app/VERSION`.
 
 ## 0.1.0 – Fully playable
-- Graphical setup program (`afrosetup.exe` on the release, not in git). It
+- Graphical setup program (`afrosetup-v0.1.0.exe` on the release, not in git). It
   installs or updates, in English, Español, Français, and Italiano, without
   administrator rights. `install.bat` remains the console installer.
 - Update keeps the extracted game, saves, and launcher settings, and rebuilds

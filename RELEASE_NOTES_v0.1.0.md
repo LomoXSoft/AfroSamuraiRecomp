@@ -7,7 +7,7 @@ files are included.
 ## Highlights
 
 - Original (30) is the default. On the machines exercised by the author, the game starts from the installer and is playable.
-- A graphical setup program, `afrosetup.exe`, in English, Español, Français, and Italiano. It can install, or update an existing 0.1.0 folder, without administrator rights and without changing PATH or the registry.
+- A graphical setup program, `afrosetup-v0.1.0.exe`, in English, Español, Français, and Italiano. It can install, or update an existing 0.1.0 folder, without administrator rights and without changing PATH or the registry.
 - `install.bat` remains the console installer.
 - Launcher choices use the labels `30 (original)`, `60 (experimental)`, `RTV (original)`, and `ROV (experimental)`.
 - Cheats are a separate dialog. Invulnerability is off unless you turn it on for that session, and it is not saved.
@@ -30,7 +30,7 @@ files are included.
 
 ## Building
 
-Run `afrosetup.exe`, or `install.bat` from a source checkout. Both compile from your own Afro Samurai (Europe) ISO. The setup program already contains this 0.1.0 source. It does not download a prebuilt game.
+Run `afrosetup-v0.1.0.exe`, or `install.bat` from a source checkout. Both compile from your own Afro Samurai (Europe) ISO. The setup program already contains this 0.1.0 source. It does not download a prebuilt game.
 
 ## Tested on
 

@@ -1,6 +1,6 @@
 # Update test checklist (Windows, not run here)
 
-Use `/opt/cursor/artifacts/afrosetup.exe` from this drop. The earlier clean install
+Use the v0.1.0 release file `afrosetup-v0.1.0.exe`. The earlier clean install
 does not test this wizard, this updater, or invulnerability.
 
 Before you click Update, nothing is started. The choice is the screen after language:

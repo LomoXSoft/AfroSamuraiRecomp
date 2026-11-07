@@ -1,6 +1,6 @@
 # Graphical installer
 
-Implemented in this drop as `tools/afrosetup.exe`, `tools/afrosetup.cpp`,
+Implemented in this drop as `tools/afrosetup-v0.1.0.exe` (the name comes from `app/VERSION`), `tools/afrosetup.cpp`,
 `tools/build_setup.sh`, `tools/build_setup.bat`, and the `-LocalTree` /
 `-NonInteractive` additions in `tools/install.ps1`. Usage and the checks that
 were actually run are in `docs/SETUP_0.1.0.md`. The notes below are the
@@ -47,7 +47,7 @@ The public installer may default to `main` only after that commit exists.
 
 ## Program to add
 
-`tools/afrosetup.exe`, a small Win32 wizard (same API style as
+`tools/afrosetup-v0.1.0.exe`, a small Win32 wizard (same API style as
 `app/src/language_picker.cpp`: no new toolkit, no admin manifest). It collects
 choices and starts the existing PowerShell script. It does not copy game
 bytes into the exe.
@@ -55,10 +55,10 @@ bytes into the exe.
 Suggested files, all new, none replacing `install.bat`:
 
 - `tools/afrosetup.cpp` — wizard
-- `tools/build_setup.bat` — builds `afrosetup.exe` with the portable clang or
+- `tools/build_setup.bat` — builds `afrosetup-v` plus `app/VERSION` (now `afrosetup-v0.1.0.exe`) with the portable clang or
   MSVC already used by `build_win.bat` (`-mwindows -municode`, subsystem
   windows). Link only `comctl32`, `shell32`, `ole32`.
-- `install.bat` stays. Add one line of text pointing at `afrosetup.exe` if it
+- `install.bat` stays. Add one line of text pointing at `afrosetup-v0.1.0.exe` if it
   sits next to the bat. Do not remove the PowerShell path.
 
 ## Wizard pages (EN and ES, same tags)
@@ -106,9 +106,9 @@ not launch PowerShell.
 On a clean Windows 10 or 11 x64 user account that is not an administrator:
 
 1. `install.bat` still completes with the user's own ISO (fallback).
-2. `afrosetup.exe` in English: cancel on the summary page, confirm no
+2. `afrosetup-v0.1.0.exe` in English: cancel on the summary page, confirm no
    `powershell` child and no partial root.
-3. `afrosetup.exe` in Spanish: full run to `afrorecomp.exe`, Europe ISO hash
+3. `afrosetup-v0.1.0.exe` in Spanish: full run to `afrorecomp.exe`, Europe ISO hash
    enforced, shortcut matches the choice.
 4. Re-run the exe on the same folder and confirm stamped steps are skipped.
 5. Point it at a bad ISO and confirm `install.ps1` stops on the SHA-1 check.

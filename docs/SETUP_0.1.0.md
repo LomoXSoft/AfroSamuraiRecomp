@@ -2,7 +2,7 @@
 
 The wizard asks, in order: language (Español / Français with accents), install folder, one of game ISO or extracted folder, the Build Tools license, shortcuts and whether to delete the downloaded tools, then a short summary. The source page is gone. The included 0.1.0 tree is used. `--local-tree=PATH` is a hidden test switch, not a page. There is a progress bar driven by `install.ps1` percent lines, with the log behind Show details. Success shows "Instalación finalizada" and Jugar, which starts `game\Play.bat` only when that button is clicked and the file exists. Finalizar and the window X do not start the game. Back on that page returns to the summary and does not install again.
 
-`tools/afrosetup.exe` is a Windows setup program. It is not the game, and it
+`tools/afrosetup-v0.1.0.exe` is a Windows setup program. It is not the game, and it
 does not contain a disc image, `default.xex`, or `default.pe`. It asks for an
 install folder and your own Europe disc, then runs the bundled
 `tools/install.ps1`. That script downloads the portable toolchain and builds
@@ -82,6 +82,8 @@ From a full tree that already contains these 0.1.0 files:
 ```
 tools\build_setup.bat
 ```
+
+That writes `tools\afrosetup-v0.1.0.exe` from `app\VERSION`. It does not replace the file already attached to the v0.1.0 release.
 
 That needs `clang++` and Python 3. It does not need the game disc. The cross
 build used here is `bash tools/build_setup.sh` with `REPO` pointing at a

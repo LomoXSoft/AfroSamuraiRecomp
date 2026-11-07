@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append the 0.1.0 source snapshot to afrosetup.exe.
+"""Append the source snapshot to afrosetup-v<VERSION>.exe.
 
 The Windows loader ignores this overlay. The setup program reads the footer
 and extracts the files only after the user presses Install.
@@ -39,7 +39,10 @@ def collect(repo: pathlib.Path, overlay: pathlib.Path) -> list[tuple[str, bytes]
                 continue
             if path.suffix.lower() in skip_suffix and path.name != "install.bat":
                 continue
-            if path.name == "afrosetup.exe":
+            # Built setup programs are not part of the source snapshot.
+            if path.name == "afrosetup.exe" or (
+                path.name.startswith("afrosetup-v") and path.suffix.lower() == ".exe"
+            ):
                 continue
             files[rel] = path
     out = []
