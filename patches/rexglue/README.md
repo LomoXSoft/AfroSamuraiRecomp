@@ -146,8 +146,11 @@ the controller.
 - Mouse look: upstream sent the pixels moved since the game's last poll, so
   the camera speed changed with the polling rate and small moves stayed inside
   the game's stick dead zone. The right stick now follows the mouse speed
-  averaged over `afro_mouse_window_ms` (30), and any movement starts at
-  `afro_mouse_deadzone` (0.27) of full deflection. `mnk_sensitivity` scales it.
+  averaged over `afro_mouse_window_ms` (10), and any movement starts at
+  `afro_mouse_deadzone` (0.35) of full deflection. `mnk_sensitivity` scales it.
+  The launcher's Advanced settings dialog has all three (Mouse sensitivity,
+  Mouse dead zone, Mouse smoothing), saved as `mouse_sens`, `mouse_dz` and
+  `mouse_win` in the launcher config.
 - `afro_button_glyphs` (`auto`): `auto` follows the last used pad or the
   keyboard, or `xbox`, `playstation`, `nintendo`, `steam`, `keyboard`.
 - The launcher's **Control** row sets these: Auto (default: `mnk_mode` on,
