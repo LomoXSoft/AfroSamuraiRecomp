@@ -1,4 +1,4 @@
-﻿# AfroSamuraiRecomp â€“ Afro Samurai (Xbox 360) static recompilation
+# AfroSamuraiRecomp – Afro Samurai (Xbox 360) static recompilation
 
 Unofficial, work-in-progress static recompilation of **Afro Samurai** (Xbox 360,
 Europe, title ID 4E4D07D8) to native Windows x64 using
@@ -81,7 +81,7 @@ Preview (**0.1.1**). **30 (default)** remains the default. Tested: a clean insta
 with the 0.1.0 setup started the game, and an update of that folder started it
 from Play. That is one install, not an independent playthrough of the whole game. **60 (experimental)** is an
 **incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
-do not treat it as stable â€” cinematics can run fast and performance dips remain.
+do not treat it as stable — cinematics can run fast and performance dips remain.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
 - Default GPU path is **RTV (default)** (host render targets): correct image at a stable
   30 FPS with **30 (default)** (launcher default). The black frames of earlier versions
@@ -112,15 +112,15 @@ do not treat it as stable â€” cinematics can run fast and performance dips 
 **Default remains Original (30).** Experimental (60) is for testers who want to help;
 it is **not** claimed smooth, complete, or timing-correct.
 
-**Enable:** Launcher â†’ **Advanced settings...** â†’ **Experimental...** â†’ Frame rate â†’
-**60 (experimental)** â†’ OK, OK, then Play. Tick **Remember** only if you want that
+**Enable:** Launcher → **Advanced settings...** → **Experimental...** → Frame rate →
+**60 (experimental)** → OK, OK, then Play. Tick **Remember** only if you want that
 choice kept.
-**Revert:** same dialog â†’ **30 (default)**. The `fps=` line is in
+**Revert:** same dialog → **30 (default)**. The `fps=` line is in
 `afro_language.cfg` next to the executable (`game\afro_language.cfg` after setup),
 not in `Documents\afrorecomp`.
 
 What it does (high level): unlocks the guest present interval (`afro_present_interval=1`),
-applies a host 60 FPS cap, and enables gated guest dt / 1/30â†’1/60 constant hooks.
+applies a host 60 FPS cap, and enables gated guest dt / 1/30→1/60 constant hooks.
 Original does **not** apply those Experimental dt/const patches; present interval
 stays at the retail default (2).
 
@@ -323,7 +323,7 @@ folder back into `Documents\afrorecomp\`).
 
 ### Launcher and options
 The launcher (shown on first run, after each update, or with Shift) offers:
-language (English, EspaÃ±ol, FranÃ§ais, Italiano), fullscreen or window, internal
+language (English, Español, Français, Italiano), fullscreen or window, internal
 resolution (1x native by default / 2x / 3x) and "remember and don't ask again".
 **Control** picks Auto (keyboard and mouse, a controller takes over when used),
 Controller or Keyboard. **Advanced settings...** holds the tested options: render
@@ -364,9 +364,9 @@ command line, e.g. `--render_target_path_d3d12=rov`.
 #### Getting a log
 See [Logs](#logs-where-afrolog-actually-is). Copy the file right after the problem
 (each launch overwrites it). Useful extra flags for `tools\run_win.bat` or `Play.bat`:
-- `--afro_xma_log=true` â€“ audio (XMA) decoding details, for sound or voice problems.
-- `--afro_perf_log=true` â€“ per-second performance counters, for FPS drops.
-- `--afro_fps_log=false` â€“ disable the bounded ~2s FPS/dt lines if the log grows too large.
+- `--afro_xma_log=true` – audio (XMA) decoding details, for sound or voice problems.
+- `--afro_perf_log=true` – per-second performance counters, for FPS drops.
+- `--afro_fps_log=false` – disable the bounded ~2s FPS/dt lines if the log grows too large.
 
 #### Reporting an issue
 Prefer the **Experimental 60 / bug report** issue template when relevant. Include:
@@ -380,12 +380,12 @@ and `install.log` / build output for install problems.
 unless a maintainer specifically asks.
 
 ### Repository layout
-- `app/` â€“ ReXGlue project: manifest, `afro_functions.toml` (extra function
+- `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
-- `install.bat`, `tools/install.ps1` â€“ console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.1.1.exe`, not committed.
-- `tools/` â€“ build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
+- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.1.1.exe`, not committed.
+- `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
-- `patches/rexglue/` â€“ ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
+- `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
 
 ### Plans
 - Performance work; controller and audio polish.
