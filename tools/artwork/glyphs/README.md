@@ -9,8 +9,9 @@ folder.
 The installer copies `tools/artwork/glyphs` next to `afrorecomp.exe` as `glyphs\`.
 
 - `playstation\`, `nintendo\`, `steam\` (Steam Deck and Steam Controller),
-  `keyboard\` (key caps for the default keyboard-as-controller bindings:
-  Space, Backspace, L, P, 1, 3, Q, E, Tab, Enter, F, K).
+  `keyboard\` (key caps and mouse buttons for the default
+  keyboard-as-controller bindings: A Space, B E, X left click, Y right click,
+  LB 1, RB 3, LT R, RT Q, Back Esc, Start Enter, LS F, RS K).
 - Files are named by the Xbox button POSITION the game asks for: `A`, `B`, `X`,
   `Y`, `LB`, `RB`, `LT`, `RT`, `BACK`, `START`, `LS`, `RS`.
 - On Nintendo the label is the one at that position: `A.png` shows **B**,

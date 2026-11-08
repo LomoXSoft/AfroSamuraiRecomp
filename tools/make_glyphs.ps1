@@ -104,7 +104,20 @@ function KeyCap($path, $text, $px = 56) {
   $g.FillPath((New-Object Drawing.SolidBrush $Dark), $top); $g.DrawPath((New-Pen $Rim 5), $top)
   Draw-Label $g $text $px 128 116 0; Save-Png $b $g $path
 }
+# Mouse with the left or right button lit.
+function Mouse($path, $right) {
+  $b, $g = New-Canvas 128 128
+  $body = Rounded 28 6 72 116 36
+  $g.FillPath((New-Object Drawing.SolidBrush $Dark), $body)
+  $g.SetClip($body)
+  $x = if ($right) { 64 } else { 28 }
+  $g.FillRectangle((New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 240))), $x, 6, 36, 50)
+  $g.ResetClip()
+  $pen = New-Pen $Rim 5
+  $g.DrawLine($pen, 64, 8, 64, 56); $g.DrawLine($pen, 30, 56, 98, 56)
+  $g.DrawPath($pen, $body); Save-Png $b $g $path
+}
 $kb = Join-Path $Out 'keyboard'
-KeyCap "$kb\A.png" 'SPACE' 31; KeyCap "$kb\B.png" 'BKSP' 36; KeyCap "$kb\X.png" 'L'; KeyCap "$kb\Y.png" 'P'
-KeyCap "$kb\LB.png" '1'; KeyCap "$kb\RB.png" '3'; KeyCap "$kb\LT.png" 'Q'; KeyCap "$kb\RT.png" 'E'
-KeyCap "$kb\BACK.png" 'TAB' 48; KeyCap "$kb\START.png" 'ENTER' 31; KeyCap "$kb\LS.png" 'F'; KeyCap "$kb\RS.png" 'K'
+KeyCap "$kb\A.png" 'SPACE' 31; KeyCap "$kb\B.png" 'E'; Mouse "$kb\X.png" $false; Mouse "$kb\Y.png" $true
+KeyCap "$kb\LB.png" '1'; KeyCap "$kb\RB.png" '3'; KeyCap "$kb\LT.png" 'R'; KeyCap "$kb\RT.png" 'Q'
+KeyCap "$kb\BACK.png" 'ESC' 44; KeyCap "$kb\START.png" 'ENTER' 31; KeyCap "$kb\LS.png" 'F'; KeyCap "$kb\RS.png" 'K'

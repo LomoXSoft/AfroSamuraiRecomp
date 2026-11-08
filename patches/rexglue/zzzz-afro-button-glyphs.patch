@@ -302,7 +302,36 @@ diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver
 diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver.cpp
 --- a/src/input/mnk/mnk_input_driver.cpp
 +++ b/src/input/mnk/mnk_input_driver.cpp
-@@ -61,6 +61,8 @@ REXCVAR_DEFINE_STRING(keybind_guide, "", "Input/Keybinds/Controller", "Guide but
+@@ -30,12 +30,14 @@ REXCVAR_DEFINE_BOOL(mnk_mouse, false, "Input",
+ REXCVAR_DEFINE_DOUBLE(mnk_sensitivity, 1.0, "Input", "Mouse sensitivity for right stick")
+     .range(0.01, 10.0);
+ 
+-REXCVAR_DEFINE_STRING(keybind_a, "Semicolon,Space", "Input/Keybinds/Controller", "A button");
+-REXCVAR_DEFINE_STRING(keybind_b, "Quote,Backspace", "Input/Keybinds/Controller", "B button");
+-REXCVAR_DEFINE_STRING(keybind_x, "L", "Input/Keybinds/Controller", "X button");
+-REXCVAR_DEFINE_STRING(keybind_y, "P", "Input/Keybinds/Controller", "Y button");
+-REXCVAR_DEFINE_STRING(keybind_left_trigger, "Q,I", "Input/Keybinds/Controller", "Left trigger");
+-REXCVAR_DEFINE_STRING(keybind_right_trigger, "E,O", "Input/Keybinds/Controller", "Right trigger");
++// afro: action-game defaults (mouse attacks, Q block, E kick, R focus, Esc
++// for the Back menu). The keyboard button icons show these keys.
++REXCVAR_DEFINE_STRING(keybind_a, "Space", "Input/Keybinds/Controller", "A button");
++REXCVAR_DEFINE_STRING(keybind_b, "E", "Input/Keybinds/Controller", "B button");
++REXCVAR_DEFINE_STRING(keybind_x, "LMB", "Input/Keybinds/Controller", "X button");
++REXCVAR_DEFINE_STRING(keybind_y, "RMB", "Input/Keybinds/Controller", "Y button");
++REXCVAR_DEFINE_STRING(keybind_left_trigger, "R", "Input/Keybinds/Controller", "Left trigger");
++REXCVAR_DEFINE_STRING(keybind_right_trigger, "Q", "Input/Keybinds/Controller", "Right trigger");
+ REXCVAR_DEFINE_STRING(keybind_left_shoulder, "1", "Input/Keybinds/Controller", "Left shoulder");
+ REXCVAR_DEFINE_STRING(keybind_right_shoulder, "3", "Input/Keybinds/Controller", "Right shoulder");
+ REXCVAR_DEFINE_STRING(keybind_lstick_up, "W", "Input/Keybinds/Controller", "Left stick up");
+@@ -54,13 +56,15 @@ REXCVAR_DEFINE_STRING(keybind_dpad_down, "Shift+Down", "Input/Keybinds/Controlle
+ REXCVAR_DEFINE_STRING(keybind_dpad_left, "Shift+Left", "Input/Keybinds/Controller", "D-pad left");
+ REXCVAR_DEFINE_STRING(keybind_dpad_right, "Shift+Right", "Input/Keybinds/Controller",
+                       "D-pad right");
+-REXCVAR_DEFINE_STRING(keybind_back, "Z,Tab", "Input/Keybinds/Controller", "Back button");
++REXCVAR_DEFINE_STRING(keybind_back, "Escape", "Input/Keybinds/Controller", "Back button");
+ REXCVAR_DEFINE_STRING(keybind_start, "X,Return", "Input/Keybinds/Controller", "Start button");
+ REXCVAR_DEFINE_STRING(keybind_guide, "", "Input/Keybinds/Controller", "Guide button");
+ 
  REXCVAR_DEFINE_BOOL(mnk_passthrough, false, "Input",
                      "Surface raw keystrokes to the title instead of emulating a pad, for "
                      "titles that read a USB keyboard. Enables the device on its own");
@@ -311,7 +340,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  
  namespace rex::input::mnk {
  
-@@ -146,6 +148,16 @@ bool TokenPressed(const bool (&key_down)[256], std::string_view token, uint8_t l
+@@ -146,6 +150,16 @@ bool TokenPressed(const bool (&key_down)[256], std::string_view token, uint8_t l
  
  std::atomic<bool> mouse_look_active{true};
  
@@ -328,7 +357,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  // ui::VirtualKey follows Windows VK_ numbering; the guest wants USB HID usage
  // page 0x07.
  uint8_t VirtualKeyToHIDUsage(rex::ui::VirtualKey vk_enum) {
-@@ -327,6 +339,10 @@ void MnkInputDriver::OnWindowAvailable(rex::ui::Window* window) {
+@@ -327,6 +341,10 @@ void MnkInputDriver::OnWindowAvailable(rex::ui::Window* window) {
      }
      window->AddInputListener(this, window_z_order());
      window->AddListener(this);
@@ -339,7 +368,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
    }
  }
  
-@@ -722,7 +738,12 @@ void MnkInputDriver::OnKeyDown(rex::ui::KeyEvent& e) {
+@@ -722,7 +740,12 @@ void MnkInputDriver::OnKeyDown(rex::ui::KeyEvent& e) {
    }
    uint16_t vk = static_cast<uint16_t>(e.virtual_key());
    SetKeyState(vk, true);
@@ -352,6 +381,18 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  }
  
  void MnkInputDriver::OnKeyUp(rex::ui::KeyEvent& e) {
+@@ -773,7 +796,11 @@ void MnkInputDriver::OnMouseDown(rex::ui::MouseEvent& e) {
+     default:
+       break;
+   }
++  const uint32_t afro_before = bound_pressed_;
+   RefreshBoundKeystrokesLocked();
++  if (bound_pressed_ & ~afro_before) {
++    AfroNoteKeyboard();
++  }
+ }
+ 
+ void MnkInputDriver::OnMouseUp(rex::ui::MouseEvent& e) {
 diff --git a/src/graphics/afro_glyphs.cpp b/src/graphics/afro_glyphs.cpp
 new file mode 100644
 --- /dev/null

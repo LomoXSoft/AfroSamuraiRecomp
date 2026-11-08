@@ -138,6 +138,10 @@ the controller.
   (`mnk_mode`), the keyboard is family 5. It is set at start when no pad has
   claimed the icons, and again whenever a key bound to a pad button is pressed.
   A pad takes over when it connects first or when one of its buttons is pressed.
+  Mouse buttons bound to pad buttons count as keyboard too. The default binds
+  are changed for an action game: X left click (attack), Y right click,
+  B E (kick), RT Q (block), LT R (focus), A Space, Back Esc (was Z/Tab),
+  Start X/Enter. `keybind_*` still override them.
 - `afro_button_glyphs` (`auto`): `auto` follows the last used pad or the
   keyboard, or `xbox`, `playstation`, `nintendo`, `steam`, `keyboard`.
 - The launcher's **Control** row sets these: Auto (default: `mnk_mode` on,
