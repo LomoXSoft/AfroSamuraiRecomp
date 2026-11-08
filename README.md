@@ -95,7 +95,7 @@ do not treat it as stable — cinematics can run fast and performance dips remai
 - Known issues (also apply at Original unless noted):
   - FPS can dip, including below 30 and especially above native internal resolution.
     Cause is **not proven** without profiling; do not assume a single GPU root cause.
-  - Black textures, including the headband.
+  - The headband looked correct in the author's play of 0.1.1. Other black textures are not claimed fixed.
   - Occasional odd audio.
   - If two tutorial prompts appear at once, the first one can stay stuck on screen
     (original game behaviour; restarting the level clears it).

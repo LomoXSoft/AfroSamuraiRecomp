@@ -33,6 +33,6 @@ SHA-256 `3336ce0378a369f953476896bb091fb457f010fcacc1b5b77968c4a9e07da1c1`
 ## Still not claimed
 
 - Invulnerability (experimental) does not prevent death. It stays off unless enabled for that launch, and it is not saved.
-- Black textures, including the headband, remain.
+- The headband looked correct in the author's play of this build. Other black textures are not claimed fixed.
 - Experimental (60) can still run cutscenes fast and drop frames.
 - No install time is guaranteed on HDD, SSD, or NVMe.
