@@ -214,18 +214,19 @@ diff --git a/src/graphics/pipeline/texture/cache.cpp b/src/graphics/pipeline/tex
 diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver.cpp
 --- a/src/input/sdl/sdl_input_driver.cpp
 +++ b/src/input/sdl/sdl_input_driver.cpp
-@@ -25,6 +25,10 @@
+@@ -25,6 +25,11 @@
  
  REXCVAR_DEFINE_STRING(hid_mappings_file, "gamecontrollerdb.txt", "Input",
                        "Path to SDL gamecontroller mappings file");
 +// afro: read by the GPU plugin to pick the button prompt icons.
 +REXCVAR_DEFINE_INT32(afro_pad_family, 0, "Input",
 +                     "afro: family of the controller used last, set by the SDL driver: "
-+                     "0 none yet, 1 Xbox, 2 PlayStation, 3 Nintendo, 4 Steam");
++                     "0 none yet, 1 Xbox, 2 PlayStation, 3 Nintendo, 4 Steam, "
++                     "5 keyboard (set by the mnk driver)");
  
  namespace rex::input::sdl {
  
-@@ -153,6 +157,41 @@ uint8_t GamepadSubType(SDL_Gamepad* gamepad) {
+@@ -153,6 +158,41 @@ uint8_t GamepadSubType(SDL_Gamepad* gamepad) {
                                  SDL_GetGamepadName(gamepad));
  }
  
@@ -267,7 +268,7 @@ diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver
  }  // namespace
  
  SDLInputDriver::SDLInputDriver(rex::ui::Window* window, size_t window_z_order)
-@@ -619,6 +658,10 @@ void SDLInputDriver::OnControllerDeviceAddedLocked(const SDL_Event& event) {
+@@ -619,6 +659,10 @@ void SDLInputDriver::OnControllerDeviceAddedLocked(const SDL_Event& event) {
    state.id = AllocateDeviceId();
    state.state_changed = true;  // XInput starts with packet_number = 1
    UpdateXCapabilities(state);
@@ -278,7 +279,7 @@ diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver
    controllers_.push_back(state);
  
    const int ordinal = static_cast<int>(controllers_.size()) - 1;
-@@ -678,9 +721,11 @@ void SDLInputDriver::OnControllerDeviceAxisMotionLocked(const SDL_Event& event)
+@@ -678,9 +722,11 @@ void SDLInputDriver::OnControllerDeviceAxisMotionLocked(const SDL_Event& event)
        break;
      case SDL_GAMEPAD_AXIS_LEFT_TRIGGER:
        pad.left_trigger = static_cast<uint8_t>(event.gaxis.value >> 7);
@@ -290,7 +291,7 @@ diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver
        break;
      default:
        assert_always();
-@@ -742,6 +787,7 @@ void SDLInputDriver::OnControllerDeviceButtonChangedLocked(const SDL_Event& even
+@@ -742,6 +788,7 @@ void SDLInputDriver::OnControllerDeviceButtonChangedLocked(const SDL_Event& even
    auto xbutton = xbutton_lookup.at(event.gbutton.button);
    // Pressed or released?
    if (event.gbutton.down) {
@@ -298,11 +299,64 @@ diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver
      if (xbutton == X_INPUT_GAMEPAD_GUIDE && !REXCVAR_GET(guide_button)) {
        return;
      }
+diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver.cpp
+--- a/src/input/mnk/mnk_input_driver.cpp
++++ b/src/input/mnk/mnk_input_driver.cpp
+@@ -61,6 +61,8 @@ REXCVAR_DEFINE_STRING(keybind_guide, "", "Input/Keybinds/Controller", "Guide but
+ REXCVAR_DEFINE_BOOL(mnk_passthrough, false, "Input",
+                     "Surface raw keystrokes to the title instead of emulating a pad, for "
+                     "titles that read a USB keyboard. Enables the device on its own");
++// afro: defined by the SDL driver; 5 = keyboard (see AfroNoteKeyboard).
++REXCVAR_DECLARE(int32_t, afro_pad_family);
+ 
+ namespace rex::input::mnk {
+ 
+@@ -146,6 +148,16 @@ bool TokenPressed(const bool (&key_down)[256], std::string_view token, uint8_t l
+ 
+ std::atomic<bool> mouse_look_active{true};
+ 
++// afro: the keyboard becomes the button icon family while it is the device in
++// use. A pad takes over as soon as it connects or a button is pressed on it.
++constexpr int32_t kAfroFamilyKeyboard = 5;
++void AfroNoteKeyboard() {
++  if (REXCVAR_GET(afro_pad_family) != kAfroFamilyKeyboard) {
++    REXLOG_INFO("afro: button icons follow the keyboard");
++    REXCVAR_SET(afro_pad_family, kAfroFamilyKeyboard);
++  }
++}
++
+ // ui::VirtualKey follows Windows VK_ numbering; the guest wants USB HID usage
+ // page 0x07.
+ uint8_t VirtualKeyToHIDUsage(rex::ui::VirtualKey vk_enum) {
+@@ -327,6 +339,10 @@ void MnkInputDriver::OnWindowAvailable(rex::ui::Window* window) {
+     }
+     window->AddInputListener(this, window_z_order());
+     window->AddListener(this);
++    // afro: keyboard icons until a pad shows up.
++    if (IsEnabled() && !REXCVAR_GET(mnk_passthrough) && REXCVAR_GET(afro_pad_family) == 0) {
++      AfroNoteKeyboard();
++    }
+   }
+ }
+ 
+@@ -722,7 +738,12 @@ void MnkInputDriver::OnKeyDown(rex::ui::KeyEvent& e) {
+   }
+   uint16_t vk = static_cast<uint16_t>(e.virtual_key());
+   SetKeyState(vk, true);
++  const uint32_t afro_before = bound_pressed_;
+   RefreshBoundKeystrokesLocked();
++  // afro: only keys bound to a pad button switch the icons (not Alt+Tab etc.).
++  if (bound_pressed_ & ~afro_before) {
++    AfroNoteKeyboard();
++  }
+ }
+ 
+ void MnkInputDriver::OnKeyUp(rex::ui::KeyEvent& e) {
 diff --git a/src/graphics/afro_glyphs.cpp b/src/graphics/afro_glyphs.cpp
 new file mode 100644
 --- /dev/null
 +++ b/src/graphics/afro_glyphs.cpp
-@@ -0,0 +1,429 @@
+@@ -0,0 +1,432 @@
 +// afro: controller-specific button prompts. See afro_glyphs.h.
 +
 +#include "afro_glyphs.h"
@@ -333,8 +387,9 @@ new file mode 100644
 +#include <stb_image.h>
 +
 +REXCVAR_DEFINE_STRING(afro_button_glyphs, "auto", "GPU",
-+                      "afro: button prompt icons: auto (follow the last used controller), "
-+                      "xbox, playstation, nintendo or steam. Xbox keeps the game's own icons.");
++                      "afro: button prompt icons: auto (follow the last used controller or "
++                      "the keyboard), xbox, playstation, nintendo, steam or keyboard. Xbox "
++                      "keeps the game's own icons.");
 +REXCVAR_DEFINE_BOOL(afro_glyph_log, false, "GPU",
 +                    "afro: log every small DXT5 texture the game loads, with its prompt hash, "
 +                    "and save it as glyph_dump\\<size>_<hash>.dds next to the executable.");
@@ -384,6 +439,7 @@ new file mode 100644
 +    case kFamilyPlayStation: return "playstation";
 +    case kFamilyNintendo: return "nintendo";
 +    case kFamilySteam: return "steam";
++    case kFamilyKeyboard: return "keyboard";
 +    default: return "xbox";
 +  }
 +}
@@ -642,8 +698,9 @@ new file mode 100644
 +  if (s == "playstation" || s == "ps") return kFamilyPlayStation;
 +  if (s == "nintendo" || s == "switch") return kFamilyNintendo;
 +  if (s == "steam") return kFamilySteam;
++  if (s == "keyboard") return kFamilyKeyboard;
 +  int32_t pad = REXCVAR_GET(afro_pad_family);
-+  return (pad >= kFamilyXbox && pad <= kFamilySteam) ? pad : kFamilyXbox;
++  return (pad >= kFamilyXbox && pad <= kFamilyKeyboard) ? pad : kFamilyXbox;
 +}
 +
 +int32_t Identify(const GuestTexture& t) {
@@ -736,7 +793,7 @@ diff --git a/src/graphics/afro_glyphs.h b/src/graphics/afro_glyphs.h
 new file mode 100644
 --- /dev/null
 +++ b/src/graphics/afro_glyphs.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,62 @@
 +#pragma once
 +// afro: controller-specific button prompts (AfroSamuraiRecomp).
 +//
@@ -758,6 +815,7 @@ new file mode 100644
 +  kFamilyPlayStation = 2,
 +  kFamilyNintendo = 3,
 +  kFamilySteam = 4,
++  kFamilyKeyboard = 5,  // keyboard-as-controller (mnk_mode)
 +};
 +
 +// What Identify needs from a texture key and its guest layout.

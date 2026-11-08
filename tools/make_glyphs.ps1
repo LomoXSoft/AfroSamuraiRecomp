@@ -34,7 +34,7 @@ function Rounded($x, $y, $w, $h, $r) {
 }
 function Draw-Label($g, $text, $px, $w, $h, $dy = 3) {
   $f = New-Object Drawing.Font 'Arial', $px, ([Drawing.FontStyle]::Bold), ([Drawing.GraphicsUnit]::Pixel)
-  $sf = New-Object Drawing.StringFormat; $sf.Alignment = 'Center'; $sf.LineAlignment = 'Center'
+  $sf = New-Object Drawing.StringFormat; $sf.Alignment = 'Center'; $sf.LineAlignment = 'Center'; $sf.FormatFlags = 'NoWrap'
   $g.DrawString($text, $f, [Drawing.Brushes]::White, (New-Object Drawing.RectangleF 0, $dy, $w, $h), $sf)
 }
 # Round face button: dark disc with a light rim.
@@ -93,3 +93,18 @@ Shoulder "$st\LB.png" 'L1'; Shoulder "$st\RB.png" 'R1'
 Trigger "$st\LT.png" 'L2'; Trigger "$st\RT.png" 'R2'
 Pill "$st\BACK.png" 'VIEW' 28; Pill "$st\START.png" 'MENU' 28
 Letter-Disc "$st\LS.png" 'L3' 48; Letter-Disc "$st\RS.png" 'R3' 48
+
+# Keyboard (mnk_mode): key caps for the default bindings of the ReXGlue
+# keyboard driver (keybind_* cvars). Rebinding keys does not redraw these.
+function KeyCap($path, $text, $px = 56) {
+  $b, $g = New-Canvas 128 128
+  $base = Rounded 8 14 112 106 26
+  $g.FillPath((New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 14, 14, 16))), $base)
+  $top = Rounded 8 8 112 100 26
+  $g.FillPath((New-Object Drawing.SolidBrush $Dark), $top); $g.DrawPath((New-Pen $Rim 5), $top)
+  Draw-Label $g $text $px 128 116 0; Save-Png $b $g $path
+}
+$kb = Join-Path $Out 'keyboard'
+KeyCap "$kb\A.png" 'SPACE' 31; KeyCap "$kb\B.png" 'BKSP' 36; KeyCap "$kb\X.png" 'L'; KeyCap "$kb\Y.png" 'P'
+KeyCap "$kb\LB.png" '1'; KeyCap "$kb\RB.png" '3'; KeyCap "$kb\LT.png" 'Q'; KeyCap "$kb\RT.png" 'E'
+KeyCap "$kb\BACK.png" 'TAB' 48; KeyCap "$kb\START.png" 'ENTER' 31; KeyCap "$kb\LS.png" 'F'; KeyCap "$kb\RS.png" 'K'

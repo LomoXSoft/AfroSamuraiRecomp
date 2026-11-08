@@ -101,7 +101,7 @@ const AdvItem kAdv[] = {
 };
 constexpr int kAdvN = sizeof(kAdv) / sizeof(kAdv[0]);
 
-struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int invuln = 0; /* 0 off, 1 on — session test only, not persisted */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; };
+struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int invuln = 0; /* 0 off, 1 on — session test only, not persisted */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ };
 
 // GPU-plugin cvars (rexgpu-xenos.dll) are registered only when the plugin is
 // loaded, after the launcher runs, and SetFlagByName rejects unknown names.
@@ -130,7 +130,7 @@ bool Explicit(const char* name) {
 
 #ifdef _WIN32
 // Launcher window: options grouped so more can be added later (one row each).
-struct UiText { const wchar_t *title, *lang, *remember, *hint, *play, *fps, *fps_orig, *fps_exp, *disp, *full, *win, *scale, *adv, *def, *off, *ok, *on, *xbtn, *xwarn, *sepia, *sepia_on, *sepia_off, *gfx, *gfx_rtv, *gfx_rov, *cheats, *cheat_title, *cheat_inv, *cheat_warn, *cancel; };
+struct UiText { const wchar_t *title, *lang, *remember, *hint, *play, *fps, *fps_orig, *fps_exp, *disp, *full, *win, *scale, *adv, *def, *off, *ok, *on, *xbtn, *xwarn, *sepia, *sepia_on, *sepia_off, *gfx, *gfx_rtv, *gfx_rov, *cheats, *cheat_title, *cheat_inv, *cheat_warn, *cancel, *ctrl, *ctrl_auto, *ctrl_pad, *ctrl_kb; };
 const UiText kText[] = {
     {L"afrorecomp_v" AFRO_VERSION_W L" - Launcher", L"Language:", L"Remember and don't ask again",
      L"Hold Shift at launch to show this window again.", L"Play",
@@ -139,7 +139,8 @@ const UiText kText[] = {
      L"Sepia filter:", L"On (original)", L"Off",
      L"Render path:", L"RTV (original)", L"ROV (experimental)",
      L"Cheats\u2026", L"Cheats", L"Invulnerability (experimental)",
-     L"Combat tested. Instant kills, falls and scripts are not.", L"Cancel"},
+     L"Combat tested. Instant kills, falls and scripts are not.", L"Cancel",
+     L"Controls:", L"Auto (keyboard + controller)", L"Controller", L"Keyboard"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanzador", L"Idioma:", L"Recordar y no volver a preguntar",
      L"Mantén Mayús al iniciar para volver a ver esta ventana.", L"Jugar",
      L"Fotogramas:", L"30 (original)", L"60 (experimental)", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resolución interna:", L"Opciones avanzadas...", L"Por defecto", L"Desactivado", L"Aceptar", L"Activado",
@@ -147,7 +148,8 @@ const UiText kText[] = {
      L"Filtro sepia:", L"Activado (original)", L"Desactivado",
      L"Ruta de render:", L"RTV (original)", L"ROV (experimental)",
      L"Trucos\u2026", L"Trucos", L"Invulnerabilidad (experimental)",
-     L"Probado en combate. Muertes instant\u00e1neas, ca\u00eddas y guiones, no.", L"Cancelar"},
+     L"Probado en combate. Muertes instant\u00e1neas, ca\u00eddas y guiones, no.", L"Cancelar",
+     L"Control:", L"Autom\u00e1tico (teclado + mando)", L"Mando", L"Teclado"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanceur", L"Langue :", L"Mémoriser et ne plus demander",
      L"Maintenez Maj au démarrage pour revoir cette fenêtre.", L"Jouer",
      L"Images/s :", L"30 (original)", L"60 (experimental)", L"Affichage :", L"Plein écran", L"Fenêtre", L"Résolution interne :", L"Options avancées...", L"Par défaut", L"Désactivé", L"OK", L"Activé",
@@ -155,7 +157,8 @@ const UiText kText[] = {
      L"Filtre sépia :", L"Activé (original)", L"Désactivé",
      L"Chemin de rendu :", L"RTV (original)", L"ROV (experimental)",
      L"Triches\u2026", L"Triches", L"Invuln\u00e9rabilit\u00e9 (exp\u00e9rimentale)",
-     L"Test\u00e9 au combat. Pas les morts instantan\u00e9es, chutes ou scripts.", L"Annuler"},
+     L"Test\u00e9 au combat. Pas les morts instantan\u00e9es, chutes ou scripts.", L"Annuler",
+     L"Contr\u00f4les :", L"Auto (clavier + manette)", L"Manette", L"Clavier"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Avvio", L"Lingua:", L"Ricorda e non chiedere più",
      L"Tieni premuto Maiusc all'avvio per rivedere questa finestra.", L"Gioca",
      L"Fotogrammi:", L"30 (original)", L"60 (experimental)", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:", L"Opzioni avanzate...", L"Predefinito", L"Disattivato", L"OK", L"Attivato",
@@ -163,7 +166,8 @@ const UiText kText[] = {
      L"Filtro seppia:", L"Attivato (originale)", L"Disattivato",
      L"Percorso di rendering:", L"RTV (original)", L"ROV (experimental)",
      L"Trucchi\u2026", L"Trucchi", L"Invulnerabilit\u00e0 (sperimentale)",
-     L"Provato in combattimento. Non morti istantanee, cadute o script.", L"Annulla"},
+     L"Provato in combattimento. Non morti istantanee, cadute o script.", L"Annulla",
+     L"Controlli:", L"Automatico (tastiera + controller)", L"Controller", L"Tastiera"},
 };
 constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
               kIdHint = 104, kIdFpsLbl = 105, kIdFps = 106, kIdDispLbl = 107,
@@ -171,7 +175,7 @@ constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
               kIdAdvBtn = 111, kIdXBtn = 112, kIdXWarn = 113, kIdXSepiaLbl = 114,
               kIdXSepia = 115, kIdXGfxLbl = 117, kIdXGfx = 118, kIdXCheats = 121,
               kIdCheatInv = 122, kIdCheatOk = 123, kIdCheatCancel = 124,
-              kIdSavesBtn = 116, kIdAdvBase = 200;
+              kIdSavesBtn = 116, kIdAdvBase = 200, kIdCtrlLbl = 125, kIdCtrl = 126;
 
 constexpr int kFpsValues[] = {0, 60};  // Original (30), Experimental (60)
 struct PickState { int sel = 0; bool remember = false; bool done = false; bool play = false; Options opt; };
@@ -243,6 +247,8 @@ void ApplyTexts(HWND h, int sel) {
   SetDlgItemTextW(h, kIdXBtn, t.xbtn);
   SetDlgItemTextW(h, kIdSavesBtn, kSaveText[sel].manage);
   FillCombo(h, kIdDisp, {t.full, t.win});
+  SetDlgItemTextW(h, kIdCtrlLbl, t.ctrl);
+  FillCombo(h, kIdCtrl, {t.ctrl_auto, t.ctrl_pad, t.ctrl_kb});
 }
 
 HFONT UiFont() {
@@ -790,6 +796,8 @@ LRESULT CALLBACK PickProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       } else if (LOWORD(w) == IDOK) {
         st->play = true;
         st->opt.window = SendDlgItemMessageW(h, kIdDisp, CB_GETCURSEL, 0, 0) == 1;
+        st->opt.control = std::clamp(
+            static_cast<int>(SendDlgItemMessageW(h, kIdCtrl, CB_GETCURSEL, 0, 0)), 0, 2);
         int si = static_cast<int>(SendDlgItemMessageW(h, kIdScale, CB_GETCURSEL, 0, 0));
         st->opt.scale = 1 + std::clamp(si, 0, 2);
         st->remember = IsDlgButtonChecked(h, kIdCheck) == BST_CHECKED;
@@ -822,7 +830,7 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   // Vertical layout (unscaled px); rows stack with no gaps when the
   // advanced button is hidden.
   const bool adv = REXCVAR_GET(advanced);
-  const int yAdv = 166, ySaves = adv ? 200 : 166, yCheck = ySaves + 40,
+  const int yAdv = 202, ySaves = adv ? 236 : 202, yCheck = ySaves + 40,
             yHint = yCheck + 26, yPlay = yHint + 42, yEnd = yPlay + 34 + 20;
   RECT rc{0, 0, S(400), S(yEnd)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
@@ -867,7 +875,11 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   SendMessageW(disp, CB_ADDSTRING, 0, (LPARAM)L"-");
   SendMessageW(disp, CB_SETCURSEL, o->window ? 1 : 0, 0);
   SendMessageW(scale, CB_SETCURSEL, (o->scale >= 1 && o->scale <= 3) ? o->scale - 1 : 0, 0);
-  mk(L"BUTTON", WS_TABSTOP, 20, 132, 360, 28, kIdXBtn);  // always shown
+  mk(L"STATIC", SS_CENTERIMAGE, 20, 128, 150, 26, kIdCtrlLbl);
+  HWND ctrl = mk(L"COMBOBOX", cbs, 180, 128, 200, 200, kIdCtrl);
+  SendMessageW(ctrl, CB_ADDSTRING, 0, (LPARAM)L"-");
+  SendMessageW(ctrl, CB_SETCURSEL, std::clamp(o->control, 0, 2), 0);
+  mk(L"BUTTON", WS_TABSTOP, 20, 168, 360, 28, kIdXBtn);  // always shown
   if (adv) mk(L"BUTTON", WS_TABSTOP, 20, yAdv, 360, 28, kIdAdvBtn);
   mk(L"BUTTON", WS_TABSTOP, 20, ySaves, 360, 28, kIdSavesBtn);
   mk(L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, 20, yCheck, 360, 22, kIdCheck);
@@ -918,6 +930,7 @@ unsigned ApplyStartupLanguage() {
       if (line.rfind("sepia=", 0) == 0) opt.sepia = line[6] == '1' ? 1 : 0;
       if (line.rfind("tick=", 0) == 0) opt.tick = std::clamp(std::atoi(line.c_str() + 5), 0, 3);
       if (line.rfind("window=", 0) == 0) opt.window = line[7] == '1';
+      if (line.rfind("control=", 0) == 0) opt.control = std::clamp(std::atoi(line.c_str() + 8), 0, 2);
       for (int i = 0; i < kAdvN; ++i) {
         std::string k = std::string(kAdv[i].key) + "=";
         if (line.rfind(k, 0) == 0)
@@ -979,7 +992,7 @@ unsigned ApplyStartupLanguage() {
     out << "language=" << lang << "\nask=" << (remember ? 0 : 1) << "\nfps=" << (remember ? opt.fps : saved_fps)
         << "\nsepia=" << (remember ? opt.sepia : stored.sepia)
         << "\ntick=0"
-        << "\nwindow=" << (opt.window ? 1 : 0) << "\nscale=" << (remember ? opt.scale : saved_scale)
+        << "\nwindow=" << (opt.window ? 1 : 0) << "\ncontrol=" << opt.control << "\nscale=" << (remember ? opt.scale : saved_scale)
         << "\nversion=" << AFRO_VERSION << "\n";
     for (int i = 0; i < kAdvN; ++i) {
       int v;
@@ -1016,6 +1029,13 @@ unsigned ApplyStartupLanguage() {
                  "[afro] invuln: requested ON for this session (player HP only; not saved)\n");
   if (!Explicit("fullscreen"))
     SetCvar("fullscreen", opt.window ? "false" : "true");
+  // Controls. Auto: the keyboard plays as a pad and its key caps are shown until
+  // a controller connects or is used (then its own icons). Controller: no
+  // keyboard pad. Keyboard: key cap icons whatever is connected.
+  if (!Explicit("mnk_mode"))
+    SetCvar("mnk_mode", opt.control == 1 ? "false" : "true");
+  if (opt.control == 2 && !Explicit("afro_button_glyphs"))
+    SetCvar("afro_button_glyphs", "keyboard");
   for (int i = 0; i < kAdvN; ++i)
     if (opt.adv[i] > 0 && !Explicit(kAdv[i].cvar))
       SetCvar(kAdv[i].cvar, kAdv[i].values[opt.adv[i]]);

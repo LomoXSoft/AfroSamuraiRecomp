@@ -134,8 +134,15 @@ the controller.
   the exe (fitted, centred, mipmapped and BC3-compressed when first used).
   Xbox keeps the game's icons. When the family changes, the prompt textures
   reload.
-- `afro_button_glyphs` (`auto`): `auto` follows the last used pad, or `xbox`,
-  `playstation`, `nintendo`, `steam`.
+- Runtime (`src/input/mnk/mnk_input_driver.cpp`): with keyboard-as-controller
+  (`mnk_mode`), the keyboard is family 5. It is set at start when no pad has
+  claimed the icons, and again whenever a key bound to a pad button is pressed.
+  A pad takes over when it connects first or when one of its buttons is pressed.
+- `afro_button_glyphs` (`auto`): `auto` follows the last used pad or the
+  keyboard, or `xbox`, `playstation`, `nintendo`, `steam`, `keyboard`.
+- The launcher's **Control** row sets these: Auto (default: `mnk_mode` on,
+  icons follow the device in use), Controller (`mnk_mode` off), Keyboard
+  (`mnk_mode` on, key cap icons). Saved as `control=` in the launcher config.
 - `afro_glyph_log` (false): logs every small DXT5 texture with its hash and
   saves it as `glyph_dump\<w>x<h>_<hash>.dds` next to the exe, to find the
   prompts not identified yet.
