@@ -148,8 +148,11 @@ is [`afrosetup-v0.1.1.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/relea
 from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
 That setup builds the source stored inside the file. It does not clone public `main`.
 
-`install.bat` with no `-Ref` builds the `main` branch. To build the tagged 0.1.1
-source from the console installer, pass `-Ref v0.1.1`.
+When it asks its questions interactively, `install.bat` with no `-Ref` builds the
+`main` branch. With `-NonInteractive` it refuses to build `main`, both with no
+`-Ref` and with `-Ref main`: pass an explicit `-Ref` that is not `main`, or
+`-LocalTree` with a 0.1.1 source tree. To build the tagged 0.1.1 source from the
+console installer, pass `-Ref v0.1.1`.
 
 1. Make an ISO of your own Afro Samurai (Europe) disc, or use an extracted folder
    that contains `default.xex` (see [Getting your game files](#getting-your-game-files)).
