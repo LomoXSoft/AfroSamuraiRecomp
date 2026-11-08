@@ -144,6 +144,25 @@ Icon files are named by the Xbox button position the game asks for: on
 Nintendo, `A.png` shows the B label that sits where Xbox A is. A missing file
 keeps the game icon.
 
+## zzzzz-afro-input-lock.patch (runtime, `rexruntime.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last.
+Fixes the keyboard-as-controller crash (`--mnk_mode=true`): the game closed
+after 25 to 110 seconds with `0xc0000374` (heap corruption in `ntdll.dll`),
+with or without the other patches.
+
+`InputSystem` rebuilds `devices_` and `device_owners_` on every
+`GetState`, `GetCapabilities`, `SetState` and `GetKeystroke`, and guest threads
+call those at the same time. With no lock, two threads cleared and refilled the
+same vectors of `DeviceInfo` (which hold `std::string`s). A device whose name
+does not fit the small-string buffer, such as `Keyboard and Mouse`, turns every
+call into heap allocations, so the race showed up quickly in mnk mode. A
+`std::recursive_mutex` now guards those entry points (recursive because
+`GetState` calls `GetStateForUI`). The UI thread only touches `InputSystem`
+at setup and shutdown, so the lock cannot wait on it.
+
+Tested: 3 minutes in the main menu and 2.5 minutes of play with the keyboard,
+no crash (before the patch: 3 crashes in 3 runs).
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and
