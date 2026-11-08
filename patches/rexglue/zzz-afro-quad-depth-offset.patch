@@ -1,0 +1,316 @@
+diff --git a/include/rex/graphics/d3d12/pipeline_cache.h b/include/rex/graphics/d3d12/pipeline_cache.h
+index 7a9d6a2..9713b57 100644
+--- a/include/rex/graphics/d3d12/pipeline_cache.h
++++ b/include/rex/graphics/d3d12/pipeline_cache.h
+@@ -249,6 +249,9 @@ class PipelineCache {
+       uint32_t has_point_coordinates : 1;
+       // PA_CL_CLIP_CNTL::ps_ucp_mode for point primitives.
+       uint32_t point_ps_ucp_mode : 2;
++      // Quad lists only. 1: add xe_afro_quad_depth_ndc_add * w to clip Z.
++      // The rasterizer constant DepthBias is cleared for that draw; slope stays.
++      uint32_t afro_quad_depth_shift : 1;
+     };
+ 
+     GeometryShaderKey() : key(0) { static_assert_size(*this, sizeof(key)); }
+@@ -283,6 +286,8 @@ class PipelineCache {
+       const uint32_t* bound_depth_and_color_render_target_formats,
+       PipelineRuntimeDescription& runtime_description_out, bool for_placeholder = false);
+ 
++  static bool AfroQuadDepthShiftEnabled(int32_t depth_bias, PipelineGeometryShader geometry_shader);
++
+   static bool GetGeometryShaderKey(PipelineGeometryShader geometry_shader_type,
+                                    DxbcShaderTranslator::Modification vertex_shader_modification,
+                                    DxbcShaderTranslator::Modification pixel_shader_modification,
+diff --git a/include/rex/graphics/pipeline/shader/dxbc_translator.h b/include/rex/graphics/pipeline/shader/dxbc_translator.h
+index 910c360..5666ca4 100644
+--- a/include/rex/graphics/pipeline/shader/dxbc_translator.h
++++ b/include/rex/graphics/pipeline/shader/dxbc_translator.h
+@@ -394,6 +394,12 @@ class DxbcShaderTranslator : public ShaderTranslator {
+     // bit 4 = signed. Zero means no scale.
+     uint32_t texture_integer_scale_bits[32];
+ 
++    // Afro experimental quad constant-offset. Added to clip Z as
++    // clip.z += afro_quad_depth_ndc_add * clip.w by the quad geometry shader.
++    // 0 leaves those vertices unchanged. Not read by vertex or pixel shaders.
++    float afro_quad_depth_ndc_add;
++    uint32_t afro_quad_depth_pad[3];
++
+    private:
+     friend class DxbcShaderTranslator;
+ 
+@@ -448,6 +454,8 @@ class DxbcShaderTranslator : public ShaderTranslator {
+ 
+       kTextureIntegerScaleBits,
+ 
++      kAfroQuadDepthNdcAdd,
++
+       kCount,
+     };
+     static_assert(uint32_t(Index::kCount) <= 64,
+diff --git a/src/graphics/d3d12/command_processor.cpp b/src/graphics/d3d12/command_processor.cpp
+index 7596d3b..06e48f4 100644
+--- a/src/graphics/d3d12/command_processor.cpp
++++ b/src/graphics/d3d12/command_processor.cpp
+@@ -50,6 +50,20 @@ REXCVAR_DEFINE_INT32(
+     "playing, an empty file afro_renderdoc_capture.request next to afrorecomp.exe "
+     "or in the install folder does the same and is removed.");
+ 
++// Quad constant depth offset. half is the default. full uses twice that
++// constant; off is the original integer bias. The slope term stays.
++// Read once at GPU init. A command-line or REX_AFRO_QUAD_DEPTH_OFFSET value
++// overrides the default. Not a console-correct fix and not a global change.
++REXCVAR_DEFINE_STRING(
++    afro_quad_depth_offset, "half", "GPU",
++    "afro: half (default), full, or off. Quad lists with a nonzero guest "
++    "constant polygon offset clear the D3D constant depth bias and add that "
++    "absolute offset in the geometry shader. Slope is unchanged. Zero-offset "
++    "draws are unchanged. Not a console-correct or global fix.")
++    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
++
++REXCVAR_DECLARE(bool, force_convert_quad_lists_to_triangle_lists);
++
+ REXCVAR_DEFINE_BOOL(d3d12_readback_memexport, false, "GPU/D3D12",
+                     "Read data written by memory export in shaders on the CPU")
+     .lifecycle(rex::cvar::Lifecycle::kHotReload);
+@@ -4223,6 +4237,46 @@ void D3D12CommandProcessor::UpdateSystemConstantValues(
+     system_constants_.edram_blend_constant[3] = regs.Get<float>(XE_GPU_REG_RB_BLEND_ALPHA);
+   }
+ 
++  // Afro experimental quad constant. 0 unless this draw is a non-tessellated
++  // quad list on the host-RTV path with a nonzero constant offset and the
++  // launcher mode is full or half. The geometry shader adds this to clip Z.
++  {
++    float ndc_add = 0.0f;
++    const std::string& quad_mode = REXCVAR_GET(afro_quad_depth_offset);
++    const bool quad_mode_on = quad_mode == "full" || quad_mode == "half";
++    static bool quad_mode_logged = false;
++    if (quad_mode_on && !quad_mode_logged) {
++      quad_mode_logged = true;
++      REXGPU_INFO(
++          "afro quad depth offset: mode {} (experimental, not a console fix; "
++          "quad lists with a nonzero constant only; slope kept; raster constant "
++          "bias cleared; zero-offset draws unchanged)",
++          quad_mode);
++    }
++    const bool tessellation_enabled =
++        xenos::IsMajorModeExplicit(vgt_draw_initiator.major_mode, vgt_draw_initiator.prim_type) &&
++        regs.Get<reg::VGT_OUTPUT_PATH_CNTL>().path_select ==
++            xenos::VGTOutputPath::kTessellationEnable;
++    const bool quad_gs = !edram_rov_used && !tessellation_enabled &&
++                         vgt_draw_initiator.prim_type == xenos::PrimitiveType::kQuadList &&
++                         !REXCVAR_GET(force_convert_quad_lists_to_triangle_lists);
++    if (quad_mode_on && quad_gs) {
++      float polygon_offset_scale = 0.0f, polygon_offset = 0.0f;
++      draw_util::GetPreferredFacePolygonOffset(regs, primitive_polygonal, polygon_offset_scale,
++                                               polygon_offset);
++      const int32_t bias = draw_util::GetD3D10IntegerPolygonOffset(
++          regs.Get<reg::RB_DEPTH_INFO>().depth_format, polygon_offset);
++      const float range = viewport_info.z_max - viewport_info.z_min;
++      // full: the integer's design bin (exponent -1). half: the next bin.
++      const float constant = (quad_mode == "half" ? 0.5f : 1.0f) * (float(bias) / 16777216.0f);
++      if (bias != 0 && range > 1.0e-8f && range < 1.0e8f && constant == constant) {
++        ndc_add = constant / range;
++      }
++    }
++    dirty |= system_constants_.afro_quad_depth_ndc_add != ndc_add;
++    system_constants_.afro_quad_depth_ndc_add = ndc_add;
++  }
++
+   cbuffer_binding_system_.up_to_date &= !dirty;
+ }
+ 
+diff --git a/src/graphics/d3d12/pipeline_cache.cpp b/src/graphics/d3d12/pipeline_cache.cpp
+index 36fa55e..00e1d54 100644
+--- a/src/graphics/d3d12/pipeline_cache.cpp
++++ b/src/graphics/d3d12/pipeline_cache.cpp
+@@ -62,4 +62,7 @@ REXCVAR_DEFINE_BOOL(d3d12_tessellation_wireframe, false, "GPU/D3D12",
+ REXCVAR_DEFINE_BOOL(d3d12_tessellation_wireframe, false, "GPU/D3D12",
+                     "Render tessellation as wireframe");
+ 
++REXCVAR_DECLARE(std::string, afro_quad_depth_offset);
++REXCVAR_DECLARE(bool, force_convert_quad_lists_to_triangle_lists);
++
+ namespace rex::graphics::d3d12 {
+@@ -83,6 +86,19 @@ namespace shaders {
+ #include "../shaders/bytecode/d3d12_5_1/tessellation_indexed_vs.h"
+ }  // namespace shaders
+ 
++// Default half. full/half clear the rasterizer constant bias for
++// quad lists whose guest constant offset is nonzero, and the geometry shader
++// adds that constant in viewport-depth units. Slope is unchanged. Zero-offset
++// draws keep the original geometry shader. Not a console-correct fix.
++bool PipelineCache::AfroQuadDepthShiftEnabled(int32_t depth_bias,
++                               PipelineGeometryShader geometry_shader) {
++  if (geometry_shader != PipelineGeometryShader::kQuadList || depth_bias == 0) return false;
++  if (REXCVAR_GET(force_convert_quad_lists_to_triangle_lists)) return false;
++  const std::string& mode = REXCVAR_GET(afro_quad_depth_offset);
++  return mode == "full" || mode == "half";
++}
++
++
+ PipelineCache::PipelineCache(D3D12CommandProcessor& command_processor,
+                              const RegisterFile& register_file,
+                              const D3D12RenderTargetCache& render_target_cache,
+@@ -601,7 +617,12 @@ void PipelineCache::InitializeShaderStorage(const std::filesystem::path& cache_r
+               DxbcShaderTranslator::Modification(pipeline_description.vertex_shader_modification),
+               DxbcShaderTranslator::Modification(pipeline_description.pixel_shader_modification),
+               pipeline_geometry_shader_key)
+-              ? &GetGeometryShader(pipeline_geometry_shader_key)
++              ? (pipeline_geometry_shader_key.afro_quad_depth_shift =
++                     AfroQuadDepthShiftEnabled(pipeline_description.depth_bias,
++                                               pipeline_description.geometry_shader)
++                         ? 1
++                         : 0,
++                 &GetGeometryShader(pipeline_geometry_shader_key))
+               : nullptr;
+       pipeline_runtime_description.root_signature = command_processor_.GetRootSignature(
+           vertex_shader, pixel_shader,
+@@ -1427,6 +1448,13 @@ bool PipelineCache::GetCurrentStateDescription(
+         regs.Get<reg::RB_DEPTH_INFO>().depth_format, polygon_offset);
+     description_out.depth_bias_slope_scaled =
+         polygon_offset_scale * xenos::kPolygonOffsetScaleSubpixelUnit;
++    // The description keeps the original integer so the pipeline cache key does
++    // not collide with a real zero-bias draw. The D3D bias register is cleared
++    // later, only while this geometry shader reads the per-draw constant.
++    if (AfroQuadDepthShiftEnabled(description_out.depth_bias, description_out.geometry_shader)) {
++      geometry_shader_key.afro_quad_depth_shift = 1;
++      runtime_description_out.geometry_shader = &GetGeometryShader(geometry_shader_key);
++    }
+   }
+   if (tessellated && REXCVAR_GET(d3d12_tessellation_wireframe)) {
+     description_out.fill_mode_wireframe = 1;
+@@ -1829,6 +1857,82 @@ void PipelineCache::CreateDxbcGeometryShader(GeometryShaderKey key,
+     }
+   }
+ 
++  if (key.afro_quad_depth_shift && key.type == PipelineGeometryShader::kQuadList) {
++    name_ptr = uint32_t((shader_out.size() - rdef_position_dwords) * sizeof(uint32_t));
++    uint32_t rdef_name_ptr_float = name_ptr;
++    name_ptr += dxbc::AppendAlignedString(shader_out, "float");
++    uint32_t rdef_type_float_position_dwords = uint32_t(shader_out.size());
++    uint32_t rdef_type_float_ptr =
++        uint32_t((rdef_type_float_position_dwords - rdef_position_dwords) * sizeof(uint32_t));
++    shader_out.resize(rdef_type_float_position_dwords + sizeof(dxbc::RdefType) / sizeof(uint32_t));
++    {
++      auto& rdef_type_float =
++          *reinterpret_cast<dxbc::RdefType*>(shader_out.data() + rdef_type_float_position_dwords);
++      rdef_type_float.variable_class = dxbc::RdefVariableClass::kScalar;
++      rdef_type_float.variable_type = dxbc::RdefVariableType::kFloat;
++      rdef_type_float.row_count = 1;
++      rdef_type_float.column_count = 1;
++      rdef_type_float.name_ptr = rdef_name_ptr_float;
++    }
++    name_ptr = uint32_t((shader_out.size() - rdef_position_dwords) * sizeof(uint32_t));
++    uint32_t rdef_name_ptr_add = name_ptr;
++    name_ptr += dxbc::AppendAlignedString(shader_out, "xe_afro_quad_depth_ndc_add");
++    uint32_t rdef_constants_position_dwords = uint32_t(shader_out.size());
++    uint32_t rdef_constants_ptr =
++        uint32_t((rdef_constants_position_dwords - rdef_position_dwords) * sizeof(uint32_t));
++    shader_out.resize(rdef_constants_position_dwords + sizeof(dxbc::RdefVariable) / sizeof(uint32_t));
++    {
++      auto& rdef_constant =
++          *reinterpret_cast<dxbc::RdefVariable*>(shader_out.data() + rdef_constants_position_dwords);
++      rdef_constant.name_ptr = rdef_name_ptr_add;
++      rdef_constant.start_offset_bytes =
++          uint32_t(offsetof(DxbcShaderTranslator::SystemConstants, afro_quad_depth_ndc_add));
++      rdef_constant.size_bytes = sizeof(float);
++      rdef_constant.flags = dxbc::kRdefVariableFlagUsed;
++      rdef_constant.type_ptr = rdef_type_float_ptr;
++      rdef_constant.start_texture = UINT32_MAX;
++      rdef_constant.start_sampler = UINT32_MAX;
++      system_cbuffer_size_vector_aligned_bytes = rex::align(
++          rdef_constant.start_offset_bytes + uint32_t(sizeof(uint32_t) * 4),
++          uint32_t(sizeof(uint32_t) * 4));
++    }
++    name_ptr = uint32_t((shader_out.size() - rdef_position_dwords) * sizeof(uint32_t));
++    uint32_t rdef_name_ptr_xe_system_cbuffer = name_ptr;
++    name_ptr += dxbc::AppendAlignedString(shader_out, "xe_system_cbuffer");
++    uint32_t rdef_cbuffer_position_dwords = uint32_t(shader_out.size());
++    shader_out.resize(rdef_cbuffer_position_dwords + sizeof(dxbc::RdefCbuffer) / sizeof(uint32_t));
++    {
++      auto& rdef_cbuffer_system =
++          *reinterpret_cast<dxbc::RdefCbuffer*>(shader_out.data() + rdef_cbuffer_position_dwords);
++      rdef_cbuffer_system.name_ptr = rdef_name_ptr_xe_system_cbuffer;
++      rdef_cbuffer_system.variable_count = 1;
++      rdef_cbuffer_system.variables_ptr = rdef_constants_ptr;
++      rdef_cbuffer_system.size_vector_aligned_bytes = system_cbuffer_size_vector_aligned_bytes;
++    }
++    uint32_t rdef_binding_position_dwords = uint32_t(shader_out.size());
++    shader_out.resize(rdef_binding_position_dwords + sizeof(dxbc::RdefInputBind) / sizeof(uint32_t));
++    {
++      auto& rdef_binding_cbuffer_system =
++          *reinterpret_cast<dxbc::RdefInputBind*>(shader_out.data() + rdef_binding_position_dwords);
++      rdef_binding_cbuffer_system.name_ptr = rdef_name_ptr_xe_system_cbuffer;
++      rdef_binding_cbuffer_system.type = dxbc::RdefInputType::kCbuffer;
++      rdef_binding_cbuffer_system.bind_point =
++          uint32_t(DxbcShaderTranslator::CbufferRegister::kSystemConstants);
++      rdef_binding_cbuffer_system.bind_count = 1;
++      rdef_binding_cbuffer_system.flags = dxbc::kRdefInputFlagUserPacked;
++    }
++    {
++      auto& rdef_header =
++          *reinterpret_cast<dxbc::RdefHeader*>(shader_out.data() + rdef_position_dwords);
++      rdef_header.cbuffer_count = 1;
++      rdef_header.cbuffers_ptr =
++          uint32_t((rdef_cbuffer_position_dwords - rdef_position_dwords) * sizeof(uint32_t));
++      rdef_header.input_bind_count = 1;
++      rdef_header.input_binds_ptr =
++          uint32_t((rdef_binding_position_dwords - rdef_position_dwords) * sizeof(uint32_t));
++    }
++  }
++
+   {
+     auto& blob_header =
+         *reinterpret_cast<dxbc::BlobHeader*>(shader_out.data() + blob_position_dwords);
+@@ -2599,8 +2703,24 @@ void PipelineCache::CreateDxbcGeometryShader(GeometryShaderKey key,
+         if (key.has_point_coordinates) {
+           a.OpMov(dxbc::Dest::O(output_register_point_coordinates, 0b0011), dxbc::Src::LF(0.0f));
+         }
+-        a.OpMov(dxbc::Dest::O(output_register_position),
+-                dxbc::Src::V2D(input_vertex_index, input_register_position));
++        if (key.afro_quad_depth_shift) {
++          // clip.z += per-draw constant * clip.w. Same add on every vertex, so
++          // the depth slope does not change. This runs before clipping.
++          a.OpMov(dxbc::Dest::R(0),
++                  dxbc::Src::V2D(input_vertex_index, input_register_position));
++          a.OpMul(dxbc::Dest::R(1, 0b0001), dxbc::Src::R(0, dxbc::Src::kWWWW),
++                  dxbc::Src::CB(0, uint32_t(DxbcShaderTranslator::CbufferRegister::kSystemConstants),
++                                uint32_t(offsetof(DxbcShaderTranslator::SystemConstants,
++                                                  afro_quad_depth_ndc_add) >>
++                                         4),
++                                dxbc::Src::kXXXX));
++          a.OpAdd(dxbc::Dest::R(0, 0b0100), dxbc::Src::R(0, dxbc::Src::kZZZZ),
++                  dxbc::Src::R(1, dxbc::Src::kXXXX));
++          a.OpMov(dxbc::Dest::O(output_register_position), dxbc::Src::R(0));
++        } else {
++          a.OpMov(dxbc::Dest::O(output_register_position),
++                  dxbc::Src::V2D(input_vertex_index, input_register_position));
++        }
+         for (uint32_t j = 0; j < input_clip_distance_count; j += 4) {
+           a.OpMov(dxbc::Dest::O(
+                       output_register_clip_distances + (j >> 2),
+@@ -2880,7 +3000,11 @@ ID3D12PipelineState* PipelineCache::CreateD3D12Pipeline(
+   }
+   state_desc.RasterizerState.FrontCounterClockwise =
+       description.front_counter_clockwise ? TRUE : FALSE;
+-  state_desc.RasterizerState.DepthBias = description.depth_bias;
++  // Quad experiment: drop only the constant term. SlopeScaledDepthBias stays.
++  state_desc.RasterizerState.DepthBias =
++      AfroQuadDepthShiftEnabled(description.depth_bias, description.geometry_shader)
++          ? 0
++          : description.depth_bias;
+   state_desc.RasterizerState.DepthBiasClamp = 0.0f;
+   // With non-square resolution scaling, make sure the worst-case impact is
+   // reverted (slope only along the scaled axis), thus max. More bias is better
+diff --git a/src/graphics/pipeline/shader/dxbc_translator.cpp b/src/graphics/pipeline/shader/dxbc_translator.cpp
+index f5f9b3a..c5898fb 100644
+--- a/src/graphics/pipeline/shader/dxbc_translator.cpp
++++ b/src/graphics/pipeline/shader/dxbc_translator.cpp
+@@ -1984,6 +1984,7 @@ const DxbcShaderTranslator::SystemConstantRdef DxbcShaderTranslator::system_cons
+     {"xe_edram_blend_constant", ShaderRdefTypeIndex::kFloat4, sizeof(float) * 4},
+     // Afro (xenia-canary d119505).
+     {"xe_texture_integer_scale_bits", ShaderRdefTypeIndex::kUint4Array8, sizeof(uint32_t) * 32},
++    {"xe_afro_quad_depth_ndc_add", ShaderRdefTypeIndex::kFloat, sizeof(float)},
+ };
+ 
+ void DxbcShaderTranslator::WriteResourceDefinition() {

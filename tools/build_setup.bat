@@ -11,7 +11,7 @@ set "VER="
 for /f "usebackq delims=" %%V in ("%~dp0..\app\VERSION") do if not defined VER set "VER=%%V"
 if not defined VER (echo app\VERSION is empty. & exit /b 1)
 set "OUT=afrosetup-v%VER%.exe"
-python make_setup_icon.py
+python make_setup_art.py
 windres -O coff afrosetup.rc -o afrosetup.res 2>nul
 if exist afrosetup.res (
   clang++ -std=c++17 -O2 -Wall -Wextra -Werror -DUNICODE -D_UNICODE -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -municode -mwindows -static -static-libgcc -static-libstdc++ -o "%OUT%" afrosetup.cpp afrosetup.res -lcomdlg32 -lshell32 -lole32 -luuid -lgdi32 -lcomctl32 || exit /b 1

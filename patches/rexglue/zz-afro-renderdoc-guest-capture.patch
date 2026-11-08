@@ -1,0 +1,178 @@
+diff --git a/src/graphics/d3d12/command_processor.cpp b/src/graphics/d3d12/command_processor.cpp
+index 35029a9..0b6e0f6 100644
+--- a/src/graphics/d3d12/command_processor.cpp
++++ b/src/graphics/d3d12/command_processor.cpp
+@@ -33,6 +33,7 @@
+ #include <rex/memory/utils.h>
+ #include <rex/ui/d3d12/d3d12_presenter.h>
+ #include <rex/ui/d3d12/d3d12_util.h>
++#include <rex/ui/renderdoc_api.h>
+ 
+ REXCVAR_DEFINE_BOOL(afro_occlusion_async, false, "GPU",
+                     "afro: do not stall the CPU on every occlusion query; write the result to guest "
+@@ -40,6 +41,15 @@ REXCVAR_DEFINE_BOOL(afro_occlusion_async, false, "GPU",
+ REXCVAR_DEFINE_BOOL(d3d12_bindless, true, "GPU/D3D12", "Use bindless resources where available")
+     .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
+ 
++// One guest frame, never a continuous capture. 1 is consumed once per process.
++// The request file can be created again later for another single frame.
++REXCVAR_DEFINE_INT32(
++    afro_renderdoc_capture, 0, "GPU",
++    "afro: 1 captures the next guest GPU frame once (the draws, not only the "
++    "presenter blit) if RenderDoc launched this process. 0 does nothing. While "
++    "playing, an empty file afro_renderdoc_capture.request next to afrorecomp.exe "
++    "or in the install folder does the same and is removed.");
++
+ REXCVAR_DEFINE_BOOL(d3d12_readback_memexport, false, "GPU/D3D12",
+                     "Read data written by memory export in shaders on the CPU")
+     .lifecycle(rex::cvar::Lifecycle::kHotReload);
+@@ -54,6 +64,128 @@ REXCVAR_DEFINE_BOOL(d3d12_submit_on_primary_buffer_end, true, "GPU/D3D12",
+ 
+ namespace rex::graphics::d3d12 {
+ 
++// RenderDoc's F12 capture ends on IDXGISwapChain::Present. This build's presenter
++// can Present the same guest image again without a new ExecuteCommandLists, so
++// those captures contain only DrawInstanced(4, 1). Guest draws are tokens until
++// DeferredCommandList::Execute replays them onto a real command list inside
++// EndSubmission. StartFrameCapture runs when that guest frame opens, before any
++// of its replays; EndFrameCapture runs after the closing ExecuteCommandLists and
++// before PaintAndPresent. Both calls stay on this command-processor thread.
++struct AfroRenderDocGuestCapture {
++  const RENDERDOC_API_1_0_0* api = nullptr;
++  bool tried = false;
++  bool capturing = false;
++  bool cvar_used = false;
++  bool file_latched[2] = {false, false};
++  ID3D12Device* device = nullptr;
++
++  static std::wstring ExeDirectory() {
++    wchar_t exe[MAX_PATH];
++    DWORD n = GetModuleFileNameW(nullptr, exe, MAX_PATH);
++    if (!n || n >= MAX_PATH) return {};
++    std::wstring path(exe, n);
++    size_t slash = path.find_last_of(L"\\/");
++    if (slash == std::wstring::npos) return {};
++    return path.substr(0, slash);
++  }
++
++  const RENDERDOC_API_1_0_0* Api() {
++    if (tried) return api;
++    tried = true;
++    static std::unique_ptr<rex::ui::RenderDocAPI> hold;
++    hold = rex::ui::RenderDocAPI::CreateIfConnected();
++    if (!hold || !hold->api_1_0_0()) {
++      REXGPU_WARN("afro renderdoc: not attached; a capture request does nothing");
++      api = nullptr;
++      return nullptr;
++    }
++    api = hold->api_1_0_0();
++    std::wstring dir = ExeDirectory();
++    std::string utf8 = "afro-guest-capture";
++    if (!dir.empty()) {
++      std::wstring wide = dir + L"\\afro-guest-capture";
++      int bytes = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, nullptr, 0, nullptr, nullptr);
++      if (bytes > 1) {
++        utf8.assign(static_cast<size_t>(bytes), '\0');
++        WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, utf8.data(), bytes, nullptr, nullptr);
++        utf8.resize(static_cast<size_t>(bytes - 1));
++      }
++    }
++    api->SetLogFilePathTemplate(utf8.c_str());
++    REXGPU_WARN("afro renderdoc: attached. Guest-frame files use template {}", utf8);
++    return api;
++  }
++
++  bool ConsumeRequest() {
++    if (!cvar_used && REXCVAR_GET(afro_renderdoc_capture) > 0) {
++      cvar_used = true;
++      REXGPU_WARN("afro renderdoc: cvar afro_renderdoc_capture=1 arms one guest frame");
++      return true;
++    }
++    std::wstring dir = ExeDirectory();
++    if (dir.empty()) return false;
++    std::wstring paths[2];
++    paths[0] = dir + L"\\afro_renderdoc_capture.request";
++    size_t slash = dir.find_last_of(L"\\/");
++    if (slash != std::wstring::npos && slash > 0) {
++      paths[1] = dir.substr(0, slash) + L"\\afro_renderdoc_capture.request";
++    }
++    for (int i = 0; i < 2; ++i) {
++      if (paths[i].empty()) continue;
++      DWORD attr = GetFileAttributesW(paths[i].c_str());
++      bool exists = attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0;
++      if (!exists) {
++        file_latched[i] = false;
++        continue;
++      }
++      if (file_latched[i]) continue;
++      file_latched[i] = true;
++      if (!DeleteFileW(paths[i].c_str())) {
++        REXGPU_WARN("afro renderdoc: request file stayed in place; it will not arm again until removed");
++      }
++      REXGPU_WARN("afro renderdoc: request file arms one guest frame");
++      return true;
++    }
++    return false;
++  }
++
++  void Begin(ID3D12Device* d3d_device) {
++    if (capturing || !ConsumeRequest()) return;
++    const RENDERDOC_API_1_0_0* rdc = Api();
++    if (!rdc) return;
++    if (rdc->IsFrameCapturing && rdc->IsFrameCapturing()) {
++      REXGPU_WARN("afro renderdoc: request ignored because RenderDoc is already capturing");
++      return;
++    }
++    device = d3d_device;
++    rdc->StartFrameCapture(d3d_device, nullptr);
++    capturing = true;
++    REXGPU_WARN(
++        "afro renderdoc: StartFrameCapture before this guest frame's command-list replay. "
++        "The presenter DrawInstanced(4, 1) is outside this capture.");
++  }
++
++  void End() {
++    if (!capturing || !api) return;
++    uint32_t ok = api->EndFrameCapture(device, nullptr);
++    capturing = false;
++    char path[2048];
++    uint32_t length = static_cast<uint32_t>(sizeof(path));
++    uint32_t count = api->GetNumCaptures ? api->GetNumCaptures() : 0;
++    if (count && api->GetCapture && api->GetCapture(count - 1, path, &length, nullptr)) {
++      REXGPU_WARN("afro renderdoc: EndFrameCapture result {} file {}", ok, path);
++    } else {
++      REXGPU_WARN("afro renderdoc: EndFrameCapture result {} (1 means the file was saved)", ok);
++    }
++  }
++};
++
++AfroRenderDocGuestCapture g_afro_renderdoc;
++
++}  // namespace rex::graphics::d3d12
++
++namespace rex::graphics::d3d12 {
++
+ // Generated with `xb buildshaders`.
+ namespace shaders {
+ #include "../shaders/bytecode/d3d12_5_1/apply_gamma_pwl_cs.h"
+@@ -3410,6 +3542,11 @@ bool D3D12CommandProcessor::BeginSubmission(bool is_guest_command) {
+ 
+   if (is_opening_frame) {
+     frame_open_ = true;
++    // Arm before any EndSubmission replays this frame's deferred draws.
++    g_afro_renderdoc.Begin(device);
++    if (g_afro_renderdoc.capturing) {
++      deferred_command_list_.InsertDebugMarker("afro-guest-frame");
++    }
+ 
+     // Reset bindings that depend on the data stored in the pools.
+     std::memset(current_float_constant_map_vertex_, 0, sizeof(current_float_constant_map_vertex_));
+@@ -3531,6 +3668,8 @@ bool D3D12CommandProcessor::EndSubmission(bool is_swap) {
+   }
+ 
+   if (is_closing_frame) {
++    // After ExecuteCommandLists above, before PaintAndPresent's swapchain blit.
++    g_afro_renderdoc.End();
+     if (REXCVAR_GET(clear_memory_page_state) && shared_memory_) {
+       shared_memory_->SetSystemPageBlocksValidWithGpuDataWritten();
+     }

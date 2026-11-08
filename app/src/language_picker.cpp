@@ -7,6 +7,7 @@
 #include <rex/cvar.h>
 
 #include <cctype>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -138,7 +139,7 @@ const UiText kText[] = {
      L"Sepia filter:", L"On (original)", L"Off",
      L"Render path:", L"RTV (original)", L"ROV (experimental)",
      L"Cheats\u2026", L"Cheats", L"Invulnerability (experimental)",
-     L"Does not prevent death. Not working reliably.", L"Cancel"},
+     L"Combat tested. Instant kills, falls and scripts are not.", L"Cancel"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanzador", L"Idioma:", L"Recordar y no volver a preguntar",
      L"Mantén Mayús al iniciar para volver a ver esta ventana.", L"Jugar",
      L"Fotogramas:", L"30 (original)", L"60 (experimental)", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resolución interna:", L"Opciones avanzadas...", L"Por defecto", L"Desactivado", L"Aceptar", L"Activado",
@@ -146,7 +147,7 @@ const UiText kText[] = {
      L"Filtro sepia:", L"Activado (original)", L"Desactivado",
      L"Ruta de render:", L"RTV (original)", L"ROV (experimental)",
      L"Trucos\u2026", L"Trucos", L"Invulnerabilidad (experimental)",
-     L"No evita la muerte. No funciona de forma fiable.", L"Cancelar"},
+     L"Probado en combate. Muertes instant\u00e1neas, ca\u00eddas y guiones, no.", L"Cancelar"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanceur", L"Langue :", L"Mémoriser et ne plus demander",
      L"Maintenez Maj au démarrage pour revoir cette fenêtre.", L"Jouer",
      L"Images/s :", L"30 (original)", L"60 (experimental)", L"Affichage :", L"Plein écran", L"Fenêtre", L"Résolution interne :", L"Options avancées...", L"Par défaut", L"Désactivé", L"OK", L"Activé",
@@ -154,7 +155,7 @@ const UiText kText[] = {
      L"Filtre sépia :", L"Activé (original)", L"Désactivé",
      L"Chemin de rendu :", L"RTV (original)", L"ROV (experimental)",
      L"Triches\u2026", L"Triches", L"Invuln\u00e9rabilit\u00e9 (exp\u00e9rimentale)",
-     L"N'emp\u00eache pas la mort. Ne fonctionne pas de fa\u00e7on fiable.", L"Annuler"},
+     L"Test\u00e9 au combat. Pas les morts instantan\u00e9es, chutes ou scripts.", L"Annuler"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Avvio", L"Lingua:", L"Ricorda e non chiedere più",
      L"Tieni premuto Maiusc all'avvio per rivedere questa finestra.", L"Gioca",
      L"Fotogrammi:", L"30 (original)", L"60 (experimental)", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:", L"Opzioni avanzate...", L"Predefinito", L"Disattivato", L"OK", L"Attivato",
@@ -162,7 +163,7 @@ const UiText kText[] = {
      L"Filtro seppia:", L"Attivato (originale)", L"Disattivato",
      L"Percorso di rendering:", L"RTV (original)", L"ROV (experimental)",
      L"Trucchi\u2026", L"Trucchi", L"Invulnerabilit\u00e0 (sperimentale)",
-     L"Non impedisce la morte. Non funziona in modo affidabile.", L"Annulla"},
+     L"Provato in combattimento. Non morti istantanee, cadute o script.", L"Annulla"},
 };
 constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
               kIdHint = 104, kIdFpsLbl = 105, kIdFps = 106, kIdDispLbl = 107,
@@ -469,7 +470,7 @@ void ShowExperimental(HWND owner, int sel, Options* o) {
   const double sc = GetDpiForSystem() / 96.0;
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const DWORD style = WS_CAPTION | WS_SYSMENU;
-  RECT rc{0, 0, S(420), S(310)};
+  RECT rc{0, 0, S(460), S(310)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   RECT orc;
   GetWindowRect(owner, &orc);
@@ -509,8 +510,8 @@ void ShowExperimental(HWND owner, int sel, Options* o) {
   SendMessageW(sep, CB_ADDSTRING, 0, (LPARAM)t.sepia_on);
   SendMessageW(sep, CB_ADDSTRING, 0, (LPARAM)t.sepia_off);
   SendMessageW(sep, CB_SETCURSEL, o->sepia ? 1 : 0, 0);
-  mk(L"BUTTON", t.cheats, WS_TABSTOP, 16, 212, 388, 28, kIdXCheats);
-  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 150, 256, 120, 32, IDOK);
+  mk(L"BUTTON", t.cheats, WS_TABSTOP, 16, 212, 424, 28, kIdXCheats);
+  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 170, 254, 120, 32, IDOK);
   EnableWindow(owner, FALSE);
   MSG msg;
   while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {
@@ -941,6 +942,9 @@ unsigned ApplyStartupLanguage() {
   if (ask) opt.fps = 0;
   // Without --advanced, most diagnostic options are ignored (safe defaults).
   // Render path (adv[0] / cfg "rt") stays user-facing for RTV/ROV A/B tests.
+  // Quad depth is not a launcher option. A saved qdepth= line is ignored so an
+  // old Off/Full choice cannot override the runtime default. A command-line or
+  // REX_AFRO_QUAD_DEPTH_OFFSET value still wins because this loop never sets it.
   const Options saved_adv = opt;
   if (!REXCVAR_GET(advanced)) {
     const int rt = opt.adv[0];
@@ -979,8 +983,8 @@ unsigned ApplyStartupLanguage() {
         << "\nversion=" << AFRO_VERSION << "\n";
     for (int i = 0; i < kAdvN; ++i) {
       int v;
-      if (i == 0)  // render path: always available in Advanced settings (experimental)
-        v = remember ? opt.adv[0] : saved_adv.adv[0];
+      if (i == 0)
+        v = remember ? opt.adv[i] : saved_adv.adv[i];
       else if (!REXCVAR_GET(advanced))
         v = saved_adv.adv[i];
       else

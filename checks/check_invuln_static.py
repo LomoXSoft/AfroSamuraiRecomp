@@ -73,7 +73,7 @@ def main() -> None:
     version = version_path.read_text(encoding="utf-8").strip()
     doc = doc_path.read_text(encoding="utf-8")
 
-    if version != "0.1.0":
+    if version != "0.1.1":
         fail(f"VERSION is {version!r}")
     if "REXCVAR_DEFINE_BOOL(afro_player_invuln, false" not in cpp:
         fail("cvar default is not false")
@@ -177,6 +177,11 @@ def main() -> None:
         fail("meter+0 must be written in one helper")
     if "r31.u32 != player" not in cpp[cpp.find("AfroPlayerMeterBeforeDeathCall"):]:
         fail("call-site hook must ignore non-player entities")
+    for token in ("hpP=", "hpO=", "callP=", "callO=", "gateM=", "gateX=", "lethal="):
+        if token not in cpp:
+            fail(f"fps probe missing {token}")
+    if "g_inv_hp_other" not in cpp or "WriteGuestFloat" in cpp[cpp.find("g_inv_hp_other"):cpp.find("g_inv_hp_other")+400]:
+        fail("other-entity hp stores must be counted, not written")
 
     if "Cheats\\u2026" not in picker and "Cheats…" not in picker:
         fail("English Cheats button missing")

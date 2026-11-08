@@ -154,6 +154,13 @@ afro_invuln::Hold g_inv_hold;
 uint32_t g_inv_clamps = 0;
 uint32_t g_inv_restores = 0;
 uint32_t g_inv_meter = 0;
+uint32_t g_inv_hp_player = 0;    // stfs sites, r31 is the singleton
+uint32_t g_inv_hp_other = 0;     // stfs sites, r31 is some other entity
+uint32_t g_inv_call_player = 0;  // bl site, r31 is the singleton
+uint32_t g_inv_call_other = 0;   // bl site, r31 is some other entity
+uint32_t g_inv_gate_match = 0;   // death entry, r3 is the player meter
+uint32_t g_inv_gate_miss = 0;    // death entry, r3 is not the player meter
+uint32_t g_inv_lethal = 0;       // player meter+0 was <= 0 at the death entry
 uint32_t g_inv_detail = 0;
 bool g_inv_suppress = false;
 bool g_inv_logged_on = false;
@@ -161,6 +168,10 @@ bool g_inv_logged_off = false;
 bool g_inv_logged_ready = false;
 bool g_inv_logged_miss = false;
 bool g_inv_logged_meter = false;
+bool g_inv_logged_hp_other = false;
+bool g_inv_logged_call_other = false;
+bool g_inv_logged_gate_miss = false;
+bool g_inv_logged_lethal = false;
 
 bool InvulnAllowDetail() {
   if (g_inv_detail < kInvulnDetailCap) {
@@ -186,11 +197,25 @@ void InvulnResetSession() {
 
 std::string InvulnFpsSuffix() {
   const bool on = (bool)REXCVAR_GET(afro_player_invuln);
-  if (!on && g_inv_clamps == 0 && g_inv_restores == 0 && g_inv_meter == 0) return {};
+  const bool any = g_inv_clamps || g_inv_restores || g_inv_meter || g_inv_hp_player ||
+                   g_inv_hp_other || g_inv_call_player || g_inv_call_other ||
+                   g_inv_gate_match || g_inv_gate_miss || g_inv_lethal;
+  if (!on && !any) return {};
+  // hpP/hpO: char-HP stores whose base is / isn't the singleton.
+  // callP/callO: the death call with r31 matching / not matching.
+  // gateM/gateX: death entry whose meter is / isn't *(player+0x7D4).
+  // lethal: that player meter was <= 0 before the compare.
   return "  invuln=" + std::string(on ? "on" : "off") +
          " clamps=" + std::to_string(g_inv_clamps) +
          " restores=" + std::to_string(g_inv_restores) +
-         " meter_guards=" + std::to_string(g_inv_meter);
+         " meter_guards=" + std::to_string(g_inv_meter) +
+         " hpP=" + std::to_string(g_inv_hp_player) +
+         " hpO=" + std::to_string(g_inv_hp_other) +
+         " callP=" + std::to_string(g_inv_call_player) +
+         " callO=" + std::to_string(g_inv_call_other) +
+         " gateM=" + std::to_string(g_inv_gate_match) +
+         " gateX=" + std::to_string(g_inv_gate_miss) +
+         " lethal=" + std::to_string(g_inv_lethal);
 }
 
 void PlayerInvulnTick() {
@@ -404,7 +429,19 @@ void AfroPlayerHpStoreHook(PPCRegister& r31, PPCRegister& f0) {
   const uint32_t player =
       rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kPlayerPtr));
   // Any other entity, including enemies, keeps the guest f0.
-  if (!GuestPtrPlausible(player) || r31.u32 != player) return;
+  if (!GuestPtrPlausible(player) || r31.u32 != player) {
+    if (GuestPtrPlausible(r31.u32)) {
+      ++g_inv_hp_other;
+      if (!g_inv_logged_hp_other) {
+        g_inv_logged_hp_other = true;
+        REXLOG_INFO(
+            "afro invuln: hp store not the singleton r31=0x{:08X} player=0x{:08X} f0={:.1f}",
+            r31.u32, player, static_cast<float>(f0.f64));
+      }
+    }
+    return;
+  }
+  ++g_inv_hp_player;
 
   const float cur = ReadGuestFloat(player + kPlayerHpFloatOff);
   const float hp_max = ReadGuestFloat(player + kPlayerHpMaxOff);
@@ -460,7 +497,19 @@ uint32_t LoadPlayerSingleton() {
 void AfroPlayerMeterBeforeDeathCall(PPCRegister& r31, PPCRegister& r3) {
   if (!(bool)REXCVAR_GET(afro_player_invuln)) return;
   const uint32_t player = LoadPlayerSingleton();
-  if (!GuestPtrPlausible(player) || r31.u32 != player) return;
+  if (!GuestPtrPlausible(player) || r31.u32 != player) {
+    if (GuestPtrPlausible(r31.u32)) {
+      ++g_inv_call_other;
+      if (!g_inv_logged_call_other) {
+        g_inv_logged_call_other = true;
+        REXLOG_INFO(
+            "afro invuln: death call not the singleton r31=0x{:08X} player=0x{:08X} r3=0x{:08X}",
+            r31.u32, player, r3.u32);
+      }
+    }
+    return;
+  }
+  ++g_inv_call_player;
   GuardPlayerMeter(r3.u32, player);
 }
 
@@ -470,6 +519,33 @@ void AfroPlayerMeterDeathGate(PPCRegister& r3) {
   if (!(bool)REXCVAR_GET(afro_player_invuln)) return;
   const uint32_t player = LoadPlayerSingleton();
   if (!GuestPtrPlausible(player)) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  const uint32_t player_meter = rex::memory::load_and_swap<uint32_t>(
+      mem->TranslateVirtual(player + kPlayerHpMeterOff));
+  if (!GuestPtrPlausible(player_meter) || r3.u32 != player_meter) {
+    ++g_inv_gate_miss;
+    if (!g_inv_logged_gate_miss) {
+      g_inv_logged_gate_miss = true;
+      REXLOG_INFO(
+          "afro invuln: death entry meter is not player+0x7D4 r3=0x{:08X} "
+          "player_meter=0x{:08X} player=0x{:08X}",
+          r3.u32, player_meter, player);
+    }
+    return;
+  }
+  ++g_inv_gate_match;
+  const float meter0 = ReadGuestFloat(r3.u32 + kMeterHp0);
+  if (!std::isfinite(meter0) || meter0 <= 0.f) {
+    ++g_inv_lethal;
+    if (!g_inv_logged_lethal) {
+      g_inv_logged_lethal = true;
+      REXLOG_INFO(
+          "afro invuln: player meter+0 is {:.1f} at the death entry "
+          "(<=0 is the lethal compare) player=0x{:08X}",
+          meter0, player);
+    }
+  }
   GuardPlayerMeter(r3.u32, player);
 }
 

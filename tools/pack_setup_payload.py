@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append the source snapshot to afrosetup-v<VERSION>.exe.
+"""Append the 0.1.0 source snapshot to afrosetup.exe.
 
 The Windows loader ignores this overlay. The setup program reads the footer
 and extracts the files only after the user presses Install.
@@ -39,7 +39,6 @@ def collect(repo: pathlib.Path, overlay: pathlib.Path) -> list[tuple[str, bytes]
                 continue
             if path.suffix.lower() in skip_suffix and path.name != "install.bat":
                 continue
-            # Built setup programs are not part of the source snapshot.
             if path.name == "afrosetup.exe" or (
                 path.name.startswith("afrosetup-v") and path.suffix.lower() == ".exe"
             ):
@@ -73,10 +72,10 @@ def main() -> None:
         if need not in names:
             raise SystemExit(f"snapshot missing {need}")
     version = dict(files)["app/VERSION"].decode("utf-8").strip()
-    if version != "0.1.0":
+    if version != "0.1.1":
         raise SystemExit(f"snapshot VERSION is {version!r}")
     ps1 = dict(files)["tools/install.ps1"].decode("utf-8")
-    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.1.0'" not in ps1:
+    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.1.1'" not in ps1:
         raise SystemExit("snapshot install.ps1 is not the local-tree build")
     body = encode(files)
     exe = args.exe.read_bytes()

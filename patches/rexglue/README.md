@@ -64,9 +64,50 @@ Same license as above (BSD 3-Clause, modifies ReXGlue code; code only).
   silent (e.g. the second boss cutscene).
 - `--afro_xma_log=true` also logs `afro xma ctx N chain ...` lines.
 
+## zz-afro-renderdoc-guest-capture.patch (GPU plugin, `rexgpu-xenos.dll`)
+Applied after `zz-afro-perf-log.patch`. Instrumentation only. It does not change
+shading. RenderDoc's own capture ends on `Present`, and this presenter can
+`Present` the same guest image again, so those captures are only
+`DrawInstanced(4, 1)`. Guest draws stay in a deferred list until
+`EndSubmission` replays them. If RenderDoc launched the process, creating
+`afro_renderdoc_capture.request` next to `afrorecomp.exe` (or in the install
+folder) captures the next guest frame: `StartFrameCapture` when that frame
+opens, `EndFrameCapture` after its closing `ExecuteCommandLists`, before
+`PaintAndPresent`. `--afro_renderdoc_capture=1` does the same once per process.
+Default is off. Nothing is captured when RenderDoc is not attached.
+
+## zzz-afro-quad-depth-offset.patch (GPU plugin, `rexgpu-xenos.dll`)
+Same license (BSD 3-Clause). Applied last. Experimental, default `off`. Not a
+console-correct fix and not a change to every draw.
+
+`afro_quad_depth_offset` is `half` by default, or `full` or `off`. The launcher
+does not show this choice. It is init-only: an explicit command-line value or
+`REX_AFRO_QUAD_DEPTH_OFFSET` overrides the default for that process. `off` is
+the original integer bias.
+
+When the mode is `full` or `half`, a draw is changed only if all of these hold:
+host render-target path (not ROV), not tessellated, guest primitive is a quad
+list, quad lists are still expanded by the geometry shader, and the guest
+constant polygon offset converts to a nonzero D3D integer bias. The rasterizer
+constant `DepthBias` is then 0. `SlopeScaledDepthBias` stays. The quad geometry
+shader adds `clip.z += C * clip.w`, with the same C on all four vertices.
+`full` uses `bias/16777216` viewport-depth units (the exponent the integer was
+sized for). `half` uses half of that. C is divided by the viewport depth range
+of that draw. A zero or non-finite range uploads 0, so that draw loses the
+constant as well. Zero-offset draws, including the depth-only passes that share
+the shader but have bias 0, keep the original geometry shader and the original
+bias. Depth-only draws that do have a nonzero constant are shifted too.
+
+The pipeline description still stores the original integer, so it does not
+collide with a real zero-bias pipeline. The geometry shader variant is chosen
+when the pipeline is created. Changing the mode needs a new process.
+
+The add happens before clipping. A vertex already within about |C| of the near
+or far plane can cross it. This build does not claim that does not happen.
+
 ## zz-afro-perf-log.patch (GPU plugin, `rexgpu-xenos.dll`)
-Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last
-(name order). Diagnostics for the FPS drops, all default off:
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Diagnostics for
+the FPS drops, all default off:
 - `afro_perf_log` (false): per-second summary `afro perf 1s: ...` plus
   `afro perf slow frame N: ...` for frames longer than `afro_perf_slow_ms`
   (37): draws, copies, RT changes, EDRAM transfers, new pipelines/shaders,

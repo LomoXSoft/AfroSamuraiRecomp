@@ -25,13 +25,46 @@ set /p OLDHOOK=<generated\default\hooks.sha1
 if /I not "%OLDHOOK%"=="%HOOKHASH%" goto dogegen
 goto ogen
 :dogegen
+echo AFROPHASE codegen
 echo Running rexglue codegen...
-"%R%\sdk\win-amd64\bin\rexglue.exe" codegen afrorecomp_manifest.toml --max_jump_table_entries=8192 > ..\..\codegen_win.log 2>&1 || (echo CODEGEN FAILED & exit /b 1)
+rem The MSVC bin holds the CRT that rexglue imports. Copy those DLLs beside
+rem rexglue so Python's vcruntime, which is earlier on PATH, is not used.
+set "REXBIN=%R%\sdk\win-amd64\bin"
+set "CRTBIN=%VCToolsInstallDir%bin\Hostx64\x64"
+python "%~dp0check_pe_imports.py" --stage-from "%CRTBIN%" "%REXBIN%\rexglue.exe"
+if errorlevel 1 exit /b 2
+set "CODELOG=%R%\codegen_rexglue.txt"
+"%REXBIN%\rexglue.exe" codegen afrorecomp_manifest.toml --max_jump_table_entries=8192 > "%CODELOG%" 2>&1
+rem Not RC: CMake reads the environment variable RC as the resource compiler.
+set GEN_EXIT=%ERRORLEVEL%
+if exist "%CODELOG%" type "%CODELOG%"
+if not "%GEN_EXIT%"=="0" (
+  echo CODEGEN FAILED exit %GEN_EXIT%
+  exit /b %GEN_EXIT%
+)
 echo ok> generated\default\gen_v3.stamp
 echo %HOOKHASH%> generated\default\hooks.sha1
 :ogen
-cmake --preset win-amd64-release -DCMAKE_PREFIX_PATH="%R%\sdk\win-amd64" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ || exit /b 1
-cmake --build out\build\win-amd64-release -j %NUMBER_OF_PROCESSORS% || exit /b 1
+echo AFROPHASE compile
+rem A previous run stored the exit code 0 in RC. CMake then looked for a
+rem compiler named "0" and left that in the cache. Drop only that cache.
+set "BCACHE=%~dp0..\app\out\build\win-amd64-release"
+set "CF=%BCACHE%\CMakeCache.txt"
+if exist "%CF%" (
+  findstr /R /C:"^CMAKE_RC_COMPILER:[A-Za-z]*=0$" "%CF%" >nul
+  if not errorlevel 1 (
+    echo Removing CMake cache that stored RC=0 as the resource compiler.
+    del /q "%CF%"
+    if exist "%BCACHE%\CMakeFiles" rmdir /s /q "%BCACHE%\CMakeFiles"
+  )
+)
+if "%RC%"=="0" set "RC="
+cmake --preset win-amd64-release -DCMAKE_PREFIX_PATH="%R%\sdk\win-amd64" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+set CMAKE_EXIT=%ERRORLEVEL%
+if not "%CMAKE_EXIT%"=="0" exit /b %CMAKE_EXIT%
+cmake --build out\build\win-amd64-release -j %NUMBER_OF_PROCESSORS%
+set BUILD_EXIT=%ERRORLEVEL%
+if not "%BUILD_EXIT%"=="0" exit /b %BUILD_EXIT%
 rem The app build copies the stock SDK DLLs next to the exe: put the patched ones back
 rem (built by tools\build_gpu_plugin.bat) so the order of the two scripts does not matter.
 set D=%~dp0..\app\out\build\win-amd64-release

@@ -2,6 +2,18 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.1.1
+- Setup program `afrosetup-v0.1.1.exe` (release asset, not committed). It carries this 0.1.1 source and does not clone public main.
+- ISO SHA-1 pin unchanged. A mismatch is logged and installation continues. A missing or unreadable ISO still stops the install.
+- Quad-list depth offset defaults to half. That choice is no longer in Advanced settings.
+- Git `safe.directory` is limited to the repositories this installer owns. It is not global and it is never `*`.
+- LLVM extraction no longer presents a finished bar before tar starts.
+- GPU plugin build fixes the private pipeline helper and the cvar declarations so the patched plugin links.
+- If `install.log` cannot be written, installation continues, the lines go to a fallback file, and a real install error is still reported.
+- Finished tools, verified downloads, extracted game data, and a completed SDK are kept on resume. An incomplete step is not marked done.
+- HDD installation can take a long time; SSD/NVMe recommended. No duration is promised.
+- Invulnerability (experimental) stays off by default and is not a death fix.
+
 ## 0.1.0 – Fully playable
 - Graphical setup program (`afrosetup-v0.1.0.exe` on the release, not in git). It
   installs or updates, in English, Español, Français, and Italiano, without

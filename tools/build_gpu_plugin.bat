@@ -8,6 +8,9 @@ setlocal
 set R=%~dp0..\..
 call "%~dp0env_win.bat" || exit /b 1
 cd /d "%R%\rexglue-sdk" || exit /b 1
+rem An older quad-depth patch names a private enum. Upgrade that copy in place
+rem before the stamp check, and do not delete the Ninja build.
+python "%~dp0repair_quad_depth_access.py" "%CD%" || exit /b 1
 rem Whole stack already in the tree? Reverse-apply all patches (last first) one after another
 rem on a scratch index (the working tree is not touched): robust to later patches touching the
 rem same lines. If that works, every patch is stamped as applied.
@@ -39,10 +42,28 @@ set "H="
 for /f %%H in ('git hash-object "%~1"') do set H=%%H
 set "ST=.git\afro-patches\%~nx1.%H%"
 if not exist .git\afro-patches mkdir .git\afro-patches
-if exist "%ST%" (echo %~nx1 already applied [stamp]& exit /b 0)
-if defined AFRO_STAMP_ONLY (type nul > "%ST%"& echo %~nx1 already applied [stack]& exit /b 0)
+if exist "%ST%" (
+  if /I not "%~nx1"=="zzz-afro-quad-depth-offset.patch" (echo %~nx1 already applied [stamp]& exit /b 0)
+  findstr /C:"PipelineCache::PipelineGeometryShader geometry_shader" "src\graphics\d3d12\pipeline_cache.cpp" >nul 2>&1
+  if errorlevel 1 (echo %~nx1 already applied [stamp]& exit /b 0)
+  echo %~nx1 stamp kept a helper that cannot see the private enum
+)
+if defined AFRO_STAMP_ONLY (
+  if /I "%~nx1"=="zzz-afro-quad-depth-offset.patch" (
+    findstr /C:"PipelineCache::PipelineGeometryShader geometry_shader" "src\graphics\d3d12\pipeline_cache.cpp" >nul 2>&1
+    if not errorlevel 1 (echo %~nx1 stack stamp would hide the private-enum helper& exit /b 1)
+  )
+  type nul > "%ST%"
+  echo %~nx1 already applied [stack]
+  exit /b 0
+)
 git apply --ignore-whitespace --reverse --check "%~1" >nul 2>&1 && (echo %~nx1 already applied& type nul > "%ST%"& exit /b 0)
-git apply --ignore-whitespace "%~1" || (echo PATCH FAILED: %~nx1 - if it is already in the tree, create "%ST%"& exit /b 1)
+git apply --ignore-whitespace "%~1" || (
+  if /I not "%~nx1"=="zzz-afro-quad-depth-offset.patch" (echo PATCH FAILED: %~nx1 - if it is already in the tree, create "%ST%"& exit /b 1)
+  findstr /C:"bool PipelineCache::AfroQuadDepthShiftEnabled" "src\graphics\d3d12\pipeline_cache.cpp" >nul 2>&1 || (echo PATCH FAILED: %~nx1 - if it is already in the tree, create "%ST%"& exit /b 1)
+  findstr /C:"static bool AfroQuadDepthShiftEnabled" "include\rex\graphics\d3d12\pipeline_cache.h" >nul 2>&1 || (echo PATCH FAILED: %~nx1 missing the private helper declaration& exit /b 1)
+  echo %~nx1 already contained the repaired helper
+)
 type nul > "%ST%"
 echo %~nx1 applied
 exit /b 0

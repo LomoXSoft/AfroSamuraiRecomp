@@ -20,7 +20,7 @@ Options (all optional; anything missing is asked interactively):
   -Ref <branch|tag>      repository revision to build (default: main)
   -RepoUrl <url|path>    repository to clone (default: the GitHub repo)
   -LocalTree <dir>       copy this prepared source tree instead of cloning.
-                         The graphical setup uses this for unpublished 0.1.0.
+                         The graphical setup uses this for private 0.1.1.
                          It does not fetch public main.
   -NonInteractive        fail instead of prompting. Requires the other answers.
   -CleanupAfterInstall   at the end, delete everything not needed to play (no question)
@@ -45,12 +45,14 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'Continue'
+$hereLog = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+. (Join-Path $hereLog 'logwrite.ps1')
 $script:DLSHARE = 0.9   # share of a download+extract step spent downloading
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $ISO_SHA1 = '29394DB1854DFC59C767D768C8D35E0A08ACB73D'
-# Graphical setup for the unpublished 0.1.0 tree passes -LocalTree and checks this.
-$LOCAL_TREE_VERSION = '0.1.0'
+# Graphical setup for the private 0.1.1 tree passes -LocalTree and checks this.
+$LOCAL_TREE_VERSION = '0.1.1'
 $NEED_GB = 20
 # Pinned downloads (official sources) with SHA-256.
 $DL = @{
@@ -58,6 +60,11 @@ $DL = @{
   cmake  = @{ url = 'https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-windows-x86_64.zip'; sha = '326c826486d46a23cf9d5a1c9ee3a567d427bdd02c4a34071937a2a675cff004'; file = 'cmake-4.4.5-windows-x86_64.zip' }
   ninja  = @{ url = 'https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-win.zip'; sha = '07fc8261b42b20e71d1720b39068c2e14ffcee6396b76fb7a795fb460b78dc65'; file = 'ninja-win-1.13.2.zip' }
   llvm   = @{ url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/clang%2Bllvm-20.1.8-x86_64-pc-windows-msvc.tar.xz'; sha = 'f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f'; file = 'clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar.xz' }
+  # Tukaani xz 5.8.1 Windows build. A zip, so it is unpacked without tar.
+  # xz.exe needs liblzma.dll from the same bin_x86-64 folder.
+  # SHA-256 of the asset whose signature xz-5.8.1-windows.zip.sig verifies
+  # with Lasse Collin's key 3690C240CE51B4670D30AD1C38EE757D69184620.
+  xz     = @{ url = 'https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1-windows.zip'; sha = '62fdfde73d5c5d293bbb4a96211b29d09adbd56bc6736976e4c9fc9942ae3c67'; file = 'xz-5.8.1-windows.zip' }
   python = @{ url = 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip'; sha = '4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3'; file = 'python-3.12.10-embed-amd64.zip' }
   pycryptodome = @{ url = 'https://files.pythonhosted.org/packages/e1/52/7d0830ccb961c9e7224b88a60df1a4eab7fa6c5fd426d7b7c972988a4cac/pycryptodome-4.3.0-cp39-abi3-win_amd64.whl'; sha = '195c9d781905605b3b9de8567c47986a9d0ee513566b5150eb9400692465b610'; file = 'pycryptodome-4.3.0-cp39-abi3-win_amd64.zip' }
   # portable-msvc.py by Martins Mozeiko (public domain): downloads MSVC + Windows SDK
@@ -106,6 +113,7 @@ $TR = @{
   'iso_ok' = @('ISO matches Afro Samurai (Europe), Redump 17884.', 'La ISO coincide con Afro Samurai (Europa), Redump 17884.', 'L''ISO correspond a Afro Samurai (Europe), Redump 17884.', 'La ISO corrisponde ad Afro Samurai (Europa), Redump 17884.')
   'iso_bad' = @('WARNING: ISO SHA-1 is {0}, expected {1}.', 'AVISO: el SHA-1 de la ISO es {0}, se esperaba {1}.', 'ATTENTION : le SHA-1 de l''ISO est {0}, attendu {1}.', 'ATTENZIONE: lo SHA-1 della ISO e {0}, atteso {1}.')
   'iso_only' = @('Only the Europe disc is supported; another version or a bad dump will NOT work.', 'Solo se admite el disco europeo; otra version o un volcado malo NO funcionara.', 'Seul le disque europeen est pris en charge ; une autre version ou un mauvais dump ne marchera PAS.', 'E supportato solo il disco europeo; un''altra versione o un dump difettoso NON funzionera.')
+  'iso_continue' = @('SHA-1 does not match. Got {0}, expected {1}. Not verified. Continuing anyway.', 'El SHA-1 no coincide. Es {0}, se esperaba {1}. No verificada. Se continua igualmente.', 'Le SHA-1 ne correspond pas. Obtenu {0}, attendu {1}. Non verifiee. Poursuite malgre tout.', 'Lo SHA-1 non coincide. Ottenuto {0}, atteso {1}. Non verificata. Si continua comunque.')
   'cont' = @('Continue anyway?', 'Continuar de todos modos?', 'Continuer quand meme ?', 'Continuare comunque?')
   'iso_nomatch' = @('ISO does not match the supported version.', 'La ISO no coincide con la version soportada.', 'L''ISO ne correspond pas a la version prise en charge.', 'La ISO non corrisponde alla versione supportata.')
   'lic1' = @('The Microsoft C++ compiler and Windows SDK are downloaded from Microsoft''s official', 'El compilador C++ de Microsoft y el SDK de Windows se descargan de los servidores', 'Le compilateur C++ de Microsoft et le SDK Windows sont telecharges depuis les serveurs', 'Il compilatore C++ di Microsoft e il Windows SDK vengono scaricati dai server ufficiali')
@@ -172,13 +180,21 @@ $TR = @{
   't_repo' = @('AfroSamuraiRecomp source ({0})', 'Codigo de AfroSamuraiRecomp ({0})', 'Sources d''AfroSamuraiRecomp ({0})', 'Sorgenti di AfroSamuraiRecomp ({0})')
   't_rexsrc' = @('ReXGlue source at {0}', 'Codigo de ReXGlue en {0}', 'Sources ReXGlue a {0}', 'Sorgenti ReXGlue a {0}')
   't_gamedata' = @('Game files', 'Archivos del juego', 'Fichiers du jeu', 'File del gioco')
-  't_app' = @('Build afrorecomp.exe (code generation + compile, 10-40 min)', 'Compilar afrorecomp.exe (generacion de codigo + compilacion, 10-40 min)', 'Compiler afrorecomp.exe (generation de code + compilation, 10-40 min)', 'Compilare afrorecomp.exe (generazione codice + compilazione, 10-40 min)')
+  't_app' = @('Build the game', 'Compilar el juego', 'Compiler le jeu', 'Compilare il gioco')
   't_gpu' = @('Build patched GPU plugin and runtime', 'Compilar el plugin de GPU y el runtime parcheados', 'Compiler le plugin GPU et le runtime patches', 'Compilare plugin GPU e runtime con patch')
 }
 $script:LI = 0
 function T($k) { $v = $TR[$k]; if (-not $v) { return $k }; $s = $v[$script:LI]; if ($args.Count) { $s = $s -f $args }; $s.Replace('`n', "`n") }
 
-function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c; if ($script:LOG) { "$(Get-Date -f 'yyyy-MM-dd HH:mm:ss') $m" | Add-Content -LiteralPath $script:LOG } }
+function Say($m, $c = 'Gray') {
+  # The setup window reads this process's stdout. Write-Host is not flushed on
+  # that pipe, so a long compile looked frozen while install.log kept growing.
+  try {
+    [Console]::Out.WriteLine([string]$m)
+    [Console]::Out.Flush()
+  } catch { Write-Host $m -ForegroundColor $c }
+  Write-InstallLog ([string]$m)
+}
 function Ask($q, $def) { $a = Read-Host "$q [$def]"; if ([string]::IsNullOrWhiteSpace($a)) { $def } else { $a.Trim().Trim('"') } }
 function YesNo($q, $def = 'y') {
   $yk = T 'yeskey'; if ($def -eq 'y') { $def = $yk }
@@ -188,69 +204,280 @@ $script:STEP = 'start'; $script:BASE = 0
 # Overall progress: each step weighted by its typical duration (minutes).
 $PLAN = [ordered]@{ 'iso-hash' = 1; git = 1; cmake = 1; ninja = 0.3; python = 0.5; llvm = 8; msvc = 6; repo = 0.3; sdk = 1; 'rexglue-src' = 4; gamedata = 4; 'build-app' = 30; 'build-gpu' = 15; verify = 0.2 }
 $TOTALW = ($PLAN.Values | Measure-Object -Sum).Sum
-$script:DONEW = 0; $script:CUR = $null; $script:LASTLOGPCT = -10; $script:LASTDRAW = [DateTime]::MinValue
+$script:DONEW = 0; $script:CUR = $null; $script:LASTLOGPCT = -10; $script:LASTDETAIL = ''; $script:LASTDRAW = [DateTime]::MinValue
+$script:StepFrac = 0
 function Prog([double]$frac, [string]$detail = '', [switch]$Force) {
+  # A nested download must not pull this step's overall percent backwards.
+  if ($frac -lt $script:StepFrac) { $frac = $script:StepFrac } else { $script:StepFrac = $frac }
   $w = if ($script:CUR) { $PLAN[$script:CUR] } else { 0 }
   $pct = [math]::Min(99, [math]::Floor(100 * ($script:DONEW + $w * [math]::Max([double]0, [math]::Min([double]1, $frac))) / $TOTALW))
-  $i = if ($script:CUR) { @($PLAN.Keys).IndexOf($script:CUR) + 1 } else { 0 }
-  $line = "[{0,3}%] {4} {1}/{2}: {3}" -f $pct, $i, $PLAN.Count, $script:STEP, (T 'step')
+  # The visible step number is the AFROSTEP plan, not the weighted PLAN
+  # (that one counts iso-hash and made LLVM look like step 6 of 14).
+  $phaseIndex = if ($script:PhaseKey) { [array]::IndexOf($script:PhasePlan, $script:PhaseKey) } else { -1 }
+  if ($phaseIndex -ge 0) {
+    $line = "[{0,3}%] {1} {2}/{3}: {4}" -f $pct, (T 'step'), ($phaseIndex + 1), $script:PhasePlan.Count, $script:STEP
+  } else {
+    $line = "[{0,3}%] {1}" -f $pct, $script:STEP
+  }
   if ($detail) { $line += " ($detail)" }
   if (-not $Force -and ((Get-Date) - $script:LASTDRAW).TotalMilliseconds -lt 500) { return }
   $script:LASTDRAW = Get-Date
   try { $Host.UI.RawUI.WindowTitle = "AfroSamuraiRecomp installer $line" } catch { }
   Write-Progress -Activity (T 'title') -Status $line -PercentComplete $pct
-  if ($Force -or $pct -ge $script:LASTLOGPCT + 5) { $script:LASTLOGPCT = $pct; Say $line White }
+  # The setup window does not read this overall percent. It reads AFROSTEP
+  # lines, one bar per step that is actually running. This line is the log.
+  $detailChanged = [bool]$detail -and ($detail -ne $script:LASTDETAIL)
+  if ($Force -or $pct -ne $script:LASTLOGPCT -or $detailChanged) {
+    $script:LASTLOGPCT = $pct
+    $script:LASTDETAIL = $detail
+    Say $line White
+  }
 }
 function Finish($n) { $script:DONEW += $PLAN[$n]; $script:CUR = $null }
 function Done($n) { Test-Path -LiteralPath (Join-Path $STAMPS "$n.done") }
 function Mark($n) { New-Item -ItemType File -Force -Path (Join-Path $STAMPS "$n.done") | Out-Null }
+# Steps the window will count. Same order as LogicalSetupSteps in afrosetup_cmd.h.
+# A tool that is already present is not one of them.
+$script:PhasePlan = @()
+$script:PhaseKey = ''
+$script:LastStepLine = ''
+$script:LastBucket = ''
+$script:CodegenLog = $false
+function Set-PhasePlan {
+  $script:PhasePlan = @()
+  foreach ($n in @('git','cmake','ninja','python','llvm','msvc')) {
+    if (-not (Done $n)) { $script:PhasePlan += $n }
+  }
+  $script:PhasePlan += 'repo'
+  foreach ($n in @('sdk','rexglue-src','gamedata')) {
+    if (-not (Done $n)) { $script:PhasePlan += $n }
+  }
+  $script:PhasePlan += @('codegen','compile','gpu','install')
+}
+function Emit-Step([string]$key, [int]$pct = -1, [long]$done = 0, [long]$total = 0, [string]$activity = '') {
+  $i = [array]::IndexOf($script:PhasePlan, $key)
+  if ($i -lt 0) { return }
+  # A measured step emits when its integer percent changes, plus the first and
+  # last unit. That is the real ratio, not a timer, and it does not write one
+  # log line per file.
+  if ($total -gt 0 -and $done -gt 0 -and $done -lt $total) {
+    $bucket = "$key|$activity|" + [int][math]::Floor(100.0 * $done / $total)
+    if ($bucket -eq $script:LastBucket) { return }
+    $script:LastBucket = $bucket
+  } elseif ($script:PhaseKey -ne $key) {
+    $script:LastBucket = ''
+  }
+  $suffix = if ($activity) { " $activity" } else { '' }
+  $line = "AFROSTEP $($i + 1)/$($script:PhasePlan.Count) $key $pct $done $total$suffix"
+  if ($line -eq $script:LastStepLine) { return }
+  $script:LastStepLine = $line
+  $script:PhaseKey = $key
+  try {
+    [Console]::Out.WriteLine($line)
+    [Console]::Out.Flush()
+  } catch { Write-Host $line }
+  Write-InstallLog $line
+}
+function Same-Sha256([string]$got, [string]$expected) {
+  # PowerShell's -eq ignores case, but the check is written out so a real
+  # one-digit difference still fails and uppercase from Get-FileHash matches.
+  if (-not $got -or -not $expected) { return $false }
+  $g = ($got -replace '\s', '').ToUpperInvariant()
+  $e = ($expected -replace '\s', '').ToUpperInvariant()
+  if ($g.Length -ne 64 -or $e.Length -ne 64) { return $false }
+  return $g -ceq $e
+}
 function Step($n, $title, [scriptblock]$body) {
-  $script:STEP = $title; $script:CUR = $n
+  $script:STEP = $title; $script:CUR = $n; $script:StepFrac = 0
+  # A reused tool is already present. It is not shown as a step.
   if (Done $n) { Say (T 'skip' $title) DarkGray; Finish $n; return }
+  $script:PhaseKey = $n
+  if ($n -ne 'build-app' -and $n -ne 'build-gpu') { Emit-Step $n -1 }
   Prog 0 -Force
-  $t = Get-Date; & $body; Mark $n; Finish $n
+  $t = Get-Date; & $body
+  Mark $n; Finish $n
   Say (T 'done_in' ((Get-Date) - $t).TotalSeconds) Green
 }
 function Fetch($key) {
   $d = $DL[$key]; $out = Join-Path $DLDIR $d.file
-  if ((Test-Path -LiteralPath $out) -and ((Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash -eq $d.sha)) { return $out }
+  if ((Test-Path -LiteralPath $out) -and (Same-Sha256 (Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash $d.sha)) { return $out }
   Say (T 'dl' $d.url)
+  $nested = [bool]($script:PhaseKey -and $script:PhaseKey -ne $key)
   $req = [Net.HttpWebRequest]::Create($d.url); $req.UserAgent = 'AfroSamuraiRecomp-installer'
   $resp = $req.GetResponse(); $len = $resp.ContentLength; $in = $resp.GetResponseStream()
   $fs = [IO.File]::Create("$out.part"); $buf = New-Object byte[] 1048576; $got = 0
   try {
     while (($r = $in.Read($buf, 0, $buf.Length)) -gt 0) {
       $fs.Write($buf, 0, $r); $got += $r
-      if ($len -gt 0) { Prog ($got / $len * $script:DLSHARE) (T 'dl_prog' $d.file ($got / 1MB) ($len / 1MB)) }
+      if ($len -gt 0) {
+        $detail = (T 'dl_prog' $d.file ($got / 1MB) ($len / 1MB))
+        if ($nested) {
+          # Keep the phase on its own measurement. This file is not that total.
+          Prog $script:StepFrac $detail
+        } else {
+          Prog ($got / $len * $script:DLSHARE) $detail
+          # Content-Length is the byte total. No length means the bar stays indeterminate.
+          if ($script:PhaseKey) { Emit-Step $script:PhaseKey -1 $got $len 'download' }
+        }
+      } elseif ($script:PhaseKey -and -not $nested) {
+        Emit-Step $script:PhaseKey -1 0 0 'download'
+      }
     }
   } finally { $fs.Close(); $in.Close(); $resp.Close() }
   $h = (Get-FileHash -LiteralPath "$out.part" -Algorithm SHA256).Hash
-  if ($h -ne $d.sha) { Remove-Item -LiteralPath "$out.part" -Force; throw (T 'sha_bad' $d.file $h $d.sha) }
+  if (-not (Same-Sha256 $h $d.sha)) { Remove-Item -LiteralPath "$out.part" -Force; throw (T 'sha_bad' $d.file $h $d.sha) }
   Move-Item -LiteralPath "$out.part" $out -Force
   Say (T 'sha_ok' ((Get-Item -LiteralPath $out).Length / 1MB))
   return $out
 }
 $TAR = Join-Path $env:SystemRoot 'System32\tar.exe'
+function Expand-ZipCounted($arc, $dest, [int]$strip, [string]$activity = 'extract') {
+  # Zip central directory gives a real entry count. tar.xz is not counted here:
+  # listing it decompresses the archive a second time.
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $z = [IO.Compression.ZipFile]::OpenRead($arc)
+  try {
+    $entries = @()
+    foreach ($e in $z.Entries) {
+      if (-not $e.FullName -or $e.FullName.EndsWith('/') -or $e.FullName.EndsWith('\')) { continue }
+      $rel = $e.FullName.Replace('/', '\')
+      if ($strip -gt 0) {
+        $parts = $rel.Split('\')
+        if ($parts.Length -le $strip) { continue }
+        $rel = ($parts | Select-Object -Skip $strip) -join '\'
+      }
+      $entries += [pscustomobject]@{ Entry = $e; Rel = $rel }
+    }
+    $total = $entries.Count
+    $n = 0
+    if ($script:PhaseKey) { Emit-Step $script:PhaseKey -1 0 $total $activity }
+    foreach ($item in $entries) {
+      $e = $item.Entry
+      $rel = $item.Rel
+      $target = Join-Path $dest $rel
+      $parent = Split-Path $target -Parent
+      if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+      [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $target, $true)
+      $n++
+      if ($script:PhaseKey) { Emit-Step $script:PhaseKey -1 $n $total $activity }
+    }
+  } finally { $z.Dispose() }
+}
+function Ensure-ManagedXz {
+  # Full path. Never `xz` from PATH: a missing xz is what made tar fail.
+  $dir = Join-Path $TOOLS 'xz'
+  $exe = Join-Path $dir 'xz.exe'
+  $dll = Join-Path $dir 'liblzma.dll'
+  if ((Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $dll)) { return $exe }
+  $zip = Fetch 'xz'
+  $stage = Join-Path $TOOLS 'xz-stage'
+  if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
+  # This count is the small xz zip, not the LLVM archive. Its own activity
+  # keeps that 53/53 from being shown as LLVM extraction finished.
+  Expand-ZipCounted $zip $stage 0 'unpack'
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  Copy-Item -LiteralPath (Join-Path $stage 'bin_x86-64\xz.exe') -Destination $exe -Force
+  Copy-Item -LiteralPath (Join-Path $stage 'bin_x86-64\liblzma.dll') -Destination $dll -Force
+  Remove-Item -LiteralPath $stage -Recurse -Force
+  if (-not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath $dll)) {
+    throw 'managed xz.exe was not unpacked from xz-5.8.1-windows.zip'
+  }
+  return $exe
+}
+function Expand-TarXz($arc, $dest, [int]$strip) {
+  # Decompress with the xz.exe this installer unpacked. Then give tar.exe only
+  # the plain .tar. The verified .tar.xz in downloads\ is not deleted.
+  $xz = Ensure-ManagedXz
+  if (-not (Test-Path -LiteralPath $TAR)) { throw "tar.exe is missing at $TAR" }
+  Say "    xz: $xz"
+  Say "    tar: $TAR"
+  $tarOut = Join-Path $dest 'payload.tar'
+  if (Test-Path -LiteralPath $tarOut) { Remove-Item -LiteralPath $tarOut -Force }
+  $compressed = [int64](Get-Item -LiteralPath $arc).Length
+  # The .tar.xz length is a real total for this phase. It is input bytes, not
+  # the unpacked tree. Stop one byte short of the end so the bar does not sit
+  # at 100% while xz is still flushing. tar itself has no reliable total.
+  if ($script:PhaseKey) {
+    if ($compressed -gt 0) { Emit-Step $script:PhaseKey -1 0 $compressed 'decompress' }
+    else { Emit-Step $script:PhaseKey -1 0 0 'decompress' }
+  }
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $xz
+  $psi.Arguments = '-dc'
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardInput = $true
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  $psi.CreateNoWindow = $true
+  $proc = New-Object System.Diagnostics.Process
+  $proc.StartInfo = $psi
+  [void]$proc.Start()
+  $fs = [IO.File]::Create($tarOut)
+  $err = ''
+  try {
+    $copy = $proc.StandardOutput.BaseStream.CopyToAsync($fs)
+    $errTask = $proc.StandardError.ReadToEndAsync()
+    $src = [IO.File]::Open($arc, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $stdin = $proc.StandardInput.BaseStream
+    try {
+      $buf = New-Object byte[] 1048576
+      $sent = [int64]0
+      while (($r = $src.Read($buf, 0, $buf.Length)) -gt 0) {
+        $stdin.Write($buf, 0, $r)
+        $sent += $r
+        if ($script:PhaseKey -and $compressed -gt 1) {
+          $shown = $sent
+          if ($shown -ge $compressed) { $shown = $compressed - 1 }
+          Emit-Step $script:PhaseKey -1 $shown $compressed 'decompress'
+        }
+      }
+    } finally { $stdin.Close(); $src.Close() }
+    $err = $errTask.GetAwaiter().GetResult()
+    $copy.Wait()
+  } finally { $fs.Close() }
+  $proc.WaitForExit()
+  $tarLen = if (Test-Path -LiteralPath $tarOut) { (Get-Item -LiteralPath $tarOut).Length } else { 0 }
+  if ($proc.ExitCode -ne 0 -or $tarLen -lt 1) {
+    if (Test-Path -LiteralPath $tarOut) { Remove-Item -LiteralPath $tarOut -Force }
+    throw "managed xz failed ($($proc.ExitCode)) $err"
+  }
+  # tar.exe does not report a file total unless the archive is read twice.
+  # Drop the decompress fraction before it starts so the bar cannot stay full.
+  if ($script:PhaseKey) { Emit-Step $script:PhaseKey -1 0 0 'extract' }
+  $arg = @('-xf', $tarOut, '-C', $dest)
+  if ($strip -gt 0) { $arg += @('--strip-components', "$strip") }
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  & $TAR @arg 2>&1 | ForEach-Object { Write-InstallLog "$_" -Bare }
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $prev
+  Remove-Item -LiteralPath $tarOut -Force
+  if ($code -ne 0) { throw "tar.exe exit $code after xz. The downloaded archive was kept." }
+  $left = @(Get-ChildItem -LiteralPath $dest -Force | Where-Object { $_.Name -ne 'payload.tar' })
+  if ($left.Count -lt 1) { throw 'extract produced no files. The downloaded archive was kept.' }
+}
 function Extract($arc, $dest, [int]$strip = 0, [switch]$Into) {
-  # Extracts with Windows' built-in tar (bsdtar: zip, tar.xz, ...), much faster than Expand-Archive.
-  # Into a temporary folder that is renamed at the end, so a cancelled run never leaves a
-  # half-extracted folder behind (-Into: add files to an existing folder instead).
+  $isZip = $arc -match '\.(zip|whl)$'
+  $isTarXz = $arc -match '\.tar\.xz$'
+  if ($script:PhaseKey) { Emit-Step $script:PhaseKey -1 0 0 'extract' }
+  # Into a temporary folder that is renamed at the end, so a failed extract
+  # never replaces a finished folder. The file in downloads\ stays.
   Prog $script:DLSHARE (T 'extracting' (Split-Path $arc -Leaf)) -Force
   $tmp = if ($Into) { $dest } else { "$dest.partial" }
   if (-not $Into -and (Test-Path -LiteralPath $tmp)) { Remove-Item -LiteralPath $tmp -Recurse -Force }
   New-Item -ItemType Directory -Force -Path $tmp | Out-Null
   $ok = $false
-  if (Test-Path -LiteralPath $TAR) {
-    $a = @('-xf', $arc, '-C', $tmp); if ($strip) { $a += @('--strip-components', "$strip") }
-    & $TAR @a 2>&1 | ForEach-Object { Add-Content -LiteralPath $LOG "$_" }
-    $ok = ($LASTEXITCODE -eq 0)
-    if (-not $ok) { Say (T 'tar_fail' $LASTEXITCODE) Yellow }
+  $fail = $null
+  if ($isTarXz) {
+    try { Expand-TarXz $arc $tmp $strip; $ok = $true } catch { $fail = $_.Exception.Message; Say $fail Yellow }
+  } elseif ($isZip) {
+    try { Expand-ZipCounted $arc $tmp $strip; $ok = $true } catch { $fail = $_.Exception.Message; Say (T 'tar_fail' $fail) Yellow }
   }
   if (-not $ok) {
-    if ($strip -or $arc -notmatch '\.(zip|whl)$') { throw (T 'cant_extract' $arc) }
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $z = [IO.Compression.ZipFile]::OpenRead($arc)
-    try { foreach ($e in $z.Entries) { $t = Join-Path $tmp $e.FullName; if ($e.Name -eq '') { New-Item -ItemType Directory -Force -Path $t | Out-Null; continue }; New-Item -ItemType Directory -Force -Path (Split-Path $t -Parent) | Out-Null; [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $t, $true) } } finally { $z.Dispose() }
+    if (-not $Into -and (Test-Path -LiteralPath $tmp)) { Remove-Item -LiteralPath $tmp -Recurse -Force }
+    # Keep the checksum or the tool's exit code. Do not replace it with "tar.exe missing".
+    if ($fail) { throw $fail }
+    throw (T 'cant_extract' $arc)
   }
   if (-not $Into) {
     if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
@@ -261,19 +488,124 @@ function Extract($arc, $dest, [int]$strip = 0, [switch]$Into) {
 function Run($exe, [string[]]$a, $wd = $null) {
   # Runs a program, streaming its output to the console and the log; throws on failure.
   if ($wd) { Push-Location -LiteralPath $wd }
+  $lines = New-Object System.Collections.Generic.List[string]
   try {
     $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     & $exe @a 2>&1 | ForEach-Object {
-      $s = "$_"; Add-Content -LiteralPath $LOG $s
-      if ($s -match '^\[(\d+)/(\d+)\]') { Prog ($script:BASE + (1.0 - $script:BASE) * [double]$Matches[1] / [double]$Matches[2]) (T 'compiling' $Matches[1] $Matches[2]) }
-      elseif ($s -match 'codegen|CODEGEN') { Write-Host "    $s" }
-      elseif ($s -notmatch '^\[') { Write-Host "    $s" }
+      $s = "$_"; $lines.Add($s); Write-InstallLog $s -Bare
+      if ($s -match '^AFROPHASE codegen') {
+        $script:CodegenLog = $true
+        Emit-Step 'codegen' -1 0 0 'generate'
+      } elseif ($s -match '^AFROPHASE compile') {
+        $script:CodegenLog = $false
+        Emit-Step 'compile' -1 0 0 'compile'
+      } elseif ($s -match 'Receiving objects:\s+\d+%\s+\((\d+)/(\d+)\)') {
+        if ($script:PhaseKey) { Emit-Step $script:PhaseKey -1 ([long]$Matches[1]) ([long]$Matches[2]) 'fetch' }
+      } elseif ($script:PhaseKey -ne 'codegen' -and $s -match '^\s*\[(\d+)/(\d+)\]') {
+        $d = [int]$Matches[1]; $t = [int]$Matches[2]
+        $key = if ($script:PhaseKey -eq 'gpu') { 'gpu' } else { 'compile' }
+        $act = if ($key -eq 'gpu') { 'graphics' } else { 'compile' }
+        Emit-Step $key -1 $d $t $act
+        Prog ($script:BASE + (1.0 - $script:BASE) * [double]$d / [double]$t) (T 'compiling' $d $t)
+      } elseif ($s -notmatch '^AFROPHASE ' -and $s -notmatch '^\[') { Say "    $s" }
+      if ($script:CodegenLog) {
+        try { Add-LogLine (Join-Path $Root 'codegen_win.log') $s | Out-Null } catch { }
+      }
     }
     $code = $LASTEXITCODE; $ErrorActionPreference = $prev
     if ($code -ne 0) { throw (T 'exit_code' $exe $code) }
+    return $lines
   } finally { if ($wd) { Pop-Location } }
 }
-function Git([string[]]$a, $wd = $null) { Run (Join-Path $TOOLS 'git\cmd\git.exe') $a $wd }
+$script:GitOwned = @()
+function Add-OwnedGit([string]$path) {
+  if (-not $path) { return }
+  $script:GitOwned += $path
+}
+function Convert-GitOwnedPath([string]$path) {
+  $full = [IO.Path]::GetFullPath($path).TrimEnd('\', '/')
+  return ($full -replace '\\', '/')
+}
+function Test-BroadSafeDirectory([string]$value) {
+  if (-not $value -or $value -eq '*' -or $value -eq '/*') { return $true }
+  $p = ($value -replace '\\', '/').TrimEnd('/')
+  if ($p -eq '*' -or $p -eq '/*') { return $true }
+  if ($p -match '^[A-Za-z]:$') { return $true }
+  if ($p -match '^//[^/]+/[^/]+$') { return $true }
+  return $false
+}
+function Get-OwnedGitDirectories([string[]]$extra) {
+  $seen = @{}
+  $out = New-Object System.Collections.Generic.List[string]
+  foreach ($raw in @($script:GitOwned + $extra)) {
+    if (-not $raw) { continue }
+    $path = Convert-GitOwnedPath $raw
+    if ($path.Contains('*') -or (Test-BroadSafeDirectory $path)) {
+      throw "Refusing to mark a broad Git directory safe: $path"
+    }
+    foreach ($value in @($path, "$path/*")) {
+      if (Test-BroadSafeDirectory $value) { throw "Refusing Git safe.directory $value" }
+      if (-not $seen.ContainsKey($value)) { $seen[$value] = $true; $out.Add($value) }
+    }
+  }
+  return $out
+}
+function Git([string[]]$a, $wd = $null) {
+  # Command-scoped safe.directory only. The user's Git configuration files are not modified.
+  $extra = @()
+  if ($wd) { $extra += $wd }
+  for ($i = 0; $i -lt $a.Count; $i++) {
+    if ($a[$i] -eq '-C' -and ($i + 1) -lt $a.Count) { $extra += $a[$i + 1] }
+  }
+  $values = @(Get-OwnedGitDirectories $extra)
+  $saved = @{}
+  $start = 0
+  if ($env:GIT_CONFIG_COUNT -match '^\d+$') { $start = [int]$env:GIT_CONFIG_COUNT }
+  $saved['GIT_CONFIG_COUNT'] = $env:GIT_CONFIG_COUNT
+  $n = $start
+  $prefix = @()
+  foreach ($value in $values) {
+    $keyName = "GIT_CONFIG_KEY_$n"
+    $valName = "GIT_CONFIG_VALUE_$n"
+    $saved[$keyName] = [Environment]::GetEnvironmentVariable($keyName)
+    $saved[$valName] = [Environment]::GetEnvironmentVariable($valName)
+    Set-Item -Path "Env:$keyName" -Value 'safe.directory'
+    Set-Item -Path "Env:$valName" -Value $value
+    $prefix += @('-c', "safe.directory=$value")
+    $n++
+  }
+  $env:GIT_CONFIG_COUNT = "$n"
+  try { Run (Join-Path $TOOLS 'git\cmd\git.exe') ($prefix + $a) $wd }
+  finally {
+    foreach ($name in @($saved.Keys)) {
+      if ($null -eq $saved[$name]) { Remove-Item -Path "Env:$name" -ErrorAction SilentlyContinue }
+      else { Set-Item -Path "Env:$name" -Value $saved[$name] }
+    }
+  }
+}
+function Test-ExactInstallerDir([string]$path, [string]$leaf) {
+  $full = [IO.Path]::GetFullPath($path).TrimEnd('\')
+  $root = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+  $expected = [IO.Path]::GetFullPath((Join-Path $root $leaf)).TrimEnd('\')
+  if (-not [string]::Equals($full, $expected, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+  if (-not $full.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) { return $false }
+  $item = Get-Item -LiteralPath $full -Force -ErrorAction SilentlyContinue
+  if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $false }
+  return $true
+}
+function Remove-IncompleteClone([string]$path, [string]$leaf) {
+  # A directory with .git is resumed, never deleted. Anything that is not this
+  # installer's own rexglue-sdk or afrorecomp folder is left untouched.
+  if (-not (Test-Path -LiteralPath $path)) { return }
+  if (Test-Path -LiteralPath (Join-Path $path '.git')) { return }
+  if ($leaf -ne 'rexglue-sdk' -and $leaf -ne 'afrorecomp') {
+    throw "Refusing to delete $path. This installer only replaces its own incomplete clone."
+  }
+  if (-not (Test-ExactInstallerDir $path $leaf)) {
+    throw "Refusing to delete $path. It is not the installer's $leaf folder."
+  }
+  Remove-Item -LiteralPath $path -Recurse -Force
+}
 
 # ---------------------------------------------------------------- setup ------
 # Language first (before anything else). Default: Windows UI language if supported.
@@ -318,6 +650,32 @@ function CheckPath($p) {
   $w | ForEach-Object { Write-Host "$(T 'warning'): $_" -ForegroundColor Yellow }
 }
 $NAME = if ($inRepo) { 'AfroSamuraiRecomp-install' } else { 'AfroSamuraiRecomp' }
+function Test-VolumeOrShareRoot([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+  $p = $Path.Trim() -replace '/', '\'
+  if ($p -match '^[A-Za-z]:\\?$') { return $true }
+  $trim = $p.TrimEnd('\')
+  if ($trim -match '^\\\\[^\\]+\\[^\\]+$') { return $true }
+  return $false
+}
+# A new install is created inside the chosen parent. D:\ becomes
+# D:\AfroSamuraiRecomp. A parent that already ends with that name is not nested again.
+# An update keeps the folder that was selected: that folder is the install itself.
+function Resolve-NewInstallRoot([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) { throw 'Install folder is empty.' }
+  $p = $Path.Trim().Trim('"') -replace '/', '\'
+  try { $p = [IO.Path]::GetFullPath($p) } catch { throw "Install folder is not a valid path: $Path" }
+  $leaf = [IO.Path]::GetFileName($p.TrimEnd('\'))
+  if ($leaf -eq 'AfroSamuraiRecomp' -and -not (Test-VolumeOrShareRoot $p)) {
+    return $p.TrimEnd('\')
+  }
+  if (Test-VolumeOrShareRoot $p) {
+    $root = [IO.Path]::GetPathRoot($p)
+    if (-not $root.EndsWith('\')) { $root += '\' }
+    return (Join-Path $root 'AfroSamuraiRecomp')
+  }
+  return (Join-Path $p.TrimEnd('\') 'AfroSamuraiRecomp')
+}
 if ($NonInteractive -and -not $InstallDir) { throw 'NonInteractive requires -InstallDir.' }
 $Root = $InstallDir
 while (-not $Root) {
@@ -325,14 +683,26 @@ while (-not $Root) {
   Write-Host (T 'choose_folder')
   $parent = PickFolder $start
   if (-not $parent) { $parent = Ask (T 'no_folder') $start }
-  $cand = [IO.Path]::GetFullPath((Join-Path $parent $NAME))
+  $cand = if ($inRepo) { [IO.Path]::GetFullPath((Join-Path $parent $NAME)) } else { Resolve-NewInstallRoot $parent }
   if ($inRepo -and $cand -eq (Split-Path $here -Parent)) { $cand = "$cand-install" }
   Write-Host ''; Write-Host (T 'install_folder' $cand) -ForegroundColor Cyan
   CheckPath $cand
   if (YesNo (T 'install_there') 'y') { $Root = $cand }
 }
-$Root = [IO.Path]::GetFullPath($Root)
-New-Item -ItemType Directory -Force -Path $Root | Out-Null
+if ($Update) {
+  try { $Root = [IO.Path]::GetFullPath($Root.Trim().Trim('"')) } catch { throw "Install folder is not a valid path: $Root" }
+  if (Test-VolumeOrShareRoot $Root) {
+    throw 'Update needs the existing AfroSamuraiRecomp folder, not the drive or share itself. Nothing was deleted.'
+  }
+} elseif (-not $inRepo) {
+  $Root = Resolve-NewInstallRoot $Root
+} else {
+  try { $Root = [IO.Path]::GetFullPath($Root.Trim().Trim('"')) } catch { throw "Install folder is not a valid path: $Root" }
+}
+if (Test-VolumeOrShareRoot $Root) {
+  throw 'Refusing to install directly on a drive or share root. Nothing was deleted.'
+}
+[IO.Directory]::CreateDirectory($Root) | Out-Null
 $LOG = Join-Path $Root 'install.log'; $script:LOG = $LOG
 $TOOLS = Join-Path $Root 'tools'; $DLDIR = Join-Path $Root 'downloads'; $STAMPS = Join-Path $Root '.install'
 $REPO = Join-Path $Root 'afrorecomp'
@@ -447,14 +817,56 @@ try {
   $script:STEP = 'verify ISO'; $script:CUR = 'iso-hash'
   if ($Iso -and -not (Done 'iso-hash')) {
     Prog 0.1 (T 'iso_sha_prog') -Force
-    Say (T 'iso_check')
-    $h = (Get-FileHash -LiteralPath $Iso -Algorithm SHA1).Hash
-    if ($h -eq $ISO_SHA1) { Say (T 'iso_ok') Green; Mark 'iso-hash' }
-    else {
-      Say (T 'iso_bad' $h $ISO_SHA1) Yellow
-      Say (T 'iso_only') Yellow
-      if ($NonInteractive) { throw (T 'iso_nomatch') }
-      if (-not (YesNo (T 'cont') 'n')) { throw (T 'iso_nomatch') }
+    # A missing or unreadable file throws here. A different SHA-1 does not.
+    $isoFull = [IO.Path]::GetFullPath($Iso)
+    $isoLen = [int64](Get-Item -LiteralPath $isoFull).Length
+    $notePath = Join-Path $STAMPS 'iso-unverified.note'
+    function Read-IsoNote {
+      if (-not (Test-Path -LiteralPath $notePath)) { return $null }
+      $m = @{}
+      foreach ($line in [IO.File]::ReadAllLines($notePath)) {
+        $eq = $line.IndexOf('=')
+        if ($eq -gt 0) { $m[$line.Substring(0, $eq)] = $line.Substring($eq + 1) }
+      }
+      return $m
+    }
+    function Test-UnverifiedNote {
+      # Same path and length: the SHA-1 already recorded still describes this file.
+      # The length does not accept the disc. It only avoids hashing those bytes again.
+      $m = Read-IsoNote
+      if (-not $m) { return $false }
+      $recorded = ''
+      try { $recorded = [IO.Path]::GetFullPath([string]$m['path']).TrimEnd('\') } catch { return $false }
+      if (-not [string]::Equals($recorded, $isoFull.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) { return $false }
+      $recordedLen = [int64]0
+      if (-not [int64]::TryParse([string]$m['length'], [ref]$recordedLen) -or $recordedLen -ne $isoLen -or $isoLen -le 0) { return $false }
+      $act = ([string]$m['actual'] -replace '\s', '').ToUpperInvariant()
+      $exp = ([string]$m['expected'] -replace '\s', '').ToUpperInvariant()
+      if ($act.Length -ne 40 -or $exp -ne $ISO_SHA1 -or $act -eq $ISO_SHA1) { return $false }
+      $script:IsoActual = $act
+      return $true
+    }
+    function Write-IsoNote([string]$actual) {
+      $tmp = "$notePath.tmp"
+      $body = "path=$isoFull`r`nlength=$isoLen`r`nactual=$actual`r`nexpected=$ISO_SHA1`r`n"
+      [IO.File]::WriteAllText($tmp, $body, (New-Object Text.UTF8Encoding $false))
+      Move-Item -LiteralPath $tmp -Destination $notePath -Force
+    }
+    $script:IsoActual = ''
+    if (Test-UnverifiedNote) {
+      Say (T 'iso_continue' $script:IsoActual $ISO_SHA1) Yellow
+    } else {
+      if (Test-Path -LiteralPath $notePath) { Remove-Item -LiteralPath $notePath -Force }
+      Say (T 'iso_check')
+      $h = (Get-FileHash -LiteralPath $isoFull -Algorithm SHA1).Hash
+      if ($h -eq $ISO_SHA1) {
+        Say (T 'iso_ok') Green
+        Mark 'iso-hash'
+        if (Test-Path -LiteralPath $notePath) { Remove-Item -LiteralPath $notePath -Force }
+      } else {
+        Write-IsoNote $h
+        Say (T 'iso_continue' $h $ISO_SHA1) Yellow
+      }
     }
   }
   Finish 'iso-hash'
@@ -501,6 +913,7 @@ try {
   Write-Host ''
 
   # ------------------------------------------------------- toolchain -------
+  Set-PhasePlan
   Step 'git' (T 't_git') { Extract (Fetch 'mingit') (Join-Path $TOOLS 'git') }
   Step 'cmake' (T 't_cmake') { Extract (Fetch 'cmake') (Join-Path $TOOLS 'cmake') 1 }
   Step 'ninja' 'Ninja' { Extract (Fetch 'ninja') (Join-Path $TOOLS 'ninja') }
@@ -525,6 +938,9 @@ try {
 
   # ------------------------------------------------------- sources ---------
   # The source step always runs (no stamp), so a re-run picks up new commits.
+  # Only these two directories are marked safe for this process. Not the drive.
+  Add-OwnedGit (Join-Path $Root 'rexglue-sdk')
+  Add-OwnedGit $REPO
   Remove-Item -LiteralPath (Join-Path $STAMPS 'repo.done') -Force -ErrorAction SilentlyContinue
   $REV = $null
   if ($LocalTree) {
@@ -548,36 +964,75 @@ try {
         if ($src.StartsWith($dest + '\', [StringComparison]::OrdinalIgnoreCase)) {
           throw 'Install folder is inside the local source. Choose a different install folder.'
         }
-        # The copy replaces afrorecomp, including any previous build output.
-        # Drop compile stamps so a repeat install of the same VERSION rebuilds.
+        # Drop compile stamps so the build runs again. Keep codegen output
+        # and the game-derived tables; those are not in this source tree.
         foreach ($n in 'build-app', 'build-gpu', 'build') {
           Remove-Item -LiteralPath (Join-Path $STAMPS "$n.done") -Force -ErrorAction SilentlyContinue
         }
         Remove-Item -LiteralPath (Join-Path $STAMPS 'build.rev') -Force -ErrorAction SilentlyContinue
         if ($Update) { Test-AfroRunning }
-        if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+        $keepRel = @('app\generated', 'app\afro_switch_tables.toml', 'app\afro_icon.ico', 'app\assets\default.pe')
+        $stash = Join-Path ([IO.Path]::GetTempPath()) ('afro-keep-' + [guid]::NewGuid().ToString('n'))
+        $stashed = @()
+        if (Test-Path -LiteralPath $dest) {
+          New-Item -ItemType Directory -Force -Path $stash | Out-Null
+          foreach ($rel in $keepRel) {
+            $from = Join-Path $dest $rel
+            if (-not (Test-Path -LiteralPath $from)) { continue }
+            $to = Join-Path $stash $rel
+            $parent = Split-Path $to -Parent
+            if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+            Move-Item -LiteralPath $from -Destination $to
+            $stashed += $rel
+          }
+          Remove-Item -LiteralPath $dest -Recurse -Force
+        }
         New-Item -ItemType Directory -Force -Path $dest | Out-Null
-        & "$env:SystemRoot\System32\robocopy.exe" $src $dest /E /NFL /NDL /NJH /NP /XJ /XD .git /XF *.iso *.xex *.pe | Out-Null
-        if ($LASTEXITCODE -ge 8) { throw "robocopy of local source failed ($LASTEXITCODE)" }
+        # File count of the source tree, excluding the git dir and disc images.
+        # Each copy advances that count. There is no time estimate.
+        $files = @(Get-ChildItem -LiteralPath $src -Recurse -File -Force | Where-Object {
+          $rel = $_.FullName.Substring($src.Length).TrimStart('\')
+          $rel -notmatch '(^|\\)\.git(\\|$)' -and $_.Extension -notin '.iso', '.xex', '.pe'
+        })
+        $n = 0
+        Emit-Step 'repo' -1 0 $files.Count 'copy'
+        foreach ($file in $files) {
+          $rel = $file.FullName.Substring($src.Length).TrimStart('\')
+          $target = Join-Path $dest $rel
+          $parent = Split-Path $target -Parent
+          if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+          Copy-Item -LiteralPath $file.FullName -Destination $target -Force
+          $n++
+          Emit-Step 'repo' -1 $n $files.Count 'copy'
+        }
+        foreach ($rel in $stashed) {
+          $from = Join-Path $stash $rel
+          $to = Join-Path $dest $rel
+          $parent = Split-Path $to -Parent
+          if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+          Move-Item -LiteralPath $from -Destination $to
+        }
+        if (Test-Path -LiteralPath $stash) { Remove-Item -LiteralPath $stash -Recurse -Force -ErrorAction SilentlyContinue }
       }
     }
     $REV = "local-$localVer"
     if (Test-Path -LiteralPath (Join-Path $REPO '.git')) {
       try {
-        $head = (& (Join-Path $TOOLS 'git\cmd\git.exe') -C $REPO rev-parse HEAD).Trim()
+        $head = "$(Git @('-C', $REPO, 'rev-parse', 'HEAD') | Select-Object -Last 1)".Trim()
         if ($head) { $REV = "local-$localVer-$head" }
       } catch { }
     }
   } else {
     if ($NonInteractive -and -not $PSBoundParameters.ContainsKey('Ref')) {
-      throw 'Refusing to build the default branch main. Pass -LocalTree with the 0.1.0 source, or an explicit -Ref that is not public main.'
+      throw 'Refusing to build the default branch main. Pass -LocalTree with the 0.1.1 source, or an explicit -Ref that is not public main.'
     }
     if ($NonInteractive -and $Ref -eq 'main') {
-      throw 'Refusing -Ref main. Public main is not the unpublished 0.1.0 source.'
+      throw 'Refusing -Ref main. Public main is not this 0.1.1 source.'
     }
     Step 'repo' (T 't_repo' $Ref) {
+      Add-OwnedGit $REPO
       if (-not (Test-Path -LiteralPath (Join-Path $REPO '.git'))) {
-        if (Test-Path -LiteralPath $REPO) { Remove-Item -LiteralPath $REPO -Recurse -Force }
+        Remove-IncompleteClone $REPO 'afrorecomp'
         Git @('clone', $RepoUrl, $REPO)
       }
       if ($REPO -ne $here2) {
@@ -585,7 +1040,7 @@ try {
         Git @('-C', $REPO, 'checkout', '--detach', 'FETCH_HEAD')
       }
     }
-    $REV = (& (Join-Path $TOOLS 'git\cmd\git.exe') -C $REPO rev-parse HEAD).Trim()
+    $REV = "$(Git @('-C', $REPO, 'rev-parse', 'HEAD') | Select-Object -Last 1)".Trim()
   }
   # Build stamps are only valid for the source revision they were built from:
   # a new commit makes build-app / build-gpu run again (incremental build).
@@ -609,8 +1064,11 @@ try {
   }
   Step 'rexglue-src' (T 't_rexsrc' $REXGLUE_COMMIT) {
     $s = Join-Path $Root 'rexglue-sdk'
+    Add-OwnedGit $s
     if (-not (Test-Path -LiteralPath (Join-Path $s '.git'))) {
-      if (Test-Path -LiteralPath $s) { Remove-Item -LiteralPath $s -Recurse -Force }
+      # A previous attempt may have left the directory before .git existed.
+      # If .git exists, this is skipped and the checkout below resumes it.
+      Remove-IncompleteClone $s 'rexglue-sdk'
       # blobless clone: full history (bd833a2 is reachable) but file contents only for the checkout
       Git @('-c', 'core.longpaths=true', 'clone', '--filter=blob:none', '--no-checkout', $REXGLUE_GIT, $s)
     }
@@ -625,8 +1083,22 @@ try {
     $g = Join-Path $Root 'gamedata'
     if ($GameDataDir) {
       Say (T 'copying' $GameDataDir)
-      & "$env:SystemRoot\System32\robocopy.exe" $GameDataDir $g /E /NFL /NDL /NJH /NP | Out-Null
-      if ($LASTEXITCODE -ge 8) { throw (T 'robocopy' $LASTEXITCODE) }
+      $srcGame = [IO.Path]::GetFullPath($GameDataDir)
+      $files = @(Get-ChildItem -LiteralPath $srcGame -Recurse -File -Force -ErrorAction SilentlyContinue)
+      $totalBytes = [long]0
+      foreach ($file in $files) { $totalBytes += [long]$file.Length }
+      $copied = [long]0
+      Emit-Step 'gamedata' -1 0 $totalBytes 'copybytes'
+      New-Item -ItemType Directory -Force -Path $g | Out-Null
+      foreach ($file in $files) {
+        $rel = $file.FullName.Substring($srcGame.Length).TrimStart('\')
+        $target = Join-Path $g $rel
+        $parent = Split-Path $target -Parent
+        if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+        Copy-Item -LiteralPath $file.FullName -Destination $target -Force
+        $copied += [long]$file.Length
+        Emit-Step 'gamedata' -1 $copied $totalBytes 'copybytes'
+      }
     } elseif (-not (Test-Path -LiteralPath (Join-Path $g 'default.xex'))) {
       Run (Join-Path $TOOLS 'python\python.exe') @((Join-Path $REPO 'tools\xiso_extract.py'), $Iso, $g, '/')
     }
@@ -634,10 +1106,11 @@ try {
   }
 
   # ------------------------------------------------------- build -----------
-  Step 'build-app' (T 't_app') { $script:BASE = 0.25; Prog 0.02 (T 'codegen') -Force; Run "$env:SystemRoot\System32\cmd.exe" @('/c', 'tools\build_win.bat') $REPO }
-  Step 'build-gpu' (T 't_gpu') { $script:BASE = 0.1; Run "$env:SystemRoot\System32\cmd.exe" @('/c', 'tools\build_gpu_plugin.bat') $REPO }
+  Step 'build-app' (T 't_app') { $script:BASE = 0.25; Emit-Step 'codegen' -1 0 0 'generate'; Run "$env:SystemRoot\System32\cmd.exe" @('/c', 'tools\build_win.bat') $REPO }
+  Step 'build-gpu' (T 't_gpu') { $script:BASE = 0.1; $script:PhaseKey = 'gpu'; Emit-Step 'gpu' -1; Run "$env:SystemRoot\System32\cmd.exe" @('/c', 'tools\build_gpu_plugin.bat') $REPO }
 
   $script:STEP = 'verify output'; $script:CUR = 'verify'; Prog 0 -Force
+  Emit-Step 'install' -1 0 0 'check'
   $out = Join-Path $REPO 'app\out\build\win-amd64-release'
   foreach ($c in @(@('afrorecomp.exe', $null), @('rexruntime.dll', 'afro_xma_frameless_chain'), @('rexgpu-xenos.dll', 'afro_edram_no_wrap'))) {
     $f = Join-Path $out $c[0]
@@ -668,7 +1141,12 @@ try {
     $prev = Join-Path $GAME '.update-prev'
     if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
-    foreach ($file in $built) { Copy-Item -LiteralPath $file.FullName (Join-Path $stage $file.Name) -Force }
+    $copyI = 0
+    foreach ($file in $built) {
+      Copy-Item -LiteralPath $file.FullName (Join-Path $stage $file.Name) -Force
+      $copyI++
+      Emit-Step 'install' -1 $copyI $built.Count 'copy'
+    }
     foreach ($n in 'afrorecomp.exe', 'rexruntime.dll', 'rexgpu-xenos.dll') {
       if (-not (Test-Path -LiteralPath (Join-Path $stage $n))) {
         Remove-Item -LiteralPath $stage -Recurse -Force
@@ -698,18 +1176,54 @@ try {
     Remove-Item -LiteralPath $prev -Recurse -Force -ErrorAction SilentlyContinue
     Say '    program files replaced after the build succeeded; saves and launcher settings were not changed'
   } else {
-    foreach ($file in $built) { Copy-Item -LiteralPath $file.FullName (Join-Path $GAME $file.Name) -Force }
+    $copyI = 0
+    foreach ($file in $built) {
+      Copy-Item -LiteralPath $file.FullName (Join-Path $GAME $file.Name) -Force
+      $copyI++
+      Emit-Step 'install' -1 $copyI $built.Count 'copy'
+    }
   }
   $ico = Join-Path $REPO 'app\afro_icon.ico'
   if ((Test-Path -LiteralPath $ico) -and (-not $Update -or -not (Test-Path -LiteralPath (Join-Path $GAME 'afro_icon.ico')))) {
     Copy-Item -LiteralPath $ico (Join-Path $GAME 'afro_icon.ico') -Force
   }
   $playBat = Join-Path $GAME 'Play.bat'
-  if (-not $Update -or -not (Test-Path -LiteralPath $playBat)) {
-    # Same options as tools\run_win.bat.
-    @('@echo off', 'rem Start Afro Samurai Recomp. Log: ..\afro.log. Hold Shift at start for the launcher.', 'cd /d "%~dp0"',
-      'afrorecomp.exe --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --readback_resolve=fast --log_file="%~dp0..\afro.log" %*') |
-      Set-Content -LiteralPath $playBat -Encoding ASCII
+  # The old stock bat runs the exe in the foreground, so cmd stays open for the
+  # whole session. start returns at once; the window stays only if start fails.
+  # A bat the user edited is left alone. afro_language.cfg is not part of this.
+  $playOld = @(
+    '@echo off',
+    'rem Start Afro Samurai Recomp. Log: ..\afro.log. Hold Shift at start for the launcher.',
+    'cd /d "%~dp0"',
+    'afrorecomp.exe --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --readback_resolve=fast --log_file="%~dp0..\afro.log" %*'
+  )
+  $playNew = @(
+    '@echo off',
+    'rem Start Afro Samurai Recomp. Log: ..\afro.log. Hold Shift at start for the launcher.',
+    'rem The game window is separate. This console closes unless start fails.',
+    'cd /d "%~dp0"',
+    'start "" "%~dp0afrorecomp.exe" --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --readback_resolve=fast --log_file="%~dp0..\afro.log" %*',
+    'if errorlevel 1 (',
+    '  echo The game did not start. El juego no se ha iniciado. See ..\afro.log',
+    '  if not defined AFRO_PLAY_NOPAUSE pause',
+    '  exit /b 1',
+    ')'
+  )
+  $playLines = @()
+  if (Test-Path -LiteralPath $playBat) {
+    $playLines = @((Get-Content -LiteralPath $playBat | ForEach-Object { $_.TrimEnd() }) | Where-Object { $_ -ne '' })
+  }
+  $sameAs = {
+    param($want)
+    if ($playLines.Count -ne $want.Count) { return $false }
+    for ($i = 0; $i -lt $want.Count; $i++) { if ($playLines[$i] -ne $want[$i]) { return $false } }
+    return $true
+  }
+  if (-not (Test-Path -LiteralPath $playBat) -or (& $sameAs $playOld) -or (& $sameAs $playNew)) {
+    $playNew | Set-Content -LiteralPath $playBat -Encoding ASCII
+    Say '    Play.bat starts the game and closes its own window'
+  } else {
+    Say '    Play.bat left as the user wrote it'
   }
   foreach ($n in 'afrorecomp.exe', 'rexruntime.dll', 'rexgpu-xenos.dll') { if (-not (Test-Path -LiteralPath (Join-Path $GAME $n))) { throw (T 'missing' $n $GAME) } }
   Say (T 'game_folder' $GAME)
@@ -748,6 +1262,9 @@ try {
   # ------------------------------------------------------- optional cleanup ---
   # Only folders INSIDE the install root; never the ISO, gamedata, game, logs or saves.
   $script:STEP = 'cleanup'
+  if (Test-VolumeOrShareRoot $Root) {
+    throw 'Refusing to clean a drive or share root. Nothing was deleted.'
+  }
   if ($NonInteractive -and -not $KeepBuildFiles -and -not $CleanupAfterInstall) {
     throw 'NonInteractive requires -KeepBuildFiles or -CleanupAfterInstall.'
   }
@@ -783,6 +1300,7 @@ try {
   try { $Host.UI.RawUI.WindowTitle = "AfroSamuraiRecomp installer FAILED at: $script:STEP" } catch { }
   Say (T 'failed' $script:STEP) Red
   Say (T 'error' $_.Exception.Message) Red
+  if ($script:LogFallback) { Say "Fallback log: $($script:LogFallback)" Yellow }
   Say (T 'full_log' $LOG) Red
   Say (T 'retry') Yellow
   exit 1

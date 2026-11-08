@@ -5,6 +5,10 @@
 *.zip
 *.bik
 *.ico
+# The setup icon is supplied pixel art, not a game icon. The build copies it
+# to tools/afrosetup.ico, which stays ignored.
+!tools/artwork/**/*.ico
+tools/afrosetup_header.inc
 assets/
 app/generated/default/
 app/afro_switch_tables.toml

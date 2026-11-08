@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Packaging checks for tools/afrosetup-v<VERSION>.exe. No Windows install is performed."""
+"""Packaging checks for tools/afrosetup.exe. No Windows install is performed."""
 
 from __future__ import annotations
 
@@ -43,16 +43,29 @@ def main() -> None:
         fail("PE image requests administrator")
     if b"asInvoker" not in image:
         fail("asInvoker manifest missing from the PE image")
-    if b"TerminateProcess" in image:
-        fail("PE image imports or names TerminateProcess")
     cpp = (ROOT / "tools" / "afrosetup.cpp").read_text(encoding="utf-8")
-    if "TerminateProcess" in cpp or "JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE" in cpp:
-        fail("setup source can kill the build")
     ps1 = (ROOT / "tools" / "install.ps1").read_text(encoding="utf-8")
+    if "ConfirmedStop" not in cpp or "DescendantPids" not in cpp or "TerminateJobObject" not in cpp:
+        fail("cancel is not limited to the process tree of this run")
+    if "taskkill" in cpp.lower() or "Stop-Process" in ps1:
+        fail("cancel kills by image name")
     if "[string]$Ref = 'main'" not in ps1:
         fail("console default branch was removed")
-    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.1.0'" not in ps1:
+    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.1.1'" not in ps1:
         fail("local-tree guard missing")
+    if "logwrite.ps1" not in ps1 or "Add-Content" in ps1:
+        fail("install.ps1 still appends the log with Add-Content")
+    logwrite = (ROOT / "tools" / "logwrite.ps1").read_text(encoding="utf-8")
+    if "FileShare]::ReadWrite" not in logwrite or "LogBusy" not in logwrite:
+        fail("log writer is missing the share mode or the recursion guard")
+    version = (ROOT / "app" / "VERSION").read_text(encoding="utf-8").strip()
+    if version != "0.1.1":
+        fail(f"VERSION is {version!r}")
+    if b"Lomorsin Afro header 1200x240" not in image:
+        fail("setup image is missing the header art marker")
+    icon = (ROOT / "tools" / "artwork" / "lomorsin-afro" / "icono_32.png").read_bytes()
+    if icon not in image:
+        fail("setup image is missing the supplied 32px icon")
     print("setup packaging checks: ok")
     print(f"  {EXE}  {len(blob)} bytes  amd64 GUI  asInvoker")
     print(f"  payload at {off} size {size}")
