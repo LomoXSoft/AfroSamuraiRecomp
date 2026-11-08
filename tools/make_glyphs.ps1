@@ -1,10 +1,10 @@
-# Draws the replacement button prompt icons (original art for this project,
-# GPL v3 like the rest of the repository) into assets\glyphs\<family>\.
+﻿# Draws the replacement button prompt icons (original art for this project,
+# GPL v3 like the rest of the repository) into tools\artwork\glyphs\<family>\.
 #
 # File names are the Xbox button POSITION the game asks for. On Nintendo the
 # label printed is the one found at that position: A.png shows B, and so on.
 # Run from anywhere:  powershell -NoProfile -File tools\make_glyphs.ps1
-param([string]$Out = (Join-Path $PSScriptRoot '..\assets\glyphs'))
+param([string]$Out = (Join-Path $PSScriptRoot 'artwork\glyphs'))
 Add-Type -AssemblyName System.Drawing
 
 $Dark = [Drawing.Color]::FromArgb(255, 28, 28, 32)
