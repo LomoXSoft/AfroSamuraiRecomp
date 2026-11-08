@@ -33,6 +33,8 @@
 #include <vector>
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "ole32.lib")
+#include <commctrl.h>
+#pragma comment(lib, "comctl32.lib")
 #endif
 
 REXCVAR_DEFINE_BOOL(choose_language, false, "Afro",
@@ -74,9 +76,8 @@ struct AdvItem {
   const char* cvar;
   const wchar_t* name;
   int n;              // number of choices
-  const char* values[6];
-  const wchar_t* labels[6];  // nullptr = use the localized Default/Off words
-  bool player = false;       // shown and applied without --advanced
+  const char* values[4];
+  const wchar_t* labels[4];  // nullptr = use the localized Default/Off words
 };
 const AdvItem kAdv[] = {
     {"rt", "render_target_path_d3d12", L"Render path (GPU)", 3, {"", "rtv", "rov"},
@@ -99,24 +100,42 @@ const AdvItem kAdv[] = {
     {"mrtclamp", "mrt_edram_used_range_clamp_to_min", L"mrt_edram_used_range_clamp_to_min", 2, {"", "false"}, {}},
     {"rtlog", "afro_rt_log", L"afro_rt_log (diagnostic, slow)", 2, {"", "true"}, {}},
     {"dumpshaders", "dump_shaders", L"Diagnostics: dump shaders", 2, {"", "shaderdump"}, {L"Off", L"On (shaderdump\\)"}},
-    // Mouse camera (keyboard play). Defaults live in the runtime (mnk driver).
-    {"mouse_sens", "mnk_sensitivity", L"Mouse: sensitivity", 6, {"", "0.5", "0.75", "1.5", "2", "3"},
-     {L"1.0", L"0.5", L"0.75", L"1.5", L"2.0", L"3.0"}, true},
-    {"mouse_dz", "afro_mouse_deadzone", L"Mouse: dead zone", 6, {"", "0", "0.2", "0.3", "0.45", "0.55"},
-     {L"0.35", L"0 (off)", L"0.2", L"0.3", L"0.45", L"0.55"}, true},
-    {"mouse_win", "afro_mouse_window_ms", L"Mouse: smoothing window", 5, {"", "5", "16", "30", "50"},
-     {L"10 ms", L"5 ms", L"16 ms", L"30 ms", L"50 ms"}, true},
 };
 constexpr int kAdvN = sizeof(kAdv) / sizeof(kAdv[0]);
-int AdvIndex(const char* key) {
-  for (int i = 0; i < kAdvN; ++i)
-    if (std::string(kAdv[i].key) == key) return i;
-  return -1;
-}
-// Mouse rows of the Advanced settings dialog (keys of kAdv entries).
-const char* const kMouseKeys[] = {"mouse_sens", "mouse_dz", "mouse_win"};
 
-struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int invuln = 0; /* 0 off, 1 on — session test only, not persisted */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ };
+// Mouse camera sliders (Advanced settings). Stored as integers: sensitivity
+// and dead zone in hundredths, smoothing in ms. The defaults match the
+// runtime's (mnk driver) cvar defaults.
+struct MouseSlider {
+  const char* key;   // cfg key
+  const char* cvar;
+  int lo, hi, def, step;
+  int scale;         // 100 = shown and sent as value/100, 1 = as is
+  const wchar_t* unit;
+};
+const MouseSlider kMouse[3] = {
+    {"mouse_sensitivity", "mnk_sensitivity", 10, 500, 200, 5, 100, L""},
+    {"mouse_deadzone", "afro_mouse_deadzone", 0, 80, 55, 1, 100, L""},
+    {"mouse_smoothing_ms", "afro_mouse_window_ms", 1, 50, 5, 1, 1, L" ms"},
+};
+std::wstring MouseText(int r, int v) {
+  wchar_t buf[32];
+  if (kMouse[r].scale == 100)
+    swprintf(buf, 32, L"%d.%02d%ls", v / 100, v % 100, kMouse[r].unit);
+  else
+    swprintf(buf, 32, L"%d%ls", v, kMouse[r].unit);
+  return buf;
+}
+std::string MouseCvarValue(int r, int v) {
+  char buf[32];
+  if (kMouse[r].scale == 100)
+    snprintf(buf, 32, "%d.%02d", v / 100, v % 100);
+  else
+    snprintf(buf, 32, "%d", v);
+  return buf;
+}
+
+struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int invuln = 0; /* 0 off, 1 on — session test only, not persisted */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; };
 
 // GPU-plugin cvars (rexgpu-xenos.dll) are registered only when the plugin is
 // loaded, after the launcher runs, and SetFlagByName rejects unknown names.
@@ -195,7 +214,8 @@ constexpr int kIdCombo = 101, kIdCheck = 102, kIdPlay = IDOK, kIdLangLbl = 103,
               kIdXSepia = 115, kIdXGfxLbl = 117, kIdXGfx = 118, kIdXCheats = 121,
               kIdCheatInv = 122, kIdCheatOk = 123, kIdCheatCancel = 124,
               kIdSavesBtn = 116, kIdAdvBase = 200, kIdCtrlLbl = 125, kIdCtrl = 126,
-              kIdXMouse = 130;  // 130..132
+              kIdXMouse = 130,     // 130..132 sliders
+              kIdXMouseVal = 133;  // 133..135 their values
 
 constexpr int kFpsValues[] = {0, 60};  // Original (30), Experimental (60)
 struct PickState { int sel = 0; bool remember = false; bool done = false; bool play = false; Options opt; };
@@ -377,10 +397,9 @@ LRESULT CALLBACK AdvProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   if ((m == WM_COMMAND && (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL)) || m == WM_CLOSE) {
     if (LOWORD(w) == IDOK && m == WM_COMMAND)
       for (int i = 0; i < kAdvN; ++i)
-        if (GetDlgItem(h, kIdAdvBase + i))  // hidden rows keep their value
-          st->opt->adv[i] = std::clamp(static_cast<int>(SendDlgItemMessageW(
-                                           h, kIdAdvBase + i, CB_GETCURSEL, 0, 0)),
-                                       0, kAdv[i].n - 1);
+        st->opt->adv[i] = std::clamp(static_cast<int>(SendDlgItemMessageW(
+                                         h, kIdAdvBase + i, CB_GETCURSEL, 0, 0)),
+                                     0, kAdv[i].n - 1);
     st->done = true;
     DestroyWindow(h);
     return 0;
@@ -403,12 +422,7 @@ void ShowAdvanced(HWND owner, int sel, Options* o) {
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const DWORD style = WS_CAPTION | WS_SYSMENU;
   const int rowH = 32, top = 16;
-  // Player rows (mouse) live in ShowExperimental, not here.
-  std::vector<int> rows;
-  for (int i = 0; i < kAdvN; ++i)
-    if (!kAdv[i].player) rows.push_back(i);
-  const int nRows = static_cast<int>(rows.size());
-  RECT rc{0, 0, S(460), S(top + nRows * rowH + 60)};
+  RECT rc{0, 0, S(460), S(top + kAdvN * rowH + 60)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   RECT orc;
   GetWindowRect(owner, &orc);
@@ -428,10 +442,9 @@ void ShowAdvanced(HWND owner, int sel, Options* o) {
     SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(UiFont()), TRUE);
     return c;
   };
-  for (int r = 0; r < nRows; ++r) {
-    const int i = rows[r];
+  for (int i = 0; i < kAdvN; ++i) {
     const AdvItem& a = kAdv[i];
-    int y = top + r * rowH;
+    int y = top + i * rowH;
     mk(L"STATIC", a.name, SS_CENTERIMAGE, 16, y, 240, 26, 0);
     HWND c = mk(L"COMBOBOX", L"", WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL, 264, y, 180, 200,
                 kIdAdvBase + i);
@@ -444,7 +457,7 @@ void ShowAdvanced(HWND owner, int sel, Options* o) {
     }
     SendMessageW(c, CB_SETCURSEL, std::clamp(o->adv[i], 0, a.n - 1), 0);
   }
-  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 170, top + nRows * rowH + 12, 120, 32, IDOK);
+  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 170, top + kAdvN * rowH + 12, 120, 32, IDOK);
   EnableWindow(owner, FALSE);
   MSG msg;
   while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {
@@ -465,6 +478,15 @@ LRESULT CALLBACK XProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     DestroyWindow(h);
     return 0;
   }
+  // Mouse sliders: keep the value next to each one current while dragging.
+  if (st && m == WM_HSCROLL && l) {
+    const int r = GetDlgCtrlID(reinterpret_cast<HWND>(l)) - kIdXMouse;
+    if (r >= 0 && r < 3) {
+      const int v = static_cast<int>(SendMessageW(reinterpret_cast<HWND>(l), TBM_GETPOS, 0, 0));
+      SetDlgItemTextW(h, kIdXMouseVal + r, MouseText(r, v).c_str());
+    }
+    return 0;
+  }
   if (st && m == WM_COMMAND && LOWORD(w) == kIdXCheats) {
     st->invuln_draft = ShowCheats(h, st->sel, st->invuln_draft);
     return 0;
@@ -476,12 +498,10 @@ LRESULT CALLBACK XProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       st->opt->sepia = SendDlgItemMessageW(h, kIdXSepia, CB_GETCURSEL, 0, 0) == 1 ? 1 : 0;
       // Reuse cfg key rt / adv[0]: 0 = RTV default, 2 = ROV (same as Advanced options).
       st->opt->adv[0] = SendDlgItemMessageW(h, kIdXGfx, CB_GETCURSEL, 0, 0) == 1 ? 2 : 0;
-      for (int r = 0; r < 3; ++r) {
-        const int i = AdvIndex(kMouseKeys[r]);
-        st->opt->adv[i] = std::clamp(static_cast<int>(SendDlgItemMessageW(
-                                         h, kIdXMouse + r, CB_GETCURSEL, 0, 0)),
-                                     0, kAdv[i].n - 1);
-      }
+      for (int r = 0; r < 3; ++r)
+        st->opt->mouse[r] = std::clamp(static_cast<int>(SendDlgItemMessageW(
+                                           h, kIdXMouse + r, TBM_GETPOS, 0, 0)),
+                                       kMouse[r].lo, kMouse[r].hi);
       // Cheats OK already updated the draft. Cancel/X/Esc of that popup did not.
       st->opt->invuln = st->invuln_draft;
       st->opt->tick = 0;  // tick UI removed; Experimental encodes interval unlock
@@ -551,18 +571,22 @@ void ShowExperimental(HWND owner, int sel, Options* o) {
   SendMessageW(sep, CB_SETCURSEL, o->sepia ? 1 : 0, 0);
   // Mouse camera (keyboard play): sensitivity, dead zone, smoothing.
   const wchar_t* mouse_lbl[3] = {t.mouse_sens, t.mouse_dz, t.mouse_win};
+  INITCOMMONCONTROLSEX icc{sizeof(icc), ICC_BAR_CLASSES};
+  InitCommonControlsEx(&icc);
   for (int r = 0; r < 3; ++r) {
-    const int i = AdvIndex(kMouseKeys[r]);
-    const AdvItem& a = kAdv[i];
+    const MouseSlider& ms = kMouse[r];
     const int y = 212 + r * 38;
+    const int v = std::clamp(o->mouse[r], ms.lo, ms.hi);
     mk(L"STATIC", mouse_lbl[r], SS_CENTERIMAGE, 16, y, 180, 26, 0);
-    HWND c = mk(L"COMBOBOX", L"", cbs, 204, y, 200, 200, kIdXMouse + r);
-    for (int k = 0; k < a.n; ++k) {
-      std::wstring txt = a.labels[k];
-      if (k == 0) txt += std::wstring(L" (") + t.def + L")";
-      SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)txt.c_str());
-    }
-    SendMessageW(c, CB_SETCURSEL, std::clamp(o->adv[i], 0, a.n - 1), 0);
+    HWND tb = mk(TRACKBAR_CLASSW, L"", WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 198, y, 196, 26,
+                 kIdXMouse + r);
+    SendMessageW(tb, TBM_SETRANGEMIN, FALSE, ms.lo);
+    SendMessageW(tb, TBM_SETRANGEMAX, FALSE, ms.hi);
+    SendMessageW(tb, TBM_SETLINESIZE, 0, ms.step);
+    SendMessageW(tb, TBM_SETPAGESIZE, 0, ms.step * 5);
+    SendMessageW(tb, TBM_SETPOS, TRUE, v);
+    mk(L"STATIC", MouseText(r, v).c_str(), SS_CENTERIMAGE | SS_RIGHT, 396, y, 48, 26,
+       kIdXMouseVal + r);
   }
   mk(L"BUTTON", t.cheats, WS_TABSTOP, 16, 326, 424, 28, kIdXCheats);
   mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 170, 368, 120, 32, IDOK);
@@ -979,6 +1003,11 @@ unsigned ApplyStartupLanguage() {
       if (line.rfind("tick=", 0) == 0) opt.tick = std::clamp(std::atoi(line.c_str() + 5), 0, 3);
       if (line.rfind("window=", 0) == 0) opt.window = line[7] == '1';
       if (line.rfind("control=", 0) == 0) opt.control = std::clamp(std::atoi(line.c_str() + 8), 0, 2);
+      for (int r = 0; r < 3; ++r) {
+        std::string k = std::string(kMouse[r].key) + "=";
+        if (line.rfind(k, 0) == 0)
+          opt.mouse[r] = std::clamp(std::atoi(line.c_str() + k.size()), kMouse[r].lo, kMouse[r].hi);
+      }
       for (int i = 0; i < kAdvN; ++i) {
         std::string k = std::string(kAdv[i].key) + "=";
         if (line.rfind(k, 0) == 0)
@@ -1009,8 +1038,7 @@ unsigned ApplyStartupLanguage() {
   const Options saved_adv = opt;
   if (!REXCVAR_GET(advanced)) {
     const int rt = opt.adv[0];
-    for (int i = 0; i < kAdvN; ++i)
-      if (!kAdv[i].player) opt.adv[i] = 0;
+    for (int i = 0; i < kAdvN; ++i) opt.adv[i] = 0;
     opt.adv[0] = (rt == 2) ? 2 : 0;
   }
   // First run of a new version: always show the launcher (new options may
@@ -1043,11 +1071,12 @@ unsigned ApplyStartupLanguage() {
         << "\ntick=0"
         << "\nwindow=" << (opt.window ? 1 : 0) << "\ncontrol=" << opt.control << "\nscale=" << (remember ? opt.scale : saved_scale)
         << "\nversion=" << AFRO_VERSION << "\n";
+    for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
     for (int i = 0; i < kAdvN; ++i) {
       int v;
       if (i == 0)
         v = remember ? opt.adv[i] : saved_adv.adv[i];
-      else if (!REXCVAR_GET(advanced) && !kAdv[i].player)
+      else if (!REXCVAR_GET(advanced))
         v = saved_adv.adv[i];
       else
         v = remember ? opt.adv[i] : stored.adv[i];
@@ -1086,6 +1115,9 @@ unsigned ApplyStartupLanguage() {
   // The mouse moves the camera whenever the keyboard can play.
   if (opt.control != 1 && !Explicit("mnk_mouse"))
     SetCvar("mnk_mouse", "true");
+  for (int r = 0; r < 3; ++r)
+    if (!Explicit(kMouse[r].cvar))
+      SetCvar(kMouse[r].cvar, MouseCvarValue(r, opt.mouse[r]).c_str());
   if (opt.control == 2 && !Explicit("afro_button_glyphs"))
     SetCvar("afro_button_glyphs", "keyboard");
   for (int i = 0; i < kAdvN; ++i)

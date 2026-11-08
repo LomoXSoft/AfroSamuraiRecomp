@@ -302,7 +302,7 @@ diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver
 diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver.cpp
 --- a/src/input/mnk/mnk_input_driver.cpp
 +++ b/src/input/mnk/mnk_input_driver.cpp
-@@ -18,9 +18,11 @@
+@@ -18,24 +18,36 @@
  #include <rex/ui/window.h>
  
  #include <algorithm>
@@ -314,9 +314,11 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  #include <string_view>
  
  REXCVAR_DEFINE_BOOL(mnk_mode, false, "Input", "Enable keyboard/mouse controller emulation");
-@@ -29,13 +31,23 @@ REXCVAR_DEFINE_BOOL(mnk_mouse, false, "Input",
+ REXCVAR_DEFINE_BOOL(mnk_mouse, false, "Input",
+                     "Use the mouse for the right stick. Off means the right stick comes "
                      "from the keybind_rstick_* keys only");
- REXCVAR_DEFINE_DOUBLE(mnk_sensitivity, 1.0, "Input", "Mouse sensitivity for right stick")
+-REXCVAR_DEFINE_DOUBLE(mnk_sensitivity, 1.0, "Input", "Mouse sensitivity for right stick")
++REXCVAR_DEFINE_DOUBLE(mnk_sensitivity, 2.0, "Input", "Mouse sensitivity for right stick")
      .range(0.01, 10.0);
 -
 -REXCVAR_DEFINE_STRING(keybind_a, "Semicolon,Space", "Input/Keybinds/Controller", "A button");
@@ -325,14 +327,14 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
 -REXCVAR_DEFINE_STRING(keybind_y, "P", "Input/Keybinds/Controller", "Y button");
 -REXCVAR_DEFINE_STRING(keybind_left_trigger, "Q,I", "Input/Keybinds/Controller", "Left trigger");
 -REXCVAR_DEFINE_STRING(keybind_right_trigger, "E,O", "Input/Keybinds/Controller", "Right trigger");
-+REXCVAR_DEFINE_DOUBLE(afro_mouse_deadzone, 0.35, "Input",
++REXCVAR_DEFINE_DOUBLE(afro_mouse_deadzone, 0.55, "Input",
 +                      "Mouse look: smallest stick deflection sent while the mouse moves, to "
 +                      "skip the game's own stick dead zone (0 = off)")
 +    .range(0.0, 0.9);
-+REXCVAR_DEFINE_INT32(afro_mouse_window_ms, 10, "Input",
++REXCVAR_DEFINE_INT32(afro_mouse_window_ms, 5, "Input",
 +                     "Mouse look: the stick follows the mouse speed averaged over this "
 +                     "many milliseconds, whatever the game's polling rate")
-+    .range(5, 200);
++    .range(1, 200);
 +
 +// afro: action-game defaults (mouse attacks, Q block, E kick, R focus, Esc
 +// for the Back menu). The keyboard button icons show these keys.
