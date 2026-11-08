@@ -101,8 +101,8 @@ do not treat it as stable — cinematics can run fast and performance dips remai
   - **Experimental (60) only:** intro and cutscenes can run too fast and frames
     can still drop. Other gameplay / Focus / combat timing may be wrong and is
     largely unverified. Not a finished 60 FPS mode.
-  - **Invulnerability (experimental)** does not currently prevent death. It is
-    off by default, lasts for that launch only, and is not saved.
+  - **Invulnerability (experimental)** works in the tested build and remains experimental.
+    It is not a guarantee for the whole game. It is off by default, lasts for that launch only, and is not saved.
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -324,9 +324,8 @@ language (English, Español, Français, Italiano), fullscreen or window, interna
 resolution (1x native by default / 2x / 3x) and "remember and don't ask again".
 **Advanced settings...** opens frame rate (**30 (original)** or **60 (experimental)**),
 render path (**RTV (original)** or **ROV (experimental)**), the sepia filter, and
-**Cheats...**. The Cheats checkbox is **Invulnerability (experimental)**. It starts
-off, lasts for that launch only, and is not written to `afro_language.cfg`. It does
-not currently prevent death.
+**Cheats...**. The Cheats checkbox is **Invulnerability (experimental)**. Invulnerability works in the tested build and remains experimental. It is not a guarantee for the whole game. It starts
+off, lasts for that launch only, and is not written to `afro_language.cfg`.
 Settings you keep with Remember are stored in `afro_language.cfg` next to the exe
 (`game\afro_language.cfg` after setup). Without Remember, the next start uses
 **30 (original)** and 1x resolution. A render-path change is written only when

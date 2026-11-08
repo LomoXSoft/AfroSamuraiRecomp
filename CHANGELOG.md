@@ -12,7 +12,7 @@ Newest first. Versions are in `app/VERSION`.
 - If `install.log` cannot be written, installation continues, the lines go to a fallback file, and a real install error is still reported.
 - Finished tools, verified downloads, extracted game data, and a completed SDK are kept on resume. An incomplete step is not marked done.
 - HDD installation can take a long time; SSD/NVMe recommended. No duration is promised.
-- Invulnerability (experimental) stays off by default and is not a death fix.
+- Invulnerability works in the tested build and remains experimental. It stays off by default and is not a guarantee for the whole game.
 
 ## 0.1.0 – Fully playable
 - Graphical setup program (`afrosetup-v0.1.0.exe` on the release, not in git). It

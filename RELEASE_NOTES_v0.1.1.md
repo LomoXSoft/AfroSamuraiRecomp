@@ -29,11 +29,12 @@ SHA-256 `3336ce0378a369f953476896bb091fb457f010fcacc1b5b77968c4a9e07da1c1`
 - Tested: a resumed HDD install finished, and the game session played correctly.
 - Tested: a clean NVMe install ran all 14 steps, ended with installation OK, and the game session played correctly.
 - Tested: the headband looked correct in play of this build.
+- Invulnerability works in the tested build and remains experimental.
 - Those runs are not a promised duration and not a check of every scene.
 
 ## Still not claimed
 
-- Invulnerability (experimental) does not prevent death. It stays off unless enabled for that launch, and it is not saved.
+- Invulnerability is not a guarantee for the whole game. It stays off unless enabled for that launch, and it is not saved.
 - Other black textures are not claimed fixed.
 - Experimental (60) can still run cutscenes fast and drop frames.
 - No install time is guaranteed on HDD, SSD, or NVMe.
