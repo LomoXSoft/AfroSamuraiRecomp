@@ -45,11 +45,19 @@ function Disc($g) {
 function Letter-Disc($path, $text, $px = 64) {
   $b, $g = New-Canvas 128 128; Disc $g; Draw-Label $g $text $px 128 128; Save-Png $b $g $path
 }
-# Shoulder button: wide rounded bar.
+# Shoulder button: wide rounded bar (the game's shoulder prompt is 128x64).
 function Shoulder($path, $text) {
-  $b, $g = New-Canvas 128 128; $gp = Rounded 8 30 112 68 30
-  $g.FillPath((New-Object Drawing.SolidBrush $Dark), $gp); $g.DrawPath((New-Pen $Rim 6), $gp)
-  Draw-Label $g $text 44 128 128; Save-Png $b $g $path
+  $b, $g = New-Canvas 256 128; $gp = Rounded 12 14 232 100 44
+  $g.FillPath((New-Object Drawing.SolidBrush $Dark), $gp); $g.DrawPath((New-Pen $Rim 7), $gp)
+  Draw-Label $g $text 64 256 128; Save-Png $b $g $path
+}
+# D-pad with the down arrow lit (the only D-pad prompt found so far).
+function Dpad($path) {
+  $b, $g = New-Canvas 128 128; Disc $g
+  $arm = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 90, 90, 98))
+  $g.FillRectangle($arm, 50, 22, 28, 84); $g.FillRectangle($arm, 22, 50, 84, 28)
+  $g.FillRectangle((New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 240))), 50, 78, 28, 28)
+  Save-Png $b $g $path
 }
 # Trigger: tall rounded bar (the game's trigger prompt is 64x128).
 function Trigger($path, $text) {
@@ -76,7 +84,7 @@ Save-Png $b $g "$ps\Y.png"
 Shoulder "$ps\LB.png" 'L1'; Shoulder "$ps\RB.png" 'R1'
 Trigger "$ps\LT.png" 'L2'; Trigger "$ps\RT.png" 'R2'
 Pill "$ps\BACK.png" 'SHARE' 26; Pill "$ps\START.png" 'OPTIONS' 21
-Letter-Disc "$ps\LS.png" 'L3' 48; Letter-Disc "$ps\RS.png" 'R3' 48
+Letter-Disc "$ps\LS.png" 'L3' 48; Letter-Disc "$ps\RS.png" 'R3' 48; Dpad "$ps\DPAD.png"
 
 # Nintendo: the label at the Xbox position (A<->B, X<->Y).
 $nx = Join-Path $Out 'nintendo'
@@ -84,7 +92,7 @@ Letter-Disc "$nx\A.png" 'B'; Letter-Disc "$nx\B.png" 'A'; Letter-Disc "$nx\X.png
 Shoulder "$nx\LB.png" 'L'; Shoulder "$nx\RB.png" 'R'
 Trigger "$nx\LT.png" 'ZL'; Trigger "$nx\RT.png" 'ZR'
 Letter-Disc "$nx\BACK.png" ([string][char]0x2212) 72; Letter-Disc "$nx\START.png" '+' 72
-Letter-Disc "$nx\LS.png" 'LS' 44; Letter-Disc "$nx\RS.png" 'RS' 44
+Letter-Disc "$nx\LS.png" 'LS' 44; Letter-Disc "$nx\RS.png" 'RS' 44; Dpad "$nx\DPAD.png"
 
 # Steam Deck / Steam Controller: same letters as Xbox, monochrome.
 $st = Join-Path $Out 'steam'
@@ -92,7 +100,7 @@ Letter-Disc "$st\A.png" 'A'; Letter-Disc "$st\B.png" 'B'; Letter-Disc "$st\X.png
 Shoulder "$st\LB.png" 'L1'; Shoulder "$st\RB.png" 'R1'
 Trigger "$st\LT.png" 'L2'; Trigger "$st\RT.png" 'R2'
 Pill "$st\BACK.png" 'VIEW' 28; Pill "$st\START.png" 'MENU' 28
-Letter-Disc "$st\LS.png" 'L3' 48; Letter-Disc "$st\RS.png" 'R3' 48
+Letter-Disc "$st\LS.png" 'L3' 48; Letter-Disc "$st\RS.png" 'R3' 48; Dpad "$st\DPAD.png"
 
 # Keyboard (mnk_mode): key caps for the default bindings of the ReXGlue
 # keyboard driver (keybind_* cvars). Rebinding keys does not redraw these.
@@ -121,3 +129,4 @@ $kb = Join-Path $Out 'keyboard'
 KeyCap "$kb\A.png" 'SPACE' 31; KeyCap "$kb\B.png" 'E'; Mouse "$kb\X.png" $false; Mouse "$kb\Y.png" $true
 KeyCap "$kb\LB.png" '1'; KeyCap "$kb\RB.png" '3'; KeyCap "$kb\LT.png" 'R'; KeyCap "$kb\RT.png" 'Q'
 KeyCap "$kb\BACK.png" 'ESC' 44; KeyCap "$kb\START.png" 'ENTER' 31; KeyCap "$kb\LS.png" 'F'; KeyCap "$kb\RS.png" 'K'
+KeyCap "$kb\DPAD.png" ([string][char]0x2193) 64

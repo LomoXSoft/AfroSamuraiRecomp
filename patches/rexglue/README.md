@@ -127,8 +127,8 @@ the controller.
   4 Steam (Valve vendor ID). It uses `SDL_GetGamepadType`, the type SDL meant
   for button labels.
 - GPU plugin (`src/graphics/afro_glyphs.*`, texture caches): the game draws each
-  prompt as its own DXT5 texture, 64x64 for A/B/X/Y and 64x128 for the
-  triggers. When one loads, its base level is untiled and hashed (FNV-1a 64).
+  prompt as its own DXT5 texture, 64x64 for A/B/X/Y and the D-pad, 64x128 for
+  the triggers and 128x64 for the shoulders. When one loads, its base level is untiled and hashed (FNV-1a 64).
   Known hashes come from RenderDoc captures of the Europe disc. For a non-Xbox
   family, the loaded levels are replaced by `glyphs\<family>\<NAME>.png` next to
   the exe (fitted, centred, mipmapped and BC3-compressed when first used).
@@ -141,12 +141,14 @@ the controller.
   Mouse buttons bound to pad buttons count as keyboard too. The default binds
   are changed for an action game: X left click (attack), Y right click,
   B E (kick), RT Q (block), LT R (focus), A Space, Back Esc (was Z/Tab),
-  Start X/Enter. `keybind_*` still override them.
+  Start X/Enter, D-pad the arrow keys, camera the mouse or Shift+arrows (the
+  upstream defaults have these two swapped). `keybind_*` still override them.
 - `afro_button_glyphs` (`auto`): `auto` follows the last used pad or the
   keyboard, or `xbox`, `playstation`, `nintendo`, `steam`, `keyboard`.
 - The launcher's **Control** row sets these: Auto (default: `mnk_mode` on,
   icons follow the device in use), Controller (`mnk_mode` off), Keyboard
-  (`mnk_mode` on, key cap icons). Saved as `control=` in the launcher config.
+  (`mnk_mode` on, key cap icons). Auto and Keyboard also turn on `mnk_mouse`
+  (the mouse moves the camera; `mnk_sensitivity` scales it). Saved as `control=` in the launcher config.
 - `afro_glyph_log` (false): logs every small DXT5 texture with its hash and
   saves it as `glyph_dump\<w>x<h>_<hash>.dds` next to the exe, to find the
   prompts not identified yet.

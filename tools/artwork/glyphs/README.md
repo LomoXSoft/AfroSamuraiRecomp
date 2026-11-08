@@ -11,13 +11,16 @@ The installer copies `tools/artwork/glyphs` next to `afrorecomp.exe` as `glyphs\
 - `playstation\`, `nintendo\`, `steam\` (Steam Deck and Steam Controller),
   `keyboard\` (key caps and mouse buttons for the default
   keyboard-as-controller bindings: A Space, B E, X left click, Y right click,
-  LB 1, RB 3, LT R, RT Q, Back Esc, Start Enter, LS F, RS K).
+  LB 1, RB 3, LT R, RT Q, Back Esc, Start Enter, LS F, RS K, D-pad down the
+  Down arrow).
 - Files are named by the Xbox button POSITION the game asks for: `A`, `B`, `X`,
-  `Y`, `LB`, `RB`, `LT`, `RT`, `BACK`, `START`, `LS`, `RS`.
+  `Y`, `LB`, `RB`, `LT`, `RT`, `BACK`, `START`, `LS`, `RS`, `DPAD` (the game's
+  only D-pad prompt found so far is the pad with down lit).
 - On Nintendo the label is the one at that position: `A.png` shows **B**,
   `B.png` shows **A**, `X.png` shows **Y**, `Y.png` shows **X**.
-- Triggers are 128x256 because the game's trigger prompt is 64x128. The rest
-  are 128x128. Any size works: the image is fitted and centred.
+- Triggers are 128x256 because the game's trigger prompt is 64x128, shoulders
+  256x128 for the 128x64 shoulder prompt. The rest are 128x128. Any size
+  works: the image is fitted and centred.
 
-Identified in game so far: A, B, X, Y and RT. The others are ready for when
-their textures are found (`--afro_glyph_log=true`).
+Identified in game so far: A, B, X, Y, LB, LT, RT and D-pad down. The others
+are ready for when their textures are found (`--afro_glyph_log=true`).

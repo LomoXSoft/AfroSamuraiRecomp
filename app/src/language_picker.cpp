@@ -1034,6 +1034,9 @@ unsigned ApplyStartupLanguage() {
   // keyboard pad. Keyboard: key cap icons whatever is connected.
   if (!Explicit("mnk_mode"))
     SetCvar("mnk_mode", opt.control == 1 ? "false" : "true");
+  // The mouse moves the camera whenever the keyboard can play.
+  if (opt.control != 1 && !Explicit("mnk_mouse"))
+    SetCvar("mnk_mouse", "true");
   if (opt.control == 2 && !Explicit("afro_button_glyphs"))
     SetCvar("afro_button_glyphs", "keyboard");
   for (int i = 0; i < kAdvN; ++i)

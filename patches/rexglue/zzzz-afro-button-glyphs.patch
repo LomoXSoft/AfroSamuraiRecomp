@@ -323,9 +323,32 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  REXCVAR_DEFINE_STRING(keybind_left_shoulder, "1", "Input/Keybinds/Controller", "Left shoulder");
  REXCVAR_DEFINE_STRING(keybind_right_shoulder, "3", "Input/Keybinds/Controller", "Right shoulder");
  REXCVAR_DEFINE_STRING(keybind_lstick_up, "W", "Input/Keybinds/Controller", "Left stick up");
-@@ -54,13 +56,15 @@ REXCVAR_DEFINE_STRING(keybind_dpad_down, "Shift+Down", "Input/Keybinds/Controlle
- REXCVAR_DEFINE_STRING(keybind_dpad_left, "Shift+Left", "Input/Keybinds/Controller", "D-pad left");
- REXCVAR_DEFINE_STRING(keybind_dpad_right, "Shift+Right", "Input/Keybinds/Controller",
+@@ -43,24 +45,30 @@ REXCVAR_DEFINE_STRING(keybind_lstick_down, "S", "Input/Keybinds/Controller", "Le
+ REXCVAR_DEFINE_STRING(keybind_lstick_left, "A", "Input/Keybinds/Controller", "Left stick left");
+ REXCVAR_DEFINE_STRING(keybind_lstick_right, "D", "Input/Keybinds/Controller", "Left stick right");
+ REXCVAR_DEFINE_STRING(keybind_lstick_press, "F", "Input/Keybinds/Controller", "Left stick press");
+-REXCVAR_DEFINE_STRING(keybind_rstick_up, "Up", "Input/Keybinds/Controller", "Right stick up");
+-REXCVAR_DEFINE_STRING(keybind_rstick_down, "Down", "Input/Keybinds/Controller", "Right stick down");
+-REXCVAR_DEFINE_STRING(keybind_rstick_left, "Left", "Input/Keybinds/Controller", "Right stick left");
+-REXCVAR_DEFINE_STRING(keybind_rstick_right, "Right", "Input/Keybinds/Controller",
++// afro: the mouse moves the camera, so the arrows are the D-pad and
++// Shift+arrows the keyboard camera (swapped from upstream).
++REXCVAR_DEFINE_STRING(keybind_rstick_up, "Shift+Up", "Input/Keybinds/Controller", "Right stick up");
++REXCVAR_DEFINE_STRING(keybind_rstick_down, "Shift+Down", "Input/Keybinds/Controller",
++                      "Right stick down");
++REXCVAR_DEFINE_STRING(keybind_rstick_left, "Shift+Left", "Input/Keybinds/Controller",
++                      "Right stick left");
++REXCVAR_DEFINE_STRING(keybind_rstick_right, "Shift+Right", "Input/Keybinds/Controller",
+                       "Right stick right");
+ REXCVAR_DEFINE_STRING(keybind_rstick_press, "K", "Input/Keybinds/Controller", "Right stick press");
+-REXCVAR_DEFINE_STRING(keybind_dpad_up, "Shift+Up", "Input/Keybinds/Controller", "D-pad up");
+-REXCVAR_DEFINE_STRING(keybind_dpad_down, "Shift+Down", "Input/Keybinds/Controller", "D-pad down");
+-REXCVAR_DEFINE_STRING(keybind_dpad_left, "Shift+Left", "Input/Keybinds/Controller", "D-pad left");
+-REXCVAR_DEFINE_STRING(keybind_dpad_right, "Shift+Right", "Input/Keybinds/Controller",
++REXCVAR_DEFINE_STRING(keybind_dpad_up, "Up", "Input/Keybinds/Controller", "D-pad up");
++REXCVAR_DEFINE_STRING(keybind_dpad_down, "Down", "Input/Keybinds/Controller", "D-pad down");
++REXCVAR_DEFINE_STRING(keybind_dpad_left, "Left", "Input/Keybinds/Controller", "D-pad left");
++REXCVAR_DEFINE_STRING(keybind_dpad_right, "Right", "Input/Keybinds/Controller",
                        "D-pad right");
 -REXCVAR_DEFINE_STRING(keybind_back, "Z,Tab", "Input/Keybinds/Controller", "Back button");
 +REXCVAR_DEFINE_STRING(keybind_back, "Escape", "Input/Keybinds/Controller", "Back button");
@@ -340,7 +363,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  
  namespace rex::input::mnk {
  
-@@ -146,6 +150,16 @@ bool TokenPressed(const bool (&key_down)[256], std::string_view token, uint8_t l
+@@ -146,6 +154,16 @@ bool TokenPressed(const bool (&key_down)[256], std::string_view token, uint8_t l
  
  std::atomic<bool> mouse_look_active{true};
  
@@ -357,7 +380,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  // ui::VirtualKey follows Windows VK_ numbering; the guest wants USB HID usage
  // page 0x07.
  uint8_t VirtualKeyToHIDUsage(rex::ui::VirtualKey vk_enum) {
-@@ -327,6 +341,10 @@ void MnkInputDriver::OnWindowAvailable(rex::ui::Window* window) {
+@@ -327,6 +345,10 @@ void MnkInputDriver::OnWindowAvailable(rex::ui::Window* window) {
      }
      window->AddInputListener(this, window_z_order());
      window->AddListener(this);
@@ -368,7 +391,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
    }
  }
  
-@@ -722,7 +740,12 @@ void MnkInputDriver::OnKeyDown(rex::ui::KeyEvent& e) {
+@@ -722,7 +744,12 @@ void MnkInputDriver::OnKeyDown(rex::ui::KeyEvent& e) {
    }
    uint16_t vk = static_cast<uint16_t>(e.virtual_key());
    SetKeyState(vk, true);
@@ -381,7 +404,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  }
  
  void MnkInputDriver::OnKeyUp(rex::ui::KeyEvent& e) {
-@@ -773,7 +796,11 @@ void MnkInputDriver::OnMouseDown(rex::ui::MouseEvent& e) {
+@@ -773,7 +800,11 @@ void MnkInputDriver::OnMouseDown(rex::ui::MouseEvent& e) {
      default:
        break;
    }
@@ -397,7 +420,7 @@ diff --git a/src/graphics/afro_glyphs.cpp b/src/graphics/afro_glyphs.cpp
 new file mode 100644
 --- /dev/null
 +++ b/src/graphics/afro_glyphs.cpp
-@@ -0,0 +1,432 @@
+@@ -0,0 +1,437 @@
 +// afro: controller-specific button prompts. See afro_glyphs.h.
 +
 +#include "afro_glyphs.h"
@@ -451,10 +474,13 @@ new file mode 100644
 +  uint64_t hash;  // FNV-1a 64 of the untiled base level
 +  int32_t glyph;
 +};
-+// From RenderDoc captures of the Europe disc (main menu and the first tutorial).
++// From RenderDoc captures and afro_glyph_log dumps of the Europe disc (main
++// menu, the first tutorial, the techniques list). The D-pad prompt is the pad
++// with the down arrow lit.
 +constexpr KnownPrompt kKnown[] = {
 +    {0x758d16bcf27aebd7ull, kA},  {0xe907e7b2220ca146ull, kB},  {0x7a2f3d5b7ea05debull, kX},
-+    {0x9bcf40e783552cfdull, kY},  {0xe0136a39bd5482c0ull, kRT},
++    {0x9bcf40e783552cfdull, kY},  {0xe0136a39bd5482c0ull, kRT}, {0xc1b8d0621ef82983ull, kLT},
++    {0x147970dc9eeee00eull, kLB}, {0x9cd007b6c830df6bull, kDpad},
 +};
 +
 +uint64_t Fnv1a64(const uint8_t* p, size_t n) {
@@ -746,7 +772,9 @@ new file mode 100644
 +
 +int32_t Identify(const GuestTexture& t) {
 +  if (!t.is_dxt5 || !t.is_2d || !t.tiled || t.scaled_resolve || t.base == nullptr) return -1;
-+  bool prompt_size = t.width == 64 && (t.height == 64 || t.height == 128);
++  // 64x64 face buttons and D-pad, 64x128 triggers, 128x64 shoulders.
++  bool prompt_size = (t.width == 64 && (t.height == 64 || t.height == 128)) ||
++                     (t.width == 128 && t.height == 64);
 +  bool log = REXCVAR_GET(afro_glyph_log);
 +  bool log_size = t.width >= 16 && t.height >= 16 && t.width <= 128 && t.height <= 128 &&
 +                  !(t.width & 3) && !(t.height & 3);
