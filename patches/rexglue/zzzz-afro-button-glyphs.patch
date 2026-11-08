@@ -1,0 +1,800 @@
+diff --git a/include/rex/graphics/pipeline/texture/cache.h b/include/rex/graphics/pipeline/texture/cache.h
+--- a/include/rex/graphics/pipeline/texture/cache.h
++++ b/include/rex/graphics/pipeline/texture/cache.h
+@@ -235,6 +235,10 @@ class TextureCache {
+ 
+     void WatchCallback(const std::unique_lock<std::recursive_mutex>& global_lock, bool is_mip);
+ 
++    // afro: drops the memory watches and marks the base and mips outdated, so
++    // a button prompt reloads when the controller family changes.
++    void AfroForceOutdated(const std::unique_lock<std::recursive_mutex>& global_lock);
++
+     // For LRU caching - updates the last usage frame and moves the texture to
+     // the end of the usage queue. Must be called any time the texture is
+     // referenced by any GPU work in the implementation to make sure it's not
+@@ -535,6 +539,9 @@ class TextureCache {
+   virtual bool LoadTextureDataFromResidentMemoryImpl(Texture& texture, bool load_base,
+                                                      bool load_mips) = 0;
+ 
++  // afro: remembers a button prompt texture to reload on a family change.
++  void AfroRegisterGlyphTexture(const TextureKey& key);
++
+   // Converts a texture fetch constant to a texture key, normalizing and
+   // validating the values, or creating an invalid key, and also gets the
+   // post-guest-swizzle signedness.
+@@ -615,6 +622,8 @@ class TextureCache {
+   uint64_t current_submission_time_ = 0;
+ 
+   std::unordered_map<TextureKey, std::unique_ptr<Texture>, TextureKey::Hasher> textures_;
++  // afro: keys of the button prompt textures seen so far.
++  std::vector<TextureKey> afro_glyph_keys_;
+ 
+   uint64_t textures_total_host_memory_usage_ = 0;
+ 
+diff --git a/include/rex/graphics/shared_memory.h b/include/rex/graphics/shared_memory.h
+--- a/include/rex/graphics/shared_memory.h
++++ b/include/rex/graphics/shared_memory.h
+@@ -73,6 +73,9 @@ class SharedMemory {
+   // Unregisters previously registered watched memory range.
+   void UnwatchMemoryRange(WatchHandle handle);
+ 
++  // afro: read-only look at guest texture data (button prompt hashing).
++  memory::Memory& AfroGuestMemory() const { return memory_; }
++
+   // Checks if the range has been updated, uploads new data if needed and
+   // ensures the host GPU memory backing the range are resident. Returns true if
+   // the range has been fully updated and is usable.
+diff --git a/src/graphics/CMakeLists.txt b/src/graphics/CMakeLists.txt
+--- a/src/graphics/CMakeLists.txt
++++ b/src/graphics/CMakeLists.txt
+@@ -19,6 +19,7 @@ set(REXGPU_XENOS_SOURCES
+     graphics_system.cpp
+     command_processor.cpp
+     afro_perf.cpp
++    afro_glyphs.cpp
+     util/draw_extent_estimator.cpp
+     util/draw.cpp
+     packet_disassembler.cpp
+@@ -109,6 +110,7 @@ rexglue_add_version_resource(rexgpu-xenos DESCRIPTION "ReXGlue Xenos GPU emulati
+ 
+ target_include_directories(rexgpu-xenos PRIVATE
+     ${REXGLUE_ROOT}/thirdparty/renderdoc
++    ${REXGLUE_ROOT}/thirdparty/stb  # afro_glyphs.cpp: PNG icons
+     ${REXGLUE_ROOT}  # For thirdparty/dxbc/DXBCChecksum.h include
+ )
+ 
+diff --git a/src/graphics/d3d12/texture_cache.cpp b/src/graphics/d3d12/texture_cache.cpp
+--- a/src/graphics/d3d12/texture_cache.cpp
++++ b/src/graphics/d3d12/texture_cache.cpp
+@@ -17,6 +17,7 @@
+ #include <memory>
+ #include <utility>
+ 
++#include "../afro_glyphs.h"
+ #include <rex/assert.h>
+ #include <rex/dbg.h>
+ #include <rex/graphics/d3d12/command_processor.h>
+@@ -1879,6 +1880,34 @@ bool D3D12TextureCache::LoadTextureDataFromResidentMemoryImpl(Texture& texture,
+   // Update LRU caching because the texture will be used by the command list.
+   d3d12_texture.MarkAsUsed();
+ 
++  // afro: button prompts. Known prompt textures are remembered (so they reload
++  // when the controller family changes) and, for a non-Xbox family with an
++  // icon on disk, the loaded levels are replaced by that icon.
++  const std::vector<afro_glyphs::Level>* afro_levels = nullptr;
++  if (!texture_resolution_scaled && !is_3d && array_size == 1 && level_packed != 0 &&
++      guest_format == xenos::TextureFormat::k_DXT4_5) {
++    afro_glyphs::GuestTexture afro_texture;
++    afro_texture.width = width;
++    afro_texture.height = height;
++    afro_texture.is_dxt5 = true;
++    afro_texture.is_2d = dimension == xenos::DataDimension::k2DOrStacked;
++    afro_texture.tiled = texture_key.tiled != 0;
++    afro_texture.scaled_resolve = false;
++    afro_texture.endianness = uint32_t(texture_key.endianness);
++    afro_texture.row_pitch_bytes = guest_layout.base.row_pitch_bytes;
++    afro_texture.base =
++        shared_memory().AfroGuestMemory().TranslatePhysical<const uint8_t*>(
++            texture_key.base_page << 12);
++    int32_t afro_glyph = afro_glyphs::Identify(afro_texture);
++    if (afro_glyph >= 0) {
++      AfroRegisterGlyphTexture(texture_key);
++      if (host_block_compressed) {
++        afro_levels = afro_glyphs::GetReplacement(afro_glyphs::ResolvedFamily(), afro_glyph,
++                                                  width, height, texture_key.mip_max_level + 1);
++      }
++    }
++  }
++
+   // Submit copying from the copy buffer to the host texture.
+   ID3D12Resource* texture_resource = d3d12_texture.resource();
+   command_processor_.PushTransitionBarrier(
+@@ -1895,6 +1924,36 @@ bool D3D12TextureCache::LoadTextureDataFromResidentMemoryImpl(Texture& texture,
+   location_dest.pResource = texture_resource;
+   location_dest.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+   for (uint32_t level = level_first; level <= level_last; ++level) {
++    if (afro_levels && level < afro_levels->size()) {
++      const afro_glyphs::Level& afro_level = (*afro_levels)[level];
++      UINT afro_pitch =
++          rex::align(afro_level.row_bytes, uint32_t(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT));
++      ID3D12Resource* afro_buffer = nullptr;
++      size_t afro_offset = 0;
++      D3D12_GPU_VIRTUAL_ADDRESS afro_gpu_address = 0;
++      uint8_t* afro_mapping = command_processor_.GetConstantBufferPool().Request(
++          command_processor_.GetCurrentSubmission(), size_t(afro_pitch) * afro_level.rows,
++          D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT, &afro_buffer, &afro_offset, &afro_gpu_address);
++      if (afro_mapping) {
++        for (uint32_t row = 0; row < afro_level.rows; ++row) {
++          std::memcpy(afro_mapping + size_t(row) * afro_pitch,
++                      afro_level.data.data() + size_t(row) * afro_level.row_bytes,
++                      afro_level.row_bytes);
++        }
++        D3D12_TEXTURE_COPY_LOCATION afro_source;
++        afro_source.pResource = afro_buffer;
++        afro_source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
++        afro_source.PlacedFootprint.Offset = afro_offset;
++        afro_source.PlacedFootprint.Footprint.Format = host_copy_format;
++        afro_source.PlacedFootprint.Footprint.Width = afro_level.row_bytes / 16 * 4;
++        afro_source.PlacedFootprint.Footprint.Height = afro_level.rows * 4;
++        afro_source.PlacedFootprint.Footprint.Depth = 1;
++        afro_source.PlacedFootprint.Footprint.RowPitch = afro_pitch;
++        location_dest.SubresourceIndex = level;
++        command_list.D3DCopyTextureRegion(&location_dest, 0, 0, 0, &afro_source, nullptr);
++        continue;
++      }
++    }
+     uint32_t guest_level = std::min(level, level_packed);
+     location_source.PlacedFootprint =
+         level ? host_slice_layouts_mips[guest_level] : host_slice_layout_base;
+diff --git a/src/graphics/pipeline/texture/cache.cpp b/src/graphics/pipeline/texture/cache.cpp
+--- a/src/graphics/pipeline/texture/cache.cpp
++++ b/src/graphics/pipeline/texture/cache.cpp
+@@ -13,6 +13,7 @@
+ #include <cstdint>
+ #include <utility>
+ 
++#include "../../afro_glyphs.h"
+ #include "../../afro_perf.h"
+ #include <rex/assert.h>
+ #include <rex/chrono/clock.h>
+@@ -465,6 +466,18 @@ bool TextureCache::CommitPreparedTextureLoad(const PendingTextureLoad& pending_l
+ void TextureCache::RequestTextures(uint32_t used_texture_mask) {
+   const auto& regs = register_file();
+ 
++  // afro: reload the button prompts with the icons of the new controller family.
++  if (afro_glyphs::FamilyChanged() && !afro_glyph_keys_.empty()) {
++    auto global_lock = global_critical_region_.Acquire();
++    for (const TextureKey& key : afro_glyph_keys_) {
++      auto it = textures_.find(key);
++      if (it != textures_.end()) {
++        it->second->AfroForceOutdated(global_lock);
++      }
++    }
++    texture_became_outdated_.store(true, std::memory_order_release);
++  }
++
+   if (texture_became_outdated_.exchange(false, std::memory_order_acquire)) {
+     // A texture has become outdated - make sure whether textures are outdated
+     // is rechecked in this draw and in subsequent ones to reload the new data
+@@ -777,6 +790,34 @@ void TextureCache::Texture::WatchCallback(
+   }
+ }
+ 
++void TextureCache::Texture::AfroForceOutdated(
++    [[maybe_unused]] const std::unique_lock<std::recursive_mutex>& global_lock) {
++  SharedMemory& shared_memory = texture_cache().shared_memory();
++  if (GetGuestBaseSize()) {
++    if (base_watch_handle_) {
++      shared_memory.UnwatchMemoryRange(base_watch_handle_);
++      base_watch_handle_ = nullptr;
++    }
++    base_outdated_ = true;
++    outdated_mask_.fetch_or(kOutdatedBitBase, std::memory_order_release);
++  }
++  if (GetGuestMipsSize()) {
++    if (mips_watch_handle_) {
++      shared_memory.UnwatchMemoryRange(mips_watch_handle_);
++      mips_watch_handle_ = nullptr;
++    }
++    mips_outdated_ = true;
++    outdated_mask_.fetch_or(kOutdatedBitMips, std::memory_order_release);
++  }
++}
++
++void TextureCache::AfroRegisterGlyphTexture(const TextureKey& key) {
++  if (std::find(afro_glyph_keys_.begin(), afro_glyph_keys_.end(), key) ==
++      afro_glyph_keys_.end()) {
++    afro_glyph_keys_.push_back(key);
++  }
++}
++
+ void TextureCache::WatchCallback(const std::unique_lock<std::recursive_mutex>& global_lock,
+                                  void* context, void* data, uint64_t argument,
+                                  bool invalidated_by_gpu) {
+diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver.cpp
+--- a/src/input/sdl/sdl_input_driver.cpp
++++ b/src/input/sdl/sdl_input_driver.cpp
+@@ -25,6 +25,10 @@
+ 
+ REXCVAR_DEFINE_STRING(hid_mappings_file, "gamecontrollerdb.txt", "Input",
+                       "Path to SDL gamecontroller mappings file");
++// afro: read by the GPU plugin to pick the button prompt icons.
++REXCVAR_DEFINE_INT32(afro_pad_family, 0, "Input",
++                     "afro: family of the controller used last, set by the SDL driver: "
++                     "0 none yet, 1 Xbox, 2 PlayStation, 3 Nintendo, 4 Steam");
+ 
+ namespace rex::input::sdl {
+ 
+@@ -153,6 +157,41 @@ uint8_t GamepadSubType(SDL_Gamepad* gamepad) {
+                                 SDL_GetGamepadName(gamepad));
+ }
+ 
++// afro: which button icons fit this pad. SDL_GetGamepadType is the type meant
++// for button labels (it also sees through Steam Input's virtual pads).
++int32_t AfroPadFamily(SDL_Gamepad* gamepad) {
++  switch (SDL_GetGamepadType(gamepad)) {
++    case SDL_GAMEPAD_TYPE_XBOX360:
++    case SDL_GAMEPAD_TYPE_XBOXONE:
++      return 1;
++    case SDL_GAMEPAD_TYPE_PS3:
++    case SDL_GAMEPAD_TYPE_PS4:
++    case SDL_GAMEPAD_TYPE_PS5:
++      return 2;
++    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO:
++    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT:
++    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT:
++    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR:
++      return 3;
++    default:
++      break;
++  }
++  // Steam Deck and Steam Controller (Valve).
++  if (SDL_GetGamepadVendor(gamepad) == 0x28DE) {
++    return 4;
++  }
++  return 1;
++}
++
++void AfroNotePadFamily(SDL_Gamepad* gamepad) {
++  int32_t family = AfroPadFamily(gamepad);
++  if (REXCVAR_GET(afro_pad_family) != family) {
++    REXLOG_INFO("afro: button icons follow \"{}\" (family {})", SDL_GetGamepadName(gamepad),
++                family);
++    REXCVAR_SET(afro_pad_family, family);
++  }
++}
++
+ }  // namespace
+ 
+ SDLInputDriver::SDLInputDriver(rex::ui::Window* window, size_t window_z_order)
+@@ -619,6 +658,10 @@ void SDLInputDriver::OnControllerDeviceAddedLocked(const SDL_Event& event) {
+   state.id = AllocateDeviceId();
+   state.state_changed = true;  // XInput starts with packet_number = 1
+   UpdateXCapabilities(state);
++  // afro: the first pad sets the icons before any button is pressed.
++  if (controllers_.empty()) {
++    AfroNotePadFamily(controller);
++  }
+   controllers_.push_back(state);
+ 
+   const int ordinal = static_cast<int>(controllers_.size()) - 1;
+@@ -678,9 +721,11 @@ void SDLInputDriver::OnControllerDeviceAxisMotionLocked(const SDL_Event& event)
+       break;
+     case SDL_GAMEPAD_AXIS_LEFT_TRIGGER:
+       pad.left_trigger = static_cast<uint8_t>(event.gaxis.value >> 7);
++      if (event.gaxis.value > 16000) AfroNotePadFamily(controllers_.at(*idx).sdl);
+       break;
+     case SDL_GAMEPAD_AXIS_RIGHT_TRIGGER:
+       pad.right_trigger = static_cast<uint8_t>(event.gaxis.value >> 7);
++      if (event.gaxis.value > 16000) AfroNotePadFamily(controllers_.at(*idx).sdl);
+       break;
+     default:
+       assert_always();
+@@ -742,6 +787,7 @@ void SDLInputDriver::OnControllerDeviceButtonChangedLocked(const SDL_Event& even
+   auto xbutton = xbutton_lookup.at(event.gbutton.button);
+   // Pressed or released?
+   if (event.gbutton.down) {
++    AfroNotePadFamily(controller.sdl);
+     if (xbutton == X_INPUT_GAMEPAD_GUIDE && !REXCVAR_GET(guide_button)) {
+       return;
+     }
+diff --git a/src/graphics/afro_glyphs.cpp b/src/graphics/afro_glyphs.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/graphics/afro_glyphs.cpp
+@@ -0,0 +1,429 @@
++// afro: controller-specific button prompts. See afro_glyphs.h.
++
++#include "afro_glyphs.h"
++
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <cstring>
++#include <filesystem>
++#include <fstream>
++#include <map>
++#include <set>
++#include <string>
++#include <tuple>
++
++#include <rex/cvar.h>
++#include <rex/graphics/pipeline/texture/util.h>
++#include <rex/logging.h>
++
++#ifdef _WIN32
++#include <windows.h>
++#endif
++
++#define STB_IMAGE_STATIC
++#define STB_IMAGE_IMPLEMENTATION
++#define STBI_ONLY_PNG
++#define STBI_NO_STDIO
++#include <stb_image.h>
++
++REXCVAR_DEFINE_STRING(afro_button_glyphs, "auto", "GPU",
++                      "afro: button prompt icons: auto (follow the last used controller), "
++                      "xbox, playstation, nintendo or steam. Xbox keeps the game's own icons.");
++REXCVAR_DEFINE_BOOL(afro_glyph_log, false, "GPU",
++                    "afro: log every small DXT5 texture the game loads, with its prompt hash, "
++                    "and save it as glyph_dump\\<size>_<hash>.dds next to the executable.");
++// Written by the SDL input driver in rexruntime: 0 none yet, else Family.
++REXCVAR_DECLARE(int32_t, afro_pad_family);
++
++namespace rex::graphics::afro_glyphs {
++namespace {
++
++// Prompt names double as the replacement file names. Files are named by the
++// Xbox button POSITION the game asks for: on Nintendo, A.png shows the B label
++// that sits where Xbox A is.
++constexpr std::array<const char*, 13> kGlyphNames = {
++    "A", "B", "X", "Y", "LB", "RB", "LT", "RT", "BACK", "START", "LS", "RS", "DPAD"};
++enum : int32_t { kA, kB, kX, kY, kLB, kRB, kLT, kRT, kBack, kStart, kLS, kRS, kDpad };
++
++struct KnownPrompt {
++  uint64_t hash;  // FNV-1a 64 of the untiled base level
++  int32_t glyph;
++};
++// From RenderDoc captures of the Europe disc (main menu and the first tutorial).
++constexpr KnownPrompt kKnown[] = {
++    {0x758d16bcf27aebd7ull, kA},  {0xe907e7b2220ca146ull, kB},  {0x7a2f3d5b7ea05debull, kX},
++    {0x9bcf40e783552cfdull, kY},  {0xe0136a39bd5482c0ull, kRT},
++};
++
++uint64_t Fnv1a64(const uint8_t* p, size_t n) {
++  uint64_t h = 0xcbf29ce484222325ull;
++  for (size_t i = 0; i < n; ++i) {
++    h ^= p[i];
++    h *= 0x100000001b3ull;
++  }
++  return h;
++}
++
++std::filesystem::path ExeDir() {
++#ifdef _WIN32
++  wchar_t buf[MAX_PATH * 4];
++  DWORD n = GetModuleFileNameW(nullptr, buf, DWORD(std::size(buf)));
++  if (n && n < std::size(buf)) return std::filesystem::path(buf).parent_path();
++#endif
++  return std::filesystem::current_path();
++}
++
++const char* FamilyDir(int32_t family) {
++  switch (family) {
++    case kFamilyPlayStation: return "playstation";
++    case kFamilyNintendo: return "nintendo";
++    case kFamilySteam: return "steam";
++    default: return "xbox";
++  }
++}
++
++void SwapBlock(uint8_t* b, uint32_t endianness) {
++  switch (endianness) {
++    case 1:  // k8in16
++      for (int i = 0; i < 16; i += 2) std::swap(b[i], b[i + 1]);
++      break;
++    case 2:  // k8in32
++      for (int i = 0; i < 16; i += 4) {
++        std::swap(b[i], b[i + 3]);
++        std::swap(b[i + 1], b[i + 2]);
++      }
++      break;
++    case 3:  // k16in32
++      for (int i = 0; i < 16; i += 4) {
++        std::swap(b[i], b[i + 2]);
++        std::swap(b[i + 1], b[i + 3]);
++      }
++      break;
++    default:
++      break;
++  }
++}
++
++void WriteDds(const std::filesystem::path& path, uint32_t w, uint32_t h,
++              const std::vector<uint8_t>& bc3) {
++  uint32_t hdr[32] = {};
++  hdr[0] = 0x20534444;  // "DDS "
++  hdr[1] = 124;
++  hdr[2] = 0x1 | 0x2 | 0x4 | 0x1000 | 0x80000;
++  hdr[3] = h;
++  hdr[4] = w;
++  hdr[5] = uint32_t(bc3.size());
++  hdr[19] = 32;
++  hdr[20] = 0x4;         // DDPF_FOURCC
++  hdr[21] = 0x35545844;  // "DXT5"
++  hdr[27] = 0x1000;      // DDSCAPS_TEXTURE
++  std::ofstream f(path, std::ios::binary);
++  f.write(reinterpret_cast<const char*>(hdr), sizeof(hdr));
++  f.write(reinterpret_cast<const char*>(bc3.data()), std::streamsize(bc3.size()));
++}
++
++// ---- BC3 encoder (bounding box, good enough for flat icons) --------------
++
++uint16_t To565(const float* c) {
++  auto q = [](float v, int bits) {
++    int m = (1 << bits) - 1;
++    return std::clamp(int(std::lround(v / 255.0f * m)), 0, m);
++  };
++  return uint16_t((q(c[0], 5) << 11) | (q(c[1], 6) << 5) | q(c[2], 5));
++}
++void From565(uint16_t v, float* c) {
++  c[0] = float((v >> 11) & 31) * 255.0f / 31.0f;
++  c[1] = float((v >> 5) & 63) * 255.0f / 63.0f;
++  c[2] = float(v & 31) * 255.0f / 31.0f;
++}
++
++void EncodeBlock(const uint8_t px[16][4], uint8_t* out) {
++  // Alpha: 8-value mode with a0 > a1.
++  uint8_t a_max = 0, a_min = 255;
++  for (int i = 0; i < 16; ++i) {
++    a_max = std::max(a_max, px[i][3]);
++    a_min = std::min(a_min, px[i][3]);
++  }
++  out[0] = a_max;
++  out[1] = a_min;
++  uint64_t a_bits = 0;
++  if (a_max != a_min) {
++    int pal[8] = {a_max, a_min};
++    for (int k = 1; k <= 6; ++k) pal[k + 1] = ((7 - k) * a_max + k * a_min) / 7;
++    for (int i = 0; i < 16; ++i) {
++      int best = 0, best_d = 1 << 30;
++      for (int k = 0; k < 8; ++k) {
++        int d = std::abs(pal[k] - px[i][3]);
++        if (d < best_d) best_d = d, best = k;
++      }
++      a_bits |= uint64_t(best) << (3 * i);
++    }
++  }
++  for (int i = 0; i < 6; ++i) out[2 + i] = uint8_t(a_bits >> (8 * i));
++
++  // Colour: bounding box of the visible texels, inset by 1/16.
++  float lo[3] = {255, 255, 255}, hi[3] = {0, 0, 0};
++  bool any = false;
++  for (int i = 0; i < 16; ++i) {
++    if (px[i][3] == 0) continue;
++    any = true;
++    for (int c = 0; c < 3; ++c) {
++      lo[c] = std::min(lo[c], float(px[i][c]));
++      hi[c] = std::max(hi[c], float(px[i][c]));
++    }
++  }
++  if (!any) {
++    std::memset(lo, 0, sizeof(lo));
++    std::memset(hi, 0, sizeof(hi));
++  }
++  for (int c = 0; c < 3; ++c) {
++    float inset = (hi[c] - lo[c]) / 16.0f;
++    lo[c] += inset;
++    hi[c] -= inset;
++  }
++  uint16_t c0 = To565(hi), c1 = To565(lo);
++  if (c0 < c1) std::swap(c0, c1);
++  uint32_t c_bits = 0;
++  if (c0 != c1) {
++    float pal[4][3];
++    From565(c0, pal[0]);
++    From565(c1, pal[1]);
++    for (int c = 0; c < 3; ++c) {
++      pal[2][c] = (2 * pal[0][c] + pal[1][c]) / 3;
++      pal[3][c] = (pal[0][c] + 2 * pal[1][c]) / 3;
++    }
++    for (int i = 0; i < 16; ++i) {
++      int best = 0;
++      float best_d = 1e30f;
++      for (int k = 0; k < 4; ++k) {
++        float d = 0;
++        for (int c = 0; c < 3; ++c) {
++          float e = pal[k][c] - float(px[i][c]);
++          d += e * e;
++        }
++        if (d < best_d) best_d = d, best = k;
++      }
++      c_bits |= uint32_t(best) << (2 * i);
++    }
++  }
++  out[8] = uint8_t(c0);
++  out[9] = uint8_t(c0 >> 8);
++  out[10] = uint8_t(c1);
++  out[11] = uint8_t(c1 >> 8);
++  for (int i = 0; i < 4; ++i) out[12 + i] = uint8_t(c_bits >> (8 * i));
++}
++
++// Straight RGBA8 image -> BC3 level.
++Level CompressLevel(const std::vector<float>& premul, uint32_t w, uint32_t h) {
++  Level lv;
++  lv.width = w;
++  lv.height = h;
++  uint32_t bx = (w + 3) / 4, by = (h + 3) / 4;
++  lv.row_bytes = bx * 16;
++  lv.rows = by;
++  lv.data.resize(size_t(bx) * by * 16);
++  for (uint32_t y0 = 0; y0 < by; ++y0) {
++    for (uint32_t x0 = 0; x0 < bx; ++x0) {
++      uint8_t px[16][4];
++      for (int i = 0; i < 16; ++i) {
++        uint32_t x = std::min(x0 * 4 + (i & 3), w - 1);
++        uint32_t y = std::min(y0 * 4 + (i >> 2), h - 1);
++        const float* p = &premul[(size_t(y) * w + x) * 4];
++        float a = p[3];
++        for (int c = 0; c < 3; ++c) {
++          float v = a > 0.0f ? p[c] / a : 0.0f;
++          px[i][c] = uint8_t(std::clamp(std::lround(v * 255.0f), 0l, 255l));
++        }
++        px[i][3] = uint8_t(std::clamp(std::lround(a * 255.0f), 0l, 255l));
++      }
++      EncodeBlock(px, &lv.data[(size_t(y0) * bx + x0) * 16]);
++    }
++  }
++  return lv;
++}
++
++bool LoadPng(const std::filesystem::path& path, std::vector<uint8_t>& rgba, int& w, int& h) {
++  std::ifstream f(path, std::ios::binary);
++  if (!f) return false;
++  std::vector<uint8_t> file((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
++  int n = 0;
++  stbi_uc* p = stbi_load_from_memory(file.data(), int(file.size()), &w, &h, &n, 4);
++  if (!p) return false;
++  rgba.assign(p, p + size_t(w) * h * 4);
++  stbi_image_free(p);
++  return true;
++}
++
++// Fits the PNG inside w x h (aspect kept, centred, transparent around it) and
++// builds level_count BC3 levels with a premultiplied box filter.
++std::vector<Level> BuildLevels(const std::vector<uint8_t>& src, int sw, int sh, uint32_t w,
++                               uint32_t h, uint32_t level_count) {
++  float scale = std::min(float(w) / float(sw), float(h) / float(sh));
++  float dw = sw * scale, dh = sh * scale;
++  float ox = (float(w) - dw) * 0.5f, oy = (float(h) - dh) * 0.5f;
++  // Supersampled bilinear into a premultiplied float image.
++  std::vector<float> img(size_t(w) * h * 4, 0.0f);
++  auto texel = [&](int x, int y, float* o) {
++    x = std::clamp(x, 0, sw - 1);
++    y = std::clamp(y, 0, sh - 1);
++    const uint8_t* p = &src[(size_t(y) * sw + x) * 4];
++    float a = p[3] / 255.0f;
++    o[0] = p[0] / 255.0f * a;
++    o[1] = p[1] / 255.0f * a;
++    o[2] = p[2] / 255.0f * a;
++    o[3] = a;
++  };
++  constexpr int kSS = 4;
++  for (uint32_t y = 0; y < h; ++y) {
++    for (uint32_t x = 0; x < w; ++x) {
++      float acc[4] = {};
++      for (int sy = 0; sy < kSS; ++sy) {
++        for (int sx = 0; sx < kSS; ++sx) {
++          float fx = (float(x) + (sx + 0.5f) / kSS - ox) / scale - 0.5f;
++          float fy = (float(y) + (sy + 0.5f) / kSS - oy) / scale - 0.5f;
++          if (fx < -0.5f || fy < -0.5f || fx > sw - 0.5f || fy > sh - 0.5f) continue;
++          int ix = int(std::floor(fx)), iy = int(std::floor(fy));
++          float tx = fx - ix, ty = fy - iy;
++          float t00[4], t10[4], t01[4], t11[4];
++          texel(ix, iy, t00);
++          texel(ix + 1, iy, t10);
++          texel(ix, iy + 1, t01);
++          texel(ix + 1, iy + 1, t11);
++          for (int c = 0; c < 4; ++c) {
++            acc[c] += (t00[c] * (1 - tx) + t10[c] * tx) * (1 - ty) +
++                      (t01[c] * (1 - tx) + t11[c] * tx) * ty;
++          }
++        }
++      }
++      for (int c = 0; c < 4; ++c) img[(size_t(y) * w + x) * 4 + c] = acc[c] / (kSS * kSS);
++    }
++  }
++  std::vector<Level> levels;
++  uint32_t lw = w, lh = h;
++  for (uint32_t level = 0; level < level_count; ++level) {
++    levels.push_back(CompressLevel(img, lw, lh));
++    if (level + 1 == level_count) break;
++    uint32_t nw = std::max(lw / 2, 1u), nh = std::max(lh / 2, 1u);
++    std::vector<float> next(size_t(nw) * nh * 4, 0.0f);
++    for (uint32_t y = 0; y < nh; ++y) {
++      for (uint32_t x = 0; x < nw; ++x) {
++        for (int c = 0; c < 4; ++c) {
++          float s = 0;
++          int n = 0;
++          for (uint32_t dy = 0; dy < 2; ++dy) {
++            for (uint32_t dx = 0; dx < 2; ++dx) {
++              uint32_t sx = std::min(x * 2 + dx, lw - 1), sy = std::min(y * 2 + dy, lh - 1);
++              s += img[(size_t(sy) * lw + sx) * 4 + c];
++              ++n;
++            }
++          }
++          next[(size_t(y) * nw + x) * 4 + c] = s / n;
++        }
++      }
++    }
++    img.swap(next);
++    lw = nw;
++    lh = nh;
++  }
++  return levels;
++}
++
++}  // namespace
++
++int32_t ResolvedFamily() {
++  const std::string& s = REXCVAR_GET(afro_button_glyphs);
++  if (s == "xbox") return kFamilyXbox;
++  if (s == "playstation" || s == "ps") return kFamilyPlayStation;
++  if (s == "nintendo" || s == "switch") return kFamilyNintendo;
++  if (s == "steam") return kFamilySteam;
++  int32_t pad = REXCVAR_GET(afro_pad_family);
++  return (pad >= kFamilyXbox && pad <= kFamilySteam) ? pad : kFamilyXbox;
++}
++
++int32_t Identify(const GuestTexture& t) {
++  if (!t.is_dxt5 || !t.is_2d || !t.tiled || t.scaled_resolve || t.base == nullptr) return -1;
++  bool prompt_size = t.width == 64 && (t.height == 64 || t.height == 128);
++  bool log = REXCVAR_GET(afro_glyph_log);
++  bool log_size = t.width >= 16 && t.height >= 16 && t.width <= 128 && t.height <= 128 &&
++                  !(t.width & 3) && !(t.height & 3);
++  if (!prompt_size && !(log && log_size)) return -1;
++
++  uint32_t bx = t.width / 4, by = t.height / 4;
++  uint32_t pitch_blocks = t.row_pitch_bytes / 16;
++  std::vector<uint8_t> tight(size_t(bx) * by * 16);
++  for (uint32_t y = 0; y < by; ++y) {
++    for (uint32_t x = 0; x < bx; ++x) {
++      int32_t off = texture_util::GetTiledOffset2D(int32_t(x), int32_t(y), pitch_blocks, 4);
++      uint8_t* dst = &tight[(size_t(y) * bx + x) * 16];
++      std::memcpy(dst, t.base + off, 16);
++      SwapBlock(dst, t.endianness);
++    }
++  }
++  uint64_t hash = Fnv1a64(tight.data(), tight.size());
++  int32_t glyph = -1;
++  for (const KnownPrompt& k : kKnown) {
++    if (k.hash == hash) glyph = k.glyph;
++  }
++
++  static std::set<uint64_t> seen;
++  if (seen.insert(hash).second) {
++    if (glyph >= 0) {
++      REXGPU_INFO("afro glyphs: prompt {} loaded ({}x{}, {:016x})", kGlyphNames[glyph], t.width,
++                  t.height, hash);
++    } else if (log) {
++      REXGPU_WARN("afro glyphs: candidate {}x{} {:016x}", t.width, t.height, hash);
++    }
++    if (log) {
++      std::error_code ec;
++      std::filesystem::path dir = ExeDir() / "glyph_dump";
++      std::filesystem::create_directories(dir, ec);
++      char name[64];
++      std::snprintf(name, sizeof(name), "%ux%u_%016llx.dds", t.width, t.height,
++                    static_cast<unsigned long long>(hash));
++      WriteDds(dir / name, t.width, t.height, tight);
++    }
++  }
++  return glyph;
++}
++
++const std::vector<Level>* GetReplacement(int32_t family, int32_t glyph, uint32_t width,
++                                         uint32_t height, uint32_t level_count) {
++  if (glyph < 0 || glyph >= int32_t(kGlyphNames.size())) return nullptr;
++  using Key = std::tuple<int32_t, int32_t, uint32_t, uint32_t, uint32_t>;
++  static std::map<Key, std::vector<Level>> cache;
++  static std::set<Key> missing;
++  Key key{family, glyph, width, height, level_count};
++  if (auto it = cache.find(key); it != cache.end()) return &it->second;
++  if (missing.count(key)) return nullptr;
++  // Xbox has no folder unless someone adds one: the original icons stay.
++  std::filesystem::path png =
++      ExeDir() / "glyphs" / FamilyDir(family) / (std::string(kGlyphNames[glyph]) + ".png");
++  std::vector<uint8_t> rgba;
++  int sw = 0, sh = 0;
++  if (!LoadPng(png, rgba, sw, sh) || sw <= 0 || sh <= 0) {
++    if (family != kFamilyXbox) {
++      REXGPU_WARN("afro glyphs: no replacement {}; keeping the game icon", png.string());
++    }
++    missing.insert(key);
++    return nullptr;
++  }
++  auto& levels = cache[key] = BuildLevels(rgba, sw, sh, width, height, level_count);
++  REXGPU_INFO("afro glyphs: {} {} from {}", FamilyDir(family), kGlyphNames[glyph], png.string());
++  return &levels;
++}
++
++bool FamilyChanged() {
++  static int32_t last = 0;
++  int32_t now = ResolvedFamily();
++  if (last == 0) {
++    last = now;
++    return false;
++  }
++  if (now == last) return false;
++  REXGPU_INFO("afro glyphs: controller family {} -> {}", FamilyDir(last), FamilyDir(now));
++  last = now;
++  return true;
++}
++
++}  // namespace rex::graphics::afro_glyphs
+diff --git a/src/graphics/afro_glyphs.h b/src/graphics/afro_glyphs.h
+new file mode 100644
+--- /dev/null
++++ b/src/graphics/afro_glyphs.h
+@@ -0,0 +1,61 @@
++#pragma once
++// afro: controller-specific button prompts (AfroSamuraiRecomp).
++//
++// The game draws each button prompt as its own 64x64 (A/B/X/Y) or 64x128
++// (triggers) DXT5 texture. When one of those textures is loaded, the texture
++// cache asks this module whether it is a known prompt, by an FNV-1a 64 hash of
++// its untiled, endian-swapped base level (equal to the host BC3 data), and, if
++// the active controller family is not Xbox, for replacement BC3 levels made
++// from glyphs\<family>\<NAME>.png next to the executable. Xbox keeps the
++// original game art.
++
++#include <cstdint>
++#include <vector>
++
++namespace rex::graphics::afro_glyphs {
++
++enum Family : int32_t {
++  kFamilyXbox = 1,
++  kFamilyPlayStation = 2,
++  kFamilyNintendo = 3,
++  kFamilySteam = 4,
++};
++
++// What Identify needs from a texture key and its guest layout.
++struct GuestTexture {
++  uint32_t width;
++  uint32_t height;
++  bool is_dxt5;          // xenos::TextureFormat::k_DXT4_5
++  bool is_2d;            // single 2D slice
++  bool tiled;
++  bool scaled_resolve;
++  uint32_t endianness;   // xenos::Endian
++  uint32_t row_pitch_bytes;  // base level, from the guest layout
++  const uint8_t* base;   // guest memory of the base level
++};
++
++// One mip level of a replacement image, tightly packed BC3 blocks.
++struct Level {
++  uint32_t width;
++  uint32_t height;
++  uint32_t row_bytes;  // blocks per row * 16
++  uint32_t rows;       // block rows
++  std::vector<uint8_t> data;
++};
++
++// Family chosen by --afro_button_glyphs ("auto" follows the last used pad).
++int32_t ResolvedFamily();
++
++// Prompt index of a texture, or -1. Logs and dumps candidates when
++// --afro_glyph_log is on.
++int32_t Identify(const GuestTexture& texture);
++
++// Replacement levels for this prompt and family (level_count levels), or
++// nullptr to keep the game texture.
++const std::vector<Level>* GetReplacement(int32_t family, int32_t glyph, uint32_t width,
++                                         uint32_t height, uint32_t level_count);
++
++// True once after the resolved family changes (checked once per call).
++bool FamilyChanged();
++
++}  // namespace rex::graphics::afro_glyphs

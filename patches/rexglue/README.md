@@ -116,6 +116,34 @@ the FPS drops, all default off:
 - `afro_occlusion_async` (false), experimental: occlusion queries no longer
   stall the CPU per query; results are written when the GPU submission finishes.
 
+## zzzz-afro-button-glyphs.patch (GPU plugin and runtime)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only, no game art).
+Applied after `zzz-afro-quad-depth-offset.patch`. Button prompts that follow
+the controller.
+
+- Runtime (`src/input/sdl/sdl_input_driver.cpp`): `afro_pad_family` records the
+  family of the pad that last pressed a button or pulled a trigger (the first
+  connected pad sets it before that): 1 Xbox, 2 PlayStation, 3 Nintendo,
+  4 Steam (Valve vendor ID). It uses `SDL_GetGamepadType`, the type SDL meant
+  for button labels.
+- GPU plugin (`src/graphics/afro_glyphs.*`, texture caches): the game draws each
+  prompt as its own DXT5 texture, 64x64 for A/B/X/Y and 64x128 for the
+  triggers. When one loads, its base level is untiled and hashed (FNV-1a 64).
+  Known hashes come from RenderDoc captures of the Europe disc. For a non-Xbox
+  family, the loaded levels are replaced by `glyphs\<family>\<NAME>.png` next to
+  the exe (fitted, centred, mipmapped and BC3-compressed when first used).
+  Xbox keeps the game's icons. When the family changes, the prompt textures
+  reload.
+- `afro_button_glyphs` (`auto`): `auto` follows the last used pad, or `xbox`,
+  `playstation`, `nintendo`, `steam`.
+- `afro_glyph_log` (false): logs every small DXT5 texture with its hash and
+  saves it as `glyph_dump\<w>x<h>_<hash>.dds` next to the exe, to find the
+  prompts not identified yet.
+
+Icon files are named by the Xbox button position the game asks for: on
+Nintendo, `A.png` shows the B label that sits where Xbox A is. A missing file
+keeps the game icon.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and
