@@ -143,6 +143,11 @@ the controller.
   B E (kick), RT Q (block), LT R (focus), A Space, Back Esc (was Z/Tab),
   Start X/Enter, D-pad the arrow keys, camera the mouse or Shift+arrows (the
   upstream defaults have these two swapped). `keybind_*` still override them.
+- Mouse look: upstream sent the pixels moved since the game's last poll, so
+  the camera speed changed with the polling rate and small moves stayed inside
+  the game's stick dead zone. The right stick now follows the mouse speed
+  averaged over `afro_mouse_window_ms` (30), and any movement starts at
+  `afro_mouse_deadzone` (0.27) of full deflection. `mnk_sensitivity` scales it.
 - `afro_button_glyphs` (`auto`): `auto` follows the last used pad or the
   keyboard, or `xbox`, `playstation`, `nintendo`, `steam`, `keyboard`.
 - The launcher's **Control** row sets these: Auto (default: `mnk_mode` on,

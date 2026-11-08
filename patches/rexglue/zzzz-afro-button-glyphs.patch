@@ -302,16 +302,38 @@ diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver
 diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver.cpp
 --- a/src/input/mnk/mnk_input_driver.cpp
 +++ b/src/input/mnk/mnk_input_driver.cpp
-@@ -30,12 +30,14 @@ REXCVAR_DEFINE_BOOL(mnk_mouse, false, "Input",
+@@ -18,9 +18,11 @@
+ #include <rex/ui/window.h>
+ 
+ #include <algorithm>
++#include <chrono>
+ #include <cmath>
+ #include <cstdlib>
+ #include <cstring>
++#include <deque>
+ #include <string_view>
+ 
+ REXCVAR_DEFINE_BOOL(mnk_mode, false, "Input", "Enable keyboard/mouse controller emulation");
+@@ -29,13 +31,23 @@ REXCVAR_DEFINE_BOOL(mnk_mouse, false, "Input",
+                     "from the keybind_rstick_* keys only");
  REXCVAR_DEFINE_DOUBLE(mnk_sensitivity, 1.0, "Input", "Mouse sensitivity for right stick")
      .range(0.01, 10.0);
- 
+-
 -REXCVAR_DEFINE_STRING(keybind_a, "Semicolon,Space", "Input/Keybinds/Controller", "A button");
 -REXCVAR_DEFINE_STRING(keybind_b, "Quote,Backspace", "Input/Keybinds/Controller", "B button");
 -REXCVAR_DEFINE_STRING(keybind_x, "L", "Input/Keybinds/Controller", "X button");
 -REXCVAR_DEFINE_STRING(keybind_y, "P", "Input/Keybinds/Controller", "Y button");
 -REXCVAR_DEFINE_STRING(keybind_left_trigger, "Q,I", "Input/Keybinds/Controller", "Left trigger");
 -REXCVAR_DEFINE_STRING(keybind_right_trigger, "E,O", "Input/Keybinds/Controller", "Right trigger");
++REXCVAR_DEFINE_DOUBLE(afro_mouse_deadzone, 0.27, "Input",
++                      "Mouse look: smallest stick deflection sent while the mouse moves, to "
++                      "skip the game's own stick dead zone (0 = off)")
++    .range(0.0, 0.9);
++REXCVAR_DEFINE_INT32(afro_mouse_window_ms, 30, "Input",
++                     "Mouse look: the stick follows the mouse speed averaged over this "
++                     "many milliseconds, whatever the game's polling rate")
++    .range(5, 200);
++
 +// afro: action-game defaults (mouse attacks, Q block, E kick, R focus, Esc
 +// for the Back menu). The keyboard button icons show these keys.
 +REXCVAR_DEFINE_STRING(keybind_a, "Space", "Input/Keybinds/Controller", "A button");
@@ -323,7 +345,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  REXCVAR_DEFINE_STRING(keybind_left_shoulder, "1", "Input/Keybinds/Controller", "Left shoulder");
  REXCVAR_DEFINE_STRING(keybind_right_shoulder, "3", "Input/Keybinds/Controller", "Right shoulder");
  REXCVAR_DEFINE_STRING(keybind_lstick_up, "W", "Input/Keybinds/Controller", "Left stick up");
-@@ -43,24 +45,30 @@ REXCVAR_DEFINE_STRING(keybind_lstick_down, "S", "Input/Keybinds/Controller", "Le
+@@ -43,24 +55,30 @@ REXCVAR_DEFINE_STRING(keybind_lstick_down, "S", "Input/Keybinds/Controller", "Le
  REXCVAR_DEFINE_STRING(keybind_lstick_left, "A", "Input/Keybinds/Controller", "Left stick left");
  REXCVAR_DEFINE_STRING(keybind_lstick_right, "D", "Input/Keybinds/Controller", "Left stick right");
  REXCVAR_DEFINE_STRING(keybind_lstick_press, "F", "Input/Keybinds/Controller", "Left stick press");
@@ -363,10 +385,56 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  
  namespace rex::input::mnk {
  
-@@ -146,6 +154,16 @@ bool TokenPressed(const bool (&key_down)[256], std::string_view token, uint8_t l
+@@ -146,6 +164,62 @@ bool TokenPressed(const bool (&key_down)[256], std::string_view token, uint8_t l
  
  std::atomic<bool> mouse_look_active{true};
  
++// afro: mouse look. Upstream sends the pixels moved since the last poll, so
++// the stick value depends on how often the game polls (uneven speed) and small
++// moves stay inside the game's dead zone (slow start). Instead the stick
++// follows the mouse speed over a short time window, and any movement starts
++// just past the dead zone. Guarded by MnkInputDriver::state_mutex_.
++struct AfroMouseSample {
++  std::chrono::steady_clock::time_point t;
++  float dx, dy;
++};
++std::deque<AfroMouseSample> afro_mouse_samples;
++constexpr size_t kAfroMaxMouseSamples = 4096;
++
++void AfroMouseStick(int32_t& rx, int32_t& ry) {
++  const auto now = std::chrono::steady_clock::now();
++  const auto window = std::chrono::milliseconds(REXCVAR_GET(afro_mouse_window_ms));
++  while (!afro_mouse_samples.empty() && now - afro_mouse_samples.front().t > window) {
++    afro_mouse_samples.pop_front();
++  }
++  double sx = 0.0, sy = 0.0;
++  for (const AfroMouseSample& s : afro_mouse_samples) {
++    sx += s.dx;
++    sy += s.dy;
++  }
++  const double secs = std::chrono::duration<double>(window).count();
++  // Pixels per second to stick fraction. Same speed as upstream at 60 polls a
++  // second: 200 stick units per pixel per poll.
++  constexpr double kScale = 200.0 / 60.0 / 32767.0;
++  const double k = REXCVAR_GET(mnk_sensitivity) * kScale / secs;
++  double fx = sx * k, fy = -sy * k;
++  const double mag = std::hypot(fx, fy);
++  if (mag > 1e-6) {
++    const double dz = REXCVAR_GET(afro_mouse_deadzone);
++    const double out = std::min(1.0, dz + mag * (1.0 - dz));
++    fx *= out / mag;
++    fy *= out / mag;
++  }
++  rx += static_cast<int32_t>(fx * 32767.0);
++  ry += static_cast<int32_t>(fy * 32767.0);
++}
++
++void AfroAddMouseSample(float dx, float dy) {
++  if (dx == 0.0f && dy == 0.0f) return;
++  afro_mouse_samples.push_back({std::chrono::steady_clock::now(), dx, dy});
++  if (afro_mouse_samples.size() > kAfroMaxMouseSamples) afro_mouse_samples.pop_front();
++}
++
 +// afro: the keyboard becomes the button icon family while it is the device in
 +// use. A pad takes over as soon as it connects or a button is pressed on it.
 +constexpr int32_t kAfroFamilyKeyboard = 5;
@@ -380,7 +448,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  // ui::VirtualKey follows Windows VK_ numbering; the guest wants USB HID usage
  // page 0x07.
  uint8_t VirtualKeyToHIDUsage(rex::ui::VirtualKey vk_enum) {
-@@ -327,6 +345,10 @@ void MnkInputDriver::OnWindowAvailable(rex::ui::Window* window) {
+@@ -327,6 +401,10 @@ void MnkInputDriver::OnWindowAvailable(rex::ui::Window* window) {
      }
      window->AddInputListener(this, window_z_order());
      window->AddListener(this);
@@ -391,7 +459,21 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
    }
  }
  
-@@ -722,7 +744,12 @@ void MnkInputDriver::OnKeyDown(rex::ui::KeyEvent& e) {
+@@ -508,10 +586,9 @@ X_RESULT MnkInputDriver::GetDeviceState(DeviceId id, X_INPUT_STATE* out_state) {
+     ry -= INT16_MAX;
+ 
+   if (REXCVAR_GET(mnk_mouse) && IsMouseLookActive()) {
+-    double sensitivity = REXCVAR_GET(mnk_sensitivity);
+-    constexpr double kBaseScale = 200.0;
+-    rx += static_cast<int32_t>(double(mouse_dx_) * sensitivity * kBaseScale);
+-    ry += static_cast<int32_t>(double(-mouse_dy_) * sensitivity * kBaseScale);
++    AfroMouseStick(rx, ry);
++  } else {
++    afro_mouse_samples.clear();
+   }
+   // Drained unconditionally: deltas keep accumulating in OnMouseMove while the
+   // mouse is off, and toggling it on would otherwise dump the whole backlog
+@@ -722,7 +799,12 @@ void MnkInputDriver::OnKeyDown(rex::ui::KeyEvent& e) {
    }
    uint16_t vk = static_cast<uint16_t>(e.virtual_key());
    SetKeyState(vk, true);
@@ -404,7 +486,7 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  }
  
  void MnkInputDriver::OnKeyUp(rex::ui::KeyEvent& e) {
-@@ -773,7 +800,11 @@ void MnkInputDriver::OnMouseDown(rex::ui::MouseEvent& e) {
+@@ -773,7 +855,11 @@ void MnkInputDriver::OnMouseDown(rex::ui::MouseEvent& e) {
      default:
        break;
    }
@@ -416,6 +498,18 @@ diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver
  }
  
  void MnkInputDriver::OnMouseUp(rex::ui::MouseEvent& e) {
+@@ -807,9 +893,11 @@ void MnkInputDriver::OnMouseMove(rex::ui::MouseEvent& e) {
+       // The pointer is locked, so the absolute position no longer moves.
+       mouse_dx_ += e.dx();
+       mouse_dy_ += e.dy();
++      AfroAddMouseSample(float(e.dx()), float(e.dy()));
+     } else {
+       mouse_dx_ += float(x - prev_mouse_x_);
+       mouse_dy_ += float(y - prev_mouse_y_);
++      AfroAddMouseSample(float(x - prev_mouse_x_), float(y - prev_mouse_y_));
+     }
+   }
+   prev_mouse_x_ = x;
 diff --git a/src/graphics/afro_glyphs.cpp b/src/graphics/afro_glyphs.cpp
 new file mode 100644
 --- /dev/null
