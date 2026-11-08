@@ -81,7 +81,7 @@ struct AdvItem {
 };
 const AdvItem kAdv[] = {
     {"rt", "render_target_path_d3d12", L"Render path (GPU)", 3, {"", "rtv", "rov"},
-     {L"RTV (original)", L"RTV", L"ROV (experimental)"}},
+     {L"RTV (default)", L"RTV", L"ROV (experimental)"}},
     {"readback", "readback_resolve", L"readback_resolve", 4, {"", "fast", "some", "full"},
      {L"none", L"fast", L"some", L"full"}},
     {"occlusion", "occlusion_query_enable", L"occlusion_query_enable", 2, {"", "false"}, {}},
@@ -164,46 +164,43 @@ bool Explicit(const char* name) {
 
 #ifdef _WIN32
 // Launcher window: options grouped so more can be added later (one row each).
-struct UiText { const wchar_t *title, *lang, *remember, *hint, *play, *fps, *fps_orig, *fps_exp, *disp, *full, *win, *scale, *adv, *def, *off, *ok, *on, *xbtn, *xwarn, *sepia, *sepia_on, *sepia_off, *gfx, *gfx_rtv, *gfx_rov, *cheats, *cheat_title, *cheat_inv, *cheat_warn, *cancel, *ctrl, *ctrl_auto, *ctrl_pad, *ctrl_kb, *mouse_sens, *mouse_dz, *mouse_win; };
+struct UiText { const wchar_t *title, *lang, *remember, *hint, *play, *fps, *fps_orig, *fps_exp, *disp, *full, *win, *scale, *adv, *def, *off, *ok, *on, *xbtn, *xwarn, *sepia, *sepia_on, *sepia_off, *gfx, *gfx_rtv, *gfx_rov, *cheats, *cheat_title, *cheat_inv, *cancel, *ctrl, *ctrl_auto, *ctrl_pad, *ctrl_kb, *mouse_sens, *mouse_dz, *mouse_win; };
 const UiText kText[] = {
     {L"afrorecomp_v" AFRO_VERSION_W L" - Launcher", L"Language:", L"Remember and don't ask again",
      L"Hold Shift at launch to show this window again.", L"Play",
-     L"Frame rate:", L"30 (original)", L"60 (experimental)", L"Display:", L"Fullscreen", L"Window", L"Internal resolution:", L"Advanced options...", L"Default", L"Off", L"OK", L"On",
+     L"Frame rate:", L"30 (default)", L"60 (experimental)", L"Display:", L"Fullscreen", L"Window", L"Internal resolution:", L"Advanced options...", L"Default", L"Off", L"OK", L"On",
      L"Advanced settings...", L"Warning: these settings are experimental and not fully tested. 60 (experimental) unlocks the present interval; results vary.",
-     L"Sepia filter:", L"On (original)", L"Off",
-     L"Render path:", L"RTV (original)", L"ROV (experimental)",
-     L"Cheats\u2026", L"Cheats", L"Invulnerability (experimental)",
-     L"Combat tested. Instant kills, falls and scripts are not.", L"Cancel",
+     L"Sepia filter:", L"On (default)", L"Off",
+     L"Render path:", L"RTV (default)", L"ROV (experimental)",
+     L"Experimental\u2026", L"Experimental", L"Invulnerability", L"Cancel",
      L"Controls:", L"Auto (keyboard + controller)", L"Controller", L"Keyboard",
      L"Mouse sensitivity:", L"Mouse dead zone:", L"Mouse smoothing:"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanzador", L"Idioma:", L"Recordar y no volver a preguntar",
      L"Mantén Mayús al iniciar para volver a ver esta ventana.", L"Jugar",
-     L"Fotogramas:", L"30 (original)", L"60 (experimental)", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resolución interna:", L"Opciones avanzadas...", L"Por defecto", L"Desactivado", L"Aceptar", L"Activado",
+     L"Fotogramas:", L"30 (por defecto)", L"60 (experimental)", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resolución interna:", L"Opciones avanzadas...", L"Por defecto", L"Desactivado", L"Aceptar", L"Activado",
      L"Ajustes avanzados...", L"Atención: estos ajustes son experimentales y no están probados del todo. 60 (experimental) desbloquea el intervalo de presentación; los resultados varían.",
-     L"Filtro sepia:", L"Activado (original)", L"Desactivado",
-     L"Ruta de render:", L"RTV (original)", L"ROV (experimental)",
-     L"Trucos\u2026", L"Trucos", L"Invulnerabilidad (experimental)",
-     L"Probado en combate. Muertes instant\u00e1neas, ca\u00eddas y guiones, no.", L"Cancelar",
+     L"Filtro sepia:", L"Activado (por defecto)", L"Desactivado",
+     L"Ruta de render:", L"RTV (por defecto)", L"ROV (experimental)",
+     L"Experimental\u2026", L"Experimental", L"Invulnerabilidad", L"Cancelar",
      L"Control:", L"Autom\u00e1tico (teclado + mando)", L"Mando", L"Teclado",
      L"Sensibilidad del rat\u00f3n:", L"Zona muerta del rat\u00f3n:", L"Suavizado del rat\u00f3n:"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanceur", L"Langue :", L"Mémoriser et ne plus demander",
      L"Maintenez Maj au démarrage pour revoir cette fenêtre.", L"Jouer",
-     L"Images/s :", L"30 (original)", L"60 (experimental)", L"Affichage :", L"Plein écran", L"Fenêtre", L"Résolution interne :", L"Options avancées...", L"Par défaut", L"Désactivé", L"OK", L"Activé",
-     L"Réglages avancés...", L"Attention : ces réglages sont expérimentaux et pas entièrement testés. 60 (experimental) débloque l'intervalle de présentation ; les résultats varient.",
-     L"Filtre sépia :", L"Activé (original)", L"Désactivé",
-     L"Chemin de rendu :", L"RTV (original)", L"ROV (experimental)",
-     L"Triches\u2026", L"Triches", L"Invuln\u00e9rabilit\u00e9 (exp\u00e9rimentale)",
-     L"Test\u00e9 au combat. Pas les morts instantan\u00e9es, chutes ou scripts.", L"Annuler",
+     L"Images/s :", L"30 (par défaut)", L"60 (expérimental)", L"Affichage :", L"Plein écran", L"Fenêtre", L"Résolution interne :", L"Options avancées...", L"Par défaut", L"Désactivé", L"OK", L"Activé",
+     L"Réglages avancés...", L"Attention : ces réglages sont expérimentaux et pas entièrement testés. 60 (expérimental) débloque l'intervalle de présentation ; les résultats varient.",
+     L"Filtre sépia :", L"Activé (par défaut)", L"Désactivé",
+     L"Chemin de rendu :", L"RTV (par d\u00e9faut)", L"ROV (exp\u00e9rimental)",
+     L"Exp\u00e9rimental\u2026", L"Exp\u00e9rimental", L"Invuln\u00e9rabilit\u00e9",
+     L"Annuler",
      L"Contr\u00f4les :", L"Auto (clavier + manette)", L"Manette", L"Clavier",
      L"Sensibilit\u00e9 souris :", L"Zone morte souris :", L"Lissage souris :"},
     {L"afrorecomp_v" AFRO_VERSION_W L" - Avvio", L"Lingua:", L"Ricorda e non chiedere più",
      L"Tieni premuto Maiusc all'avvio per rivedere questa finestra.", L"Gioca",
-     L"Fotogrammi:", L"30 (original)", L"60 (experimental)", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:", L"Opzioni avanzate...", L"Predefinito", L"Disattivato", L"OK", L"Attivato",
-     L"Impostazioni avanzate...", L"Attenzione: queste impostazioni sono sperimentali e non del tutto testate. 60 (experimental) sblocca l'intervallo di presentazioni; i risultati variano.",
-     L"Filtro seppia:", L"Attivato (originale)", L"Disattivato",
-     L"Percorso di rendering:", L"RTV (original)", L"ROV (experimental)",
-     L"Trucchi\u2026", L"Trucchi", L"Invulnerabilit\u00e0 (sperimentale)",
-     L"Provato in combattimento. Non morti istantanee, cadute o script.", L"Annulla",
+     L"Fotogrammi:", L"30 (predefinito)", L"60 (sperimentale)", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:", L"Opzioni avanzate...", L"Predefinito", L"Disattivato", L"OK", L"Attivato",
+     L"Impostazioni avanzate...", L"Attenzione: queste impostazioni sono sperimentali e non del tutto testate. 60 (sperimentale) sblocca l'intervallo di presentazioni; i risultati variano.",
+     L"Filtro seppia:", L"Attivato (predefinito)", L"Disattivato",
+     L"Percorso di rendering:", L"RTV (predefinito)", L"ROV (sperimentale)",
+     L"Sperimentale\u2026", L"Sperimentale", L"Invulnerabilit\u00e0", L"Annulla",
      L"Controlli:", L"Automatico (tastiera + controller)", L"Controller", L"Tastiera",
      L"Sensibilità mouse:", L"Zona morta mouse:", L"Smussatura mouse:"},
 };
@@ -302,18 +299,19 @@ HFONT UiFont() {
   return font;
 }
 
-struct AdvState { bool done = false; Options* opt; int sel = 0; int invuln_draft = 0; };
+// Advanced settings keep the Experimental popup's choices as drafts until OK.
+struct AdvState { bool done = false; Options* opt; int sel = 0; int fps_draft = 0; int sepia_draft = 0; };
 
-struct CheatState { bool done = false; bool accept = false; int invuln = 0; };
+struct ExpState { bool done = false; bool accept = false; int fps = 0; int sepia = 0; };
 
-// Separate modal. OK stores the checkbox into the returned draft. Cancel, X,
-// and Esc leave `current` unchanged and do not start the game (no PickState).
-int ShowCheats(HWND owner, int sel, int current) {
+// Experimental popup (not fully tested options): warning, frame rate, sepia.
+// OK updates the drafts. Cancel, X and Esc leave them unchanged.
+void ShowExperimentalPopup(HWND owner, int sel, int& fps, int& sepia) {
   const UiText& t = kText[sel];
   HINSTANCE inst = GetModuleHandleW(nullptr);
   WNDCLASSW wc{};
   wc.lpfnWndProc = [](HWND h, UINT m, WPARAM w, LPARAM l) -> LRESULT {
-    auto* st = reinterpret_cast<CheatState*>(GetWindowLongPtrW(h, GWLP_USERDATA));
+    auto* st = reinterpret_cast<ExpState*>(GetWindowLongPtrW(h, GWLP_USERDATA));
     if (!st) return DefWindowProcW(h, m, w, l);
     const auto discard = [&] {
       st->accept = false;
@@ -321,7 +319,9 @@ int ShowCheats(HWND owner, int sel, int current) {
       DestroyWindow(h);
     };
     const auto accept = [&] {
-      st->invuln = IsDlgButtonChecked(h, kIdCheatInv) == BST_CHECKED ? 1 : 0;
+      int fi = static_cast<int>(SendDlgItemMessageW(h, kIdFps, CB_GETCURSEL, 0, 0));
+      st->fps = kFpsValues[std::clamp(fi, 0, 1)];
+      st->sepia = SendDlgItemMessageW(h, kIdXSepia, CB_GETCURSEL, 0, 0) == 1 ? 1 : 0;
       st->accept = true;
       st->done = true;
       DestroyWindow(h);
@@ -350,7 +350,7 @@ int ShowCheats(HWND owner, int sel, int current) {
   wc.hInstance = inst;
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
   wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
-  wc.lpszClassName = L"AfroCheats";
+  wc.lpszClassName = L"AfroExperimentalPopup";
   RegisterClassW(&wc);
   const double sc = GetDpiForSystem() / 96.0;
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
@@ -362,9 +362,10 @@ int ShowCheats(HWND owner, int sel, int current) {
   HWND h = CreateWindowExW(WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, wc.lpszClassName, t.cheat_title,
                            style | WS_VISIBLE, orc.left + S(30), orc.top + S(30),
                            rc.right - rc.left, rc.bottom - rc.top, owner, nullptr, inst, nullptr);
-  if (!h) return current;
-  CheatState st;
-  st.invuln = current ? 1 : 0;
+  if (!h) return;
+  ExpState st;
+  st.fps = fps;
+  st.sepia = sepia;
   SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&st));
   auto mk = [&](const wchar_t* cls, const wchar_t* text, DWORD s_, int x, int y, int cw, int ch,
                 int id) {
@@ -373,11 +374,20 @@ int ShowCheats(HWND owner, int sel, int current) {
     SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(UiFont()), TRUE);
     return c;
   };
-  HWND box = mk(L"BUTTON", t.cheat_inv, WS_TABSTOP | BS_AUTOCHECKBOX | BS_MULTILINE, 16, 16, 420, 44, kIdCheatInv);
-  SendMessageW(box, BM_SETCHECK, current ? BST_CHECKED : BST_UNCHECKED, 0);
-  mk(L"STATIC", t.cheat_warn, SS_LEFT, 16, 68, 420, 44, 0);
-  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 70, 130, 150, 32, kIdCheatOk);
-  mk(L"BUTTON", t.cancel, WS_TABSTOP, 236, 130, 150, 32, kIdCheatCancel);
+  const DWORD cbs = WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL;
+  mk(L"STATIC", t.xwarn, SS_SUNKEN, 16, 14, 428, 68, kIdXWarn);
+  mk(L"STATIC", t.fps, SS_CENTERIMAGE, 16, 98, 180, 26, 0);
+  HWND fc = mk(L"COMBOBOX", L"", cbs, 204, 98, 240, 200, kIdFps);
+  SendMessageW(fc, CB_ADDSTRING, 0, (LPARAM)t.fps_orig);
+  SendMessageW(fc, CB_ADDSTRING, 0, (LPARAM)t.fps_exp);
+  SendMessageW(fc, CB_SETCURSEL, fps == 60 ? 1 : 0, 0);
+  mk(L"STATIC", t.sepia, SS_CENTERIMAGE, 16, 136, 180, 26, kIdXSepiaLbl);
+  HWND sp = mk(L"COMBOBOX", L"", cbs, 204, 136, 240, 200, kIdXSepia);
+  SendMessageW(sp, CB_ADDSTRING, 0, (LPARAM)t.sepia_on);
+  SendMessageW(sp, CB_ADDSTRING, 0, (LPARAM)t.sepia_off);
+  SendMessageW(sp, CB_SETCURSEL, sepia ? 1 : 0, 0);
+  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 70, 184, 150, 32, kIdCheatOk);
+  mk(L"BUTTON", t.cancel, WS_TABSTOP, 236, 184, 150, 32, kIdCheatCancel);
   EnableWindow(owner, FALSE);
   MSG msg;
   while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {
@@ -389,7 +399,10 @@ int ShowCheats(HWND owner, int sel, int current) {
   EnableWindow(owner, TRUE);
   SetForegroundWindow(owner);
   UnregisterClassW(wc.lpszClassName, inst);
-  return st.accept ? st.invuln : current;
+  if (st.accept) {
+    fps = st.fps;
+    sepia = st.sepia;
+  }
 }
 
 LRESULT CALLBACK AdvProc(HWND h, UINT m, WPARAM w, LPARAM l) {
@@ -488,22 +501,21 @@ LRESULT CALLBACK XProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     return 0;
   }
   if (st && m == WM_COMMAND && LOWORD(w) == kIdXCheats) {
-    st->invuln_draft = ShowCheats(h, st->sel, st->invuln_draft);
+    ShowExperimentalPopup(h, st->sel, st->fps_draft, st->sepia_draft);
     return 0;
   }
   if ((m == WM_COMMAND && (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL)) || m == WM_CLOSE) {
     if (st && LOWORD(w) == IDOK && m == WM_COMMAND) {
-      int fi = static_cast<int>(SendDlgItemMessageW(h, kIdFps, CB_GETCURSEL, 0, 0));
-      st->opt->fps = kFpsValues[std::clamp(fi, 0, 1)];
-      st->opt->sepia = SendDlgItemMessageW(h, kIdXSepia, CB_GETCURSEL, 0, 0) == 1 ? 1 : 0;
+      // Experimental popup OK already updated the drafts; Cancel did not.
+      st->opt->fps = st->fps_draft;
+      st->opt->sepia = st->sepia_draft;
       // Reuse cfg key rt / adv[0]: 0 = RTV default, 2 = ROV (same as Advanced options).
       st->opt->adv[0] = SendDlgItemMessageW(h, kIdXGfx, CB_GETCURSEL, 0, 0) == 1 ? 2 : 0;
       for (int r = 0; r < 3; ++r)
         st->opt->mouse[r] = std::clamp(static_cast<int>(SendDlgItemMessageW(
                                            h, kIdXMouse + r, TBM_GETPOS, 0, 0)),
                                        kMouse[r].lo, kMouse[r].hi);
-      // Cheats OK already updated the draft. Cancel/X/Esc of that popup did not.
-      st->opt->invuln = st->invuln_draft;
+      st->opt->invuln = IsDlgButtonChecked(h, kIdCheatInv) == BST_CHECKED ? 1 : 0;
       st->opt->tick = 0;  // tick UI removed; Experimental encodes interval unlock
     }
     if (st) st->done = true;
@@ -513,9 +525,9 @@ LRESULT CALLBACK XProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   return DefWindowProcW(h, m, w, l);
 }
 
-// Modal advanced settings: FPS + render path (RTV/ROV) + sepia + Cheats button.
-// Path/FPS/sepia are saved when "Remember" is ticked. Invulnerability lives in
-// the Cheats popup and is session-only (never written to afro.cfg).
+// Modal advanced settings (tested options): render path (RTV/ROV), mouse
+// sliders, invulnerability, and the Experimental button (frame rate, sepia).
+// Saved when "Remember" is ticked, except invulnerability (session only).
 void ShowExperimental(HWND owner, int sel, Options* o) {
   const UiText& t = kText[sel];
   HINSTANCE inst = GetModuleHandleW(nullptr);
@@ -529,7 +541,7 @@ void ShowExperimental(HWND owner, int sel, Options* o) {
   const double sc = GetDpiForSystem() / 96.0;
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const DWORD style = WS_CAPTION | WS_SYSMENU;
-  RECT rc{0, 0, S(460), S(424)};
+  RECT rc{0, 0, S(460), S(300)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   RECT orc;
   GetWindowRect(owner, &orc);
@@ -542,7 +554,8 @@ void ShowExperimental(HWND owner, int sel, Options* o) {
   AdvState st;
   st.opt = o;
   st.sel = sel;
-  st.invuln_draft = o->invuln ? 1 : 0;
+  st.fps_draft = o->fps;
+  st.sepia_draft = o->sepia;
   SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&st));
   auto mk = [&](const wchar_t* cls, const wchar_t* text, DWORD s_, int x, int y, int cw, int ch,
                 int id) {
@@ -552,44 +565,35 @@ void ShowExperimental(HWND owner, int sel, Options* o) {
     return c;
   };
   const DWORD cbs = WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL;
-  mk(L"STATIC", t.xwarn, SS_SUNKEN, 16, 14, 388, 68, kIdXWarn);
-  mk(L"STATIC", t.fps, SS_CENTERIMAGE, 16, 98, 180, 26, 0);
-  HWND fps = mk(L"COMBOBOX", L"", cbs, 204, 98, 200, 200, kIdFps);
-  SendMessageW(fps, CB_ADDSTRING, 0, (LPARAM)t.fps_orig);
-  SendMessageW(fps, CB_ADDSTRING, 0, (LPARAM)t.fps_exp);
-  SendMessageW(fps, CB_SETCURSEL, o->fps == 60 ? 1 : 0, 0);
-  mk(L"STATIC", t.gfx, SS_CENTERIMAGE, 16, 136, 180, 26, kIdXGfxLbl);
-  HWND gfx = mk(L"COMBOBOX", L"", cbs, 204, 136, 200, 200, kIdXGfx);
+  mk(L"STATIC", t.gfx, SS_CENTERIMAGE, 16, 16, 180, 26, kIdXGfxLbl);
+  HWND gfx = mk(L"COMBOBOX", L"", cbs, 204, 16, 240, 200, kIdXGfx);
   SendMessageW(gfx, CB_ADDSTRING, 0, (LPARAM)t.gfx_rtv);
   SendMessageW(gfx, CB_ADDSTRING, 0, (LPARAM)t.gfx_rov);
   // adv[0]: 0/1 = RTV, 2 = ROV (same cfg key as Advanced options "rt").
   SendMessageW(gfx, CB_SETCURSEL, o->adv[0] == 2 ? 1 : 0, 0);
-  mk(L"STATIC", t.sepia, SS_CENTERIMAGE, 16, 174, 180, 26, kIdXSepiaLbl);
-  HWND sep = mk(L"COMBOBOX", L"", cbs, 204, 174, 200, 200, kIdXSepia);
-  SendMessageW(sep, CB_ADDSTRING, 0, (LPARAM)t.sepia_on);
-  SendMessageW(sep, CB_ADDSTRING, 0, (LPARAM)t.sepia_off);
-  SendMessageW(sep, CB_SETCURSEL, o->sepia ? 1 : 0, 0);
   // Mouse camera (keyboard play): sensitivity, dead zone, smoothing.
   const wchar_t* mouse_lbl[3] = {t.mouse_sens, t.mouse_dz, t.mouse_win};
   INITCOMMONCONTROLSEX icc{sizeof(icc), ICC_BAR_CLASSES};
   InitCommonControlsEx(&icc);
   for (int r = 0; r < 3; ++r) {
     const MouseSlider& ms = kMouse[r];
-    const int y = 212 + r * 38;
+    const int y = 54 + r * 38;
     const int v = std::clamp(o->mouse[r], ms.lo, ms.hi);
     mk(L"STATIC", mouse_lbl[r], SS_CENTERIMAGE, 16, y, 180, 26, 0);
-    HWND tb = mk(TRACKBAR_CLASSW, L"", WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 198, y, 196, 26,
+    HWND tb = mk(TRACKBAR_CLASSW, L"", WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 198, y, 192, 26,
                  kIdXMouse + r);
     SendMessageW(tb, TBM_SETRANGEMIN, FALSE, ms.lo);
     SendMessageW(tb, TBM_SETRANGEMAX, FALSE, ms.hi);
     SendMessageW(tb, TBM_SETLINESIZE, 0, ms.step);
     SendMessageW(tb, TBM_SETPAGESIZE, 0, ms.step * 5);
     SendMessageW(tb, TBM_SETPOS, TRUE, v);
-    mk(L"STATIC", MouseText(r, v).c_str(), SS_CENTERIMAGE | SS_RIGHT, 396, y, 48, 26,
+    mk(L"STATIC", MouseText(r, v).c_str(), SS_CENTERIMAGE | SS_RIGHT, 392, y, 52, 26,
        kIdXMouseVal + r);
   }
-  mk(L"BUTTON", t.cheats, WS_TABSTOP, 16, 326, 424, 28, kIdXCheats);
-  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 170, 368, 120, 32, IDOK);
+  HWND inv = mk(L"BUTTON", t.cheat_inv, WS_TABSTOP | BS_AUTOCHECKBOX, 16, 168, 428, 26, kIdCheatInv);
+  SendMessageW(inv, BM_SETCHECK, o->invuln ? BST_CHECKED : BST_UNCHECKED, 0);
+  mk(L"BUTTON", t.cheats, WS_TABSTOP, 16, 206, 428, 28, kIdXCheats);
+  mk(L"BUTTON", t.ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 170, 250, 120, 32, IDOK);
   EnableWindow(owner, FALSE);
   MSG msg;
   while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {

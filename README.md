@@ -1,4 +1,4 @@
-# AfroSamuraiRecomp – Afro Samurai (Xbox 360) static recompilation
+﻿# AfroSamuraiRecomp â€“ Afro Samurai (Xbox 360) static recompilation
 
 Unofficial, work-in-progress static recompilation of **Afro Samurai** (Xbox 360,
 Europe, title ID 4E4D07D8) to native Windows x64 using
@@ -60,7 +60,7 @@ delete them. Details: [Saves](#saves).
   happened and the log. **Never attach game files** (ISO, extracted files).
   More help: [Troubleshooting](#troubleshooting).
 
-This is a preview. **30 (original)** is the default. **60 (experimental)** is incomplete and opt-in. See [Status and limitations](#status-and-limitations).
+This is a preview. **30 (default)** is the default. **60 (experimental)** is incomplete and opt-in. See [Status and limitations](#status-and-limitations).
 
 ---
 
@@ -77,14 +77,14 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.1.1**). **30 (original)** remains the default. Tested: a clean install
+Preview (**0.1.1**). **30 (default)** remains the default. Tested: a clean install
 with the 0.1.0 setup started the game, and an update of that folder started it
 from Play. That is one install, not an independent playthrough of the whole game. **60 (experimental)** is an
 **incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
-do not treat it as stable — cinematics can run fast and performance dips remain.
+do not treat it as stable â€” cinematics can run fast and performance dips remain.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
-- Default GPU path is **RTV (original)** (host render targets): correct image at a stable
-  30 FPS with **30 (original)** (launcher default). The black frames of earlier versions
+- Default GPU path is **RTV (default)** (host render targets): correct image at a stable
+  30 FPS with **30 (default)** (launcher default). The black frames of earlier versions
   are fixed by the `afro-edram-no-wrap` GPU plugin patch.
 - **ROV (experimental)** is still available as an optional fallback (correct image but slow,
   can drop below 15 FPS): **Advanced settings...** or
@@ -101,7 +101,7 @@ do not treat it as stable — cinematics can run fast and performance dips remai
   - **Experimental (60) only:** intro and cutscenes can run too fast and frames
     can still drop. Other gameplay / Focus / combat timing may be wrong and is
     largely unverified. Not a finished 60 FPS mode.
-  - **Invulnerability (experimental)** works in the tested build and remains experimental.
+  - **Invulnerability** (Advanced settings) works in the tested build.
     It is not a guarantee for the whole game. It is off by default, lasts for that launch only, and is not saved.
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
@@ -112,15 +112,15 @@ do not treat it as stable — cinematics can run fast and performance dips remai
 **Default remains Original (30).** Experimental (60) is for testers who want to help;
 it is **not** claimed smooth, complete, or timing-correct.
 
-**Enable:** Launcher → **Advanced settings...** → Frame rate →
-**60 (experimental)** → OK, then Play. Tick **Remember** only if you want that
+**Enable:** Launcher â†’ **Advanced settings...** â†’ **Experimental...** â†’ Frame rate â†’
+**60 (experimental)** â†’ OK, OK, then Play. Tick **Remember** only if you want that
 choice kept.
-**Revert:** same dialog → **30 (original)**. The `fps=` line is in
+**Revert:** same dialog â†’ **30 (default)**. The `fps=` line is in
 `afro_language.cfg` next to the executable (`game\afro_language.cfg` after setup),
 not in `Documents\afrorecomp`.
 
 What it does (high level): unlocks the guest present interval (`afro_present_interval=1`),
-applies a host 60 FPS cap, and enables gated guest dt / 1/30→1/60 constant hooks.
+applies a host 60 FPS cap, and enables gated guest dt / 1/30â†’1/60 constant hooks.
 Original does **not** apply those Experimental dt/const patches; present interval
 stays at the retail default (2).
 
@@ -323,15 +323,18 @@ folder back into `Documents\afrorecomp\`).
 
 ### Launcher and options
 The launcher (shown on first run, after each update, or with Shift) offers:
-language (English, Español, Français, Italiano), fullscreen or window, internal
+language (English, EspaÃ±ol, FranÃ§ais, Italiano), fullscreen or window, internal
 resolution (1x native by default / 2x / 3x) and "remember and don't ask again".
-**Advanced settings...** opens frame rate (**30 (original)** or **60 (experimental)**),
-render path (**RTV (original)** or **ROV (experimental)**), the sepia filter, and
-**Cheats...**. The Cheats checkbox is **Invulnerability (experimental)**. Invulnerability works in the tested build and remains experimental. It is not a guarantee for the whole game. It starts
+**Control** picks Auto (keyboard and mouse, a controller takes over when used),
+Controller or Keyboard. **Advanced settings...** holds the tested options: render
+path (**RTV (default)** or **ROV (experimental)**), mouse sensitivity, mouse dead
+zone and mouse smoothing (sliders), and **Invulnerability**. Invulnerability starts
 off, lasts for that launch only, and is not written to `afro_language.cfg`.
+Its **Experimental...** button opens the options that are not fully tested:
+frame rate (**30 (default)** or **60 (experimental)**) and the sepia filter.
 Settings you keep with Remember are stored in `afro_language.cfg` next to the exe
 (`game\afro_language.cfg` after setup). Without Remember, the next start uses
-**30 (original)** and 1x resolution. A render-path change is written only when
+**30 (default)** and 1x resolution. A render-path change is written only when
 Remember is ticked. Saves are not in that file; they are in `Documents\afrorecomp`.
 
 Developer options: start with `--advanced` (e.g. `tools\run_win.bat --advanced`)
@@ -361,9 +364,9 @@ command line, e.g. `--render_target_path_d3d12=rov`.
 #### Getting a log
 See [Logs](#logs-where-afrolog-actually-is). Copy the file right after the problem
 (each launch overwrites it). Useful extra flags for `tools\run_win.bat` or `Play.bat`:
-- `--afro_xma_log=true` – audio (XMA) decoding details, for sound or voice problems.
-- `--afro_perf_log=true` – per-second performance counters, for FPS drops.
-- `--afro_fps_log=false` – disable the bounded ~2s FPS/dt lines if the log grows too large.
+- `--afro_xma_log=true` â€“ audio (XMA) decoding details, for sound or voice problems.
+- `--afro_perf_log=true` â€“ per-second performance counters, for FPS drops.
+- `--afro_fps_log=false` â€“ disable the bounded ~2s FPS/dt lines if the log grows too large.
 
 #### Reporting an issue
 Prefer the **Experimental 60 / bug report** issue template when relevant. Include:
@@ -377,12 +380,12 @@ and `install.log` / build output for install problems.
 unless a maintainer specifically asks.
 
 ### Repository layout
-- `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
+- `app/` â€“ ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
-- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.1.1.exe`, not committed.
-- `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
+- `install.bat`, `tools/install.ps1` â€“ console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.1.1.exe`, not committed.
+- `tools/` â€“ build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
-- `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
+- `patches/rexglue/` â€“ ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
 
 ### Plans
 - Performance work; controller and audio polish.
