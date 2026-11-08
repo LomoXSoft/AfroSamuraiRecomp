@@ -26,13 +26,20 @@ SHA-256 `3336ce0378a369f953476896bb091fb457f010fcacc1b5b77968c4a9e07da1c1`
 
 ## Tested
 
-- The author reports a resumed HDD install that finished and a game session that played correctly.
-- The author reports a clean NVMe install that ran all 14 steps, ended with installation OK, and was followed by a game session that played correctly.
-- Those are reports of those runs. They are not a promised duration and not a check of every scene.
+- Tested: a resumed HDD install finished, and the game session played correctly.
+- Tested: a clean NVMe install ran all 14 steps, ended with installation OK, and the game session played correctly.
+- Tested: the headband looked correct in play of this build.
+- Those runs are not a promised duration and not a check of every scene.
 
 ## Still not claimed
 
 - Invulnerability (experimental) does not prevent death. It stays off unless enabled for that launch, and it is not saved.
-- The headband looked correct in the author's play of this build. Other black textures are not claimed fixed.
+- Other black textures are not claimed fixed.
 - Experimental (60) can still run cutscenes fast and drop frames.
 - No install time is guaranteed on HDD, SSD, or NVMe.
+
+## Headband comparison
+
+![Headband: original GPU vs quad depth offset full vs half (default)](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/download/v0.1.1/headband-comparison-v0.1.1.png)
+
+Development rendering comparison: original (left), full (middle), and half (right). Half is the default in 0.1.1.

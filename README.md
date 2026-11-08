@@ -77,10 +77,9 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.1.1**). **30 (original)** remains the default. On the author's Windows PC,
-a clean install with the 0.1.0 setup started the game, and an update of that
-folder started it from Play. That is the author's report, not an independent
-playthrough of the whole game. **60 (experimental)** is an
+Preview (**0.1.1**). **30 (original)** remains the default. Tested: a clean install
+with the 0.1.0 setup started the game, and an update of that folder started it
+from Play. That is one install, not an independent playthrough of the whole game. **60 (experimental)** is an
 **incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
 do not treat it as stable — cinematics can run fast and performance dips remain.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
@@ -95,7 +94,7 @@ do not treat it as stable — cinematics can run fast and performance dips remai
 - Known issues (also apply at Original unless noted):
   - FPS can dip, including below 30 and especially above native internal resolution.
     Cause is **not proven** without profiling; do not assume a single GPU root cause.
-  - The headband looked correct in the author's play of 0.1.1. Other black textures are not claimed fixed.
+  - Tested: the headband looked correct in play of 0.1.1. Other black textures are not claimed fixed.
   - Occasional odd audio.
   - If two tutorial prompts appear at once, the first one can stay stuck on screen
     (original game behaviour; restarting the level clears it).
