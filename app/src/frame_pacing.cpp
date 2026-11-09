@@ -718,7 +718,14 @@ void AfroSwapHook(PPCRegister& r31) {
                   (cine && REXCVAR_GET(afro_cutscene_30)) ? 30 : 60);
     }
   }
-  const int cap = REXCVAR_GET(afro_fps_cap);
+  int cap = REXCVAR_GET(afro_fps_cap);
+  // Interval 2 (retail, or cutscenes in Experimental 60) normally gets its 30 FPS
+  // from the guest vblank timer. With --vsync=false that timer runs at 1 kHz, so
+  // hold those frames at 30 here; cutscene timing uses the retail 1/30 step.
+  // `vsync` lives in the GPU plugin, so read it by name.
+  const bool guest_vsync =
+      !rex::cvar::GetFlagInfo("vsync") || rex::cvar::Query<bool>("vsync");
+  if (!guest_vsync && EffectiveInterval() >= 2 && (cap <= 0 || cap > 30)) cap = 30;
   if (cap > 0) {
     const auto period = std::chrono::duration_cast<clk::duration>(
         std::chrono::duration<double>(1.0 / cap));
