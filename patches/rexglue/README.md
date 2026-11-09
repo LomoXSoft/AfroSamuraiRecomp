@@ -208,6 +208,20 @@ Measured on the bridge with `--afro_perf_log=true`: GPU thread busy time per
 frame went from about 4.5 to 3.6–4.2 µs per draw, and the low points from
 21–25 FPS to about 30 FPS.
 
+## zzzzzzz-afro-mouse-recapture.patch (runtime, `rexruntime.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last.
+With keyboard and mouse on (launcher Control: Auto or Keyboard), the mouse
+camera hides and locks the cursor (`src/input/mnk/mnk_input_driver.cpp`). In
+fullscreen the cursor could stay on screen from the start until an alt-tab, which
+releases and takes that capture again. The driver now does the same itself:
+- once, about 120 input polls (some 2 seconds) after the first capture, while the
+  game finishes starting up;
+- when the window gains focus;
+- when the window is resized (entering or leaving fullscreen).
+
+Each time it logs `afro mnk: mouse capture taken again (startup|focus|resize)`.
+The next input poll withdraws the capture if the game no longer wants the mouse.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and

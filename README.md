@@ -77,8 +77,8 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
   E kick, R focus, Esc menu, arrows for the D-pad. Mouse sensitivity, dead zone and
   smoothing are sliders in the launcher.
 - **60 FPS** (0.2.0): the whole game, cutscenes included, at the right speed.
-- **Launcher**: Play, Settings and saved games. Settings has Graphics (display,
-  resolution, frame rate, VSync), Gameplay (language, controls, mouse,
+- **Launcher**: language, Play, Settings and saved games. Settings has Graphics
+  (display, resolution, frame rate, VSync), Gameplay (controls, mouse,
   invulnerability) and Experimental (effects, render path) tabs.
 - **Fixes over earlier recompilation builds**: all cutscene voices, black frames,
   and the headband texture.
@@ -367,12 +367,12 @@ you can also restore one by hand (close the game, copy the contents of a `saves-
 folder back into `Documents\afrorecomp\`).
 
 ### Launcher and options
-The launcher (shown on first run, after each update, or with Shift) has three
-buttons: **Play**, **Settings...** and **Manage saved games...**. Settings has
-three tabs:
+The launcher (shown on first run, after each update, or with Shift) has the
+language (English, Español, Français, Italiano) and three buttons: **Play**,
+**Settings...** and **Manage saved games...**. Settings has three tabs:
 - **Graphics**: fullscreen or window, internal resolution (1x native by default /
   2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
-- **Gameplay**: language (English, Español, Français, Italiano), controls (Auto:
+- **Gameplay**: controls (Auto:
   keyboard and mouse, a controller takes over when used; Controller; Keyboard), mouse
   sensitivity, dead zone and smoothing, and **Invulnerability**. Invulnerability
   starts off, lasts for that launch only, and is not written to `afro_language.cfg`.

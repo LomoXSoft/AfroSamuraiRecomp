@@ -17,11 +17,13 @@ Newest first. Versions are in `app/VERSION`.
   no copy of rendered images back to the CPU (`readback_resolve` left at none).
 - VSync option; off by default with 60. With it off, 30 FPS scenes are held at 30
   by the frame limiter.
-- Launcher: Play, Settings and Manage saved games. Settings has Graphics, Gameplay and
-  Experimental tabs; "Skip this window at launch" moved into Settings. Settings are
+- Launcher: language, Play, Settings and Manage saved games. Settings has Graphics,
+  Gameplay and Experimental tabs; "Skip this window at launch" moved into Settings. Settings are
   saved on every Play. Raw GPU switches only with `--advanced`.
 - 0.1.x configs: a saved 60 stays 60 (with VSync off); old effect switches reset.
 - Setup shows its details (the install log) by default.
+- Keyboard and mouse in fullscreen: the cursor no longer stays on screen until an
+  alt-tab (`zzzzzzz-afro-mouse-recapture` patch).
 
 ## 0.1.2 – Controller button prompts + keyboard and mouse
 - Setup program `afrosetup-v0.1.2.exe` (release asset, not committed). It carries this 0.1.2 source.

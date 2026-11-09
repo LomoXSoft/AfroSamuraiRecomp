@@ -1,0 +1,95 @@
+diff --git a/include/rex/input/mnk/mnk_input_driver.h b/include/rex/input/mnk/mnk_input_driver.h
+index 2d36faa..26d9712 100644
+--- a/include/rex/input/mnk/mnk_input_driver.h
++++ b/include/rex/input/mnk/mnk_input_driver.h
+@@ -56,6 +56,7 @@ class MnkInputDriver final : public InputDriver,
+   void OnClosing(rex::ui::UIEvent& e) override;
+   void OnLostFocus(rex::ui::UISetupEvent& e) override;
+   void OnGotFocus(rex::ui::UISetupEvent& e) override;
++  void OnResize(rex::ui::UISetupEvent& e) override;
+ 
+  private:
+   bool IsEnabled() const;
+@@ -76,6 +77,8 @@ class MnkInputDriver final : public InputDriver,
+   void QueueMouseCaptureUpdate(bool should_capture);
+   void ApplyMouseCaptureFromUIThread();
+   void ReleaseMouseCaptureFromUIThread(rex::ui::Window* window);
++  // afro: release and take the capture again, as an alt-tab does.
++  void RecaptureMouseFromUIThread(const char* why);
+   void RecenterCursorFromUIThread(int32_t x, int32_t y);
+   // Safe to call from any thread.
+   void DetachFromWindow();
+@@ -96,6 +99,9 @@ class MnkInputDriver final : public InputDriver,
+   int32_t prev_mouse_x_ = 0;
+   int32_t prev_mouse_y_ = 0;
+   bool mouse_captured_ = false;
++  // afro: polls left before the first capture is taken again (-1 = done).
++  std::atomic<int> first_recapture_polls_{-1};
++  bool first_capture_done_ = false;
+   // Whether the window has the pointer locked and is reporting relative motion.
+   bool relative_mouse_mode_ = false;
+   // Cursor visibility to restore on capture release - the window owner may run
+diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver.cpp
+index 409be1f..88bc9fd 100644
+--- a/src/input/mnk/mnk_input_driver.cpp
++++ b/src/input/mnk/mnk_input_driver.cpp
+@@ -517,6 +517,17 @@ X_RESULT MnkInputDriver::GetDeviceState(DeviceId id, X_INPUT_STATE* out_state) {
+   // and lock the cursor, breaking the ImGui overlays.
+   QueueMouseCaptureUpdate(IsEnabled() && REXCVAR_GET(mnk_mouse) && IsMouseLookActive() &&
+                           has_focus_ && is_active());
++  // afro: the first capture is taken while the game still starts up (fullscreen
++  // switch, swap chain) and in fullscreen the cursor could stay on screen until an
++  // alt-tab. Take it again once, about 2 s later.
++  if (first_recapture_polls_.load(std::memory_order_relaxed) > 0 &&
++      first_recapture_polls_.fetch_sub(1, std::memory_order_relaxed) == 1) {
++    std::lock_guard lock(state_mutex_);
++    if (attached_window_) {
++      attached_window_->app_context().CallInUIThreadDeferred(
++          [this] { RecaptureMouseFromUIThread("startup"); });
++    }
++  }
+ 
+   if (!is_active() || !has_focus_) {
+     if (out_state) {
+@@ -737,6 +748,10 @@ void MnkInputDriver::ApplyMouseCaptureFromUIThread() {
+     return;
+   }
+   mouse_captured_ = true;
++  if (!first_capture_done_) {
++    first_capture_done_ = true;
++    first_recapture_polls_.store(120, std::memory_order_relaxed);
++  }
+   precapture_cursor_visibility_ = window->GetCursorVisibility();
+   window->SetCursorVisibility(rex::ui::Window::CursorVisibility::kHidden);
+   window->CaptureMouse();
+@@ -761,6 +776,16 @@ void MnkInputDriver::ReleaseMouseCaptureFromUIThread(rex::ui::Window* window) {
+   window->ReleaseMouse();
+ }
+ 
++void MnkInputDriver::RecaptureMouseFromUIThread(const char* why) {
++  if (!attached_window_ || !mouse_captured_) {
++    return;
++  }
++  REXLOG_INFO("afro mnk: mouse capture taken again ({})", why);
++  ReleaseMouseCaptureFromUIThread(attached_window_);
++  // The next poll withdraws this if the game no longer wants the mouse.
++  QueueMouseCaptureUpdate(true);
++}
++
+ void MnkInputDriver::RecenterCursorFromUIThread(int32_t x, int32_t y) {
+   rex::ui::Window* window = attached_window_;
+   if (!window) {
+@@ -928,6 +953,13 @@ void MnkInputDriver::OnLostFocus(rex::ui::UISetupEvent&) {
+ 
+ void MnkInputDriver::OnGotFocus(rex::ui::UISetupEvent&) {
+   has_focus_ = true;
++  // afro: a capture taken before the window really had focus is not applied.
++  RecaptureMouseFromUIThread("focus");
++}
++
++void MnkInputDriver::OnResize(rex::ui::UISetupEvent&) {
++  // afro: entering or leaving fullscreen can leave the cursor shown.
++  RecaptureMouseFromUIThread("resize");
+ }
+ 
+ }  // namespace rex::input::mnk

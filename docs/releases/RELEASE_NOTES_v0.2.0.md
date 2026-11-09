@@ -37,10 +37,11 @@ Your extracted game, saves and launcher settings stay.
   (i7-10700F, RX 9060 XT).
 
 ### Launcher
-- Three buttons: **Play**, **Settings...** and **Manage saved games...**.
+- The main window has the **language** and three buttons: **Play**,
+  **Settings...** and **Manage saved games...**.
 - **Settings** has three tabs:
   - **Graphics**: display, internal resolution, frame rate, VSync.
-  - **Gameplay**: language, controls, mouse sliders, invulnerability.
+  - **Gameplay**: controls, mouse sliders, invulnerability.
   - **Experimental** (not fully tested): sepia filter, blood effect, depth of
     field, bloom, focus effect, render path.
 - Choosing 60 also sets **VSync** to Off; with VSync on, a frame that misses 60
@@ -49,10 +50,13 @@ Your extracted game, saves and launcher settings stay.
   press Play. Hold **Shift** at launch to show the launcher again.
 - If you saved 60 in 0.1.x, it stays 60 (with VSync off).
 
+### Keyboard and mouse
+- In fullscreen, the mouse cursor no longer stays on screen until you alt-tab.
+
 ### Setup
 - Shows its details (the install log) by default.
-- Applies the updated ReXGlue patch `zzzzzz-afro-gpu-fast-path` on install and
-  on update.
+- Applies the updated ReXGlue patch `zzzzzz-afro-gpu-fast-path` and the new
+  `zzzzzzz-afro-mouse-recapture` on install and on update.
 
 ## Tested
 
