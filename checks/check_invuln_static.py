@@ -73,7 +73,7 @@ def main() -> None:
     version = version_path.read_text(encoding="utf-8").strip()
     doc = doc_path.read_text(encoding="utf-8")
 
-    if version != "0.1.1":
+    if version != "0.1.2":
         fail(f"VERSION is {version!r}")
     if "REXCVAR_DEFINE_BOOL(afro_player_invuln, false" not in cpp:
         fail("cvar default is not false")

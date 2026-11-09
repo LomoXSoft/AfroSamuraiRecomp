@@ -414,12 +414,12 @@ int main(int argc, char** argv) {
         std::string text(f.bytes.begin(), f.bytes.end());
         while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
           text.pop_back();
-        version_ok = text == "0.1.1";
+        version_ok = text == "0.1.2";
       }
       if (f.path == "tools/install.ps1") {
         std::string text(f.bytes.begin(), f.bytes.end());
         ps1_ok = text.find("LocalTree") != std::string::npos &&
-                 text.find("$LOCAL_TREE_VERSION = '0.1.1'") != std::string::npos &&
+                 text.find("$LOCAL_TREE_VERSION = '0.1.2'") != std::string::npos &&
                  text.find("Refusing -Ref main") != std::string::npos &&
                  text.find("AFROSTEP ") != std::string::npos &&
                  text.find("AFROPHASE compile") != std::string::npos &&
@@ -432,8 +432,8 @@ int main(int argc, char** argv) {
                    text.find("AfroPlayerMeterDeathGate") != std::string::npos;
       }
     }
-    Expect(version_ok, "bundled VERSION is 0.1.1");
-    Expect(ps1_ok, "bundled install.ps1 is the 0.1.1 local-tree script");
+    Expect(version_ok, "bundled VERSION is 0.1.2");
+    Expect(ps1_ok, "bundled install.ps1 is the 0.1.2 local-tree script");
     Expect(bat_ok, "bundled tree still contains install.bat");
     Expect(hooks_ok, "bundled hooks include the meter death gate");
   }
@@ -444,7 +444,7 @@ int main(int argc, char** argv) {
     return std::string(std::istreambuf_iterator<char>(in), {});
   };
   std::string script_text, window_cpp, build_bat;
-  for (const char* dir : {"/tmp/afro-0.1.1", "..", "."}) {
+  for (const char* dir : {"/tmp/afro-0.1.2", "..", "."}) {
     if (script_text.empty()) script_text = read_text(std::string(dir) + "/tools/install.ps1");
     if (window_cpp.empty()) window_cpp = read_text(std::string(dir) + "/tools/afrosetup.cpp");
     if (build_bat.empty()) build_bat = read_text(std::string(dir) + "/tools/build_win.bat");

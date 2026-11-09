@@ -20,7 +20,7 @@ Options (all optional; anything missing is asked interactively):
   -Ref <branch|tag>      repository revision to build (default: main)
   -RepoUrl <url|path>    repository to clone (default: the GitHub repo)
   -LocalTree <dir>       copy this prepared source tree instead of cloning.
-                         The graphical setup uses this for private 0.1.1.
+                         The graphical setup uses this for private 0.1.2.
                          It does not fetch public main.
   -NonInteractive        fail instead of prompting. Requires the other answers.
   -CleanupAfterInstall   at the end, delete everything not needed to play (no question)
@@ -51,8 +51,8 @@ $script:DLSHARE = 0.9   # share of a download+extract step spent downloading
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $ISO_SHA1 = '29394DB1854DFC59C767D768C8D35E0A08ACB73D'
-# Graphical setup for the private 0.1.1 tree passes -LocalTree and checks this.
-$LOCAL_TREE_VERSION = '0.1.1'
+# Graphical setup for the private 0.1.2 tree passes -LocalTree and checks this.
+$LOCAL_TREE_VERSION = '0.1.2'
 $NEED_GB = 20
 # Pinned downloads (official sources) with SHA-256.
 $DL = @{
@@ -1024,10 +1024,10 @@ try {
     }
   } else {
     if ($NonInteractive -and -not $PSBoundParameters.ContainsKey('Ref')) {
-      throw 'Refusing to build the default branch main. Pass -LocalTree with the 0.1.1 source, or an explicit -Ref that is not public main.'
+      throw 'Refusing to build the default branch main. Pass -LocalTree with the 0.1.2 source, or an explicit -Ref that is not public main.'
     }
     if ($NonInteractive -and $Ref -eq 'main') {
-      throw 'Refusing -Ref main. Public main is not this 0.1.1 source.'
+      throw 'Refusing -Ref main. Public main is not this 0.1.2 source.'
     }
     Step 'repo' (T 't_repo' $Ref) {
       Add-OwnedGit $REPO
@@ -1186,6 +1186,19 @@ try {
   $ico = Join-Path $REPO 'app\afro_icon.ico'
   if ((Test-Path -LiteralPath $ico) -and (-not $Update -or -not (Test-Path -LiteralPath (Join-Path $GAME 'afro_icon.ico')))) {
     Copy-Item -LiteralPath $ico (Join-Path $GAME 'afro_icon.ico') -Force
+  }
+  # Button prompt icons for non-Xbox controllers and the keyboard (0.1.2). The
+  # GPU plugin reads them from <exe>\glyphs\<family>\. Refreshed on every run.
+  $glyphSrc = Join-Path $REPO 'tools\artwork\glyphs'
+  if (Test-Path -LiteralPath $glyphSrc) {
+    foreach ($fam in (Get-ChildItem -LiteralPath $glyphSrc -Directory)) {
+      $dst = Join-Path (Join-Path $GAME 'glyphs') $fam.Name
+      New-Item -ItemType Directory -Force -Path $dst | Out-Null
+      Get-ChildItem -LiteralPath $fam.FullName -File -Filter '*.png' | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName (Join-Path $dst $_.Name) -Force
+      }
+    }
+    Say '    button icons copied to game\glyphs'
   }
   $playBat = Join-Path $GAME 'Play.bat'
   # The old stock bat runs the exe in the foreground, so cmd stays open for the
