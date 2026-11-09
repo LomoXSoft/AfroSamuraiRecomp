@@ -75,8 +75,8 @@ Your extracted game, saves and launcher settings stay.
 
 - RB, Start, Back and the stick-click prompts have not been found yet and keep the
   Xbox icon.
-- Switch and Steam icons were checked by forcing that icon set. No real Switch or
-  Steam Deck controller was tested.
+- Switch icons were checked only with the icon set forced, and Steam icons were not
+  looked at in game. No real Switch or Steam Deck controller was tested.
 - Keyboard icons show the default keys, not keys you rebind.
 - Experimental (60) can still run cutscenes fast and drop frames.
 - No install time is guaranteed on HDD, SSD, or NVMe.
