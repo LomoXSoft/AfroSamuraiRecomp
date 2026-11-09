@@ -4,6 +4,7 @@
 #include "frame_pacing.h"
 #include "player_hp_invuln.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <mutex>
@@ -18,6 +19,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 
 REXCVAR_DEFINE_INT32(afro_fps_cap, 0, "Afro",
@@ -27,6 +29,25 @@ REXCVAR_DEFINE_BOOL(afro_fps_log, true, "Afro",
 
 REXCVAR_DEFINE_INT32(afro_present_interval, 2, "Afro",
                      "Guest D3D present interval (2 = original 30 FPS, 1 = unlocked ~60)");
+
+REXCVAR_DEFINE_BOOL(afro_cutscene_30, true, "Afro",
+                    "Experimental (60): play in-engine cutscenes at the original 30 FPS");
+// Off by default: tested 2026-11-09, rewriting every 1/30 constant load lost the
+// loading-screen "Afro!" voice and broke scripted timing; leaving it alone kept
+// enemy spawns and scripts correct.
+REXCVAR_DEFINE_BOOL(afro_dt30_rewrite, false, "Afro",
+                    "Experimental (60): rewrite the game's 1/30 constant loads to the step "
+                    "time (diagnostic switch)");
+REXCVAR_DEFINE_BOOL(afro_dt_force_all, false, "Afro",
+                    "Experimental (60): old behaviour, force the step over the game's time "
+                    "scale and pause too (breaks focus slow motion)");
+REXCVAR_DEFINE_STRING(afro_dt_mode, "dynamic", "Afro",
+                      "Experimental (60) step time: dynamic = real frame time clamped to "
+                      "1/60..1/30 (normal speed when a scene drops below 60), fixed60 = "
+                      "always 1/60 (slow motion when the frame rate drops)");
+REXCVAR_DEFINE_BOOL(afro_globals_dump, false, "Afro",
+                    "Diagnostic: write the guest globals 0x828A0000-0x82900000 to "
+                    "afro_globals.bin next to the exe twice a second");
 
 REXCVAR_DEFINE_STRING(afro_tick_mode, "original", "Afro",
                       "Tick mode request: original|force30|force60|varying (flags unmapped)");
@@ -119,7 +140,37 @@ int ClampedPresentInterval() {
   return v;
 }
 
-bool Experimental60() { return ClampedPresentInterval() == 1; }
+// In-engine cutscene flags, found by comparing global-memory snapshots with
+// screenshots: byte 0x828E6172 is 1 during full in-engine cinematics, byte
+// 0x828E6173 is 1 during in-level dialogue scenes, both 0 in gameplay.
+constexpr uint32_t kCineFlagAddr = 0x828E6172;
+bool InCutscene() {
+  auto* mem = rex::system::kernel_memory();
+  if (!mem || !rex::system::kernel_state()) return false;
+  const uint8_t* p = mem->TranslateVirtual<uint8_t*>(kCineFlagAddr);
+  return p[0] != 0 || p[1] != 0;
+}
+
+// Present interval the game should use now. Experimental (60) falls back to the
+// original 30 FPS (interval 2, the game's own 1/30 step) during cutscenes, which
+// step once per present and would otherwise play at double speed.
+int EffectiveInterval() {
+  const int v = ClampedPresentInterval();
+  if (v == 1 && REXCVAR_GET(afro_cutscene_30) && InCutscene()) return 2;
+  return v;
+}
+
+bool Experimental60() { return EffectiveInterval() == 1; }
+
+// Experimental (60) step time. The game steps 0x828B1C04 and its 1/30 constants
+// once per present. At a fixed 1/60, a scene that only reaches 30 FPS plays in
+// slow motion. Dynamic mode uses the real time between presents (average of the
+// last 4, clamped to 1/60..1/30) so the game keeps wall-clock speed.
+std::atomic<float> g_step_dt{1.f / 60.f};
+float StepDt() {
+  if (REXCVAR_GET(afro_dt_mode) == "fixed60") return 1.f / 60.f;
+  return g_step_dt.load(std::memory_order_relaxed);
+}
 
 const char* TickModeName() {
   const std::string& m = REXCVAR_GET(afro_tick_mode);
@@ -348,12 +399,12 @@ std::atomic<uint64_t> g_cine_mode_counts[5]{};
 void ForceExperimentalPrimaryDt() {
   if (!Experimental60()) return;
   if (!rex::system::kernel_state()) return;
-  WriteGuestFloat(kDtAddr, kDt60);
+  if (REXCVAR_GET(afro_dt_force_all)) WriteGuestFloat(kDtAddr, StepDt());
   if (g_dt_feed_logged.exchange(1) == 0) {
     REXLOG_INFO(
-        "afro dt: Experimental feed {:.6f}s (1/60) -> 0x828B1C04 only "
-        "(1BF0 measured + 1C08 scale untouched; 1/30 const loads -> 1/60 for anim/cutscene)",
-        kDt60);
+        "afro dt: Experimental feed mode={} (now {:.6f}s) -> 0x828B1C04 only "
+        "(1BF0 measured + 1C08 scale untouched; 1/30 const loads -> same step)",
+        REXCVAR_GET(afro_dt_mode), StepDt());
   }
 }
 
@@ -361,7 +412,7 @@ void ForceDevicePresentInterval(uint32_t device) {
   if (device < 0x1000) return;
   auto* mem = rex::system::kernel_memory();
   if (!mem) return;
-  const int v = ClampedPresentInterval();
+  const int v = EffectiveInterval();
   rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(device + 0x3c),
                                         static_cast<uint32_t>(v));
   if (v == 1) {
@@ -383,36 +434,66 @@ void ForceDevicePresentInterval(uint32_t device) {
   }
 }
 
+// Diagnostic recorder (afro_globals_dump): every 30 guest frames, appends
+// [u32 'AFGD'][u32 frame][u64 Unix time in ms][kDumpLen bytes, guest byte order]
+// to afro_globals.bin in the working directory. Used offline to find the flag
+// that marks in-engine cutscenes (compare with screenshots taken meanwhile).
+constexpr uint32_t kDumpBase = 0x828A0000;
+constexpr uint32_t kDumpLen = 0x60000;
+void GlobalsDumpTick(uint64_t frame) {
+  if (!REXCVAR_GET(afro_globals_dump) || frame % 30) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  static FILE* f = nullptr;
+  if (!f) {
+    f = std::fopen("afro_globals.bin", "wb");
+    if (!f) return;
+    REXLOG_INFO("afro globals dump: 0x{:08X}+0x{:X} every 30 frames -> afro_globals.bin",
+                kDumpBase, kDumpLen);
+  }
+  const uint32_t magic = 0x44474641;  // "AFGD"
+  const uint32_t fr = uint32_t(frame);
+  const uint64_t ms = uint64_t(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch()).count());
+  std::fwrite(&magic, 4, 1, f);
+  std::fwrite(&fr, 4, 1, f);
+  std::fwrite(&ms, 8, 1, f);
+  std::fwrite(mem->TranslateVirtual(kDumpBase), 1, kDumpLen, f);
+  std::fflush(f);
+}
+
 void PatchPrimaryDtStore(PPCRegister& base, PPCRegister& f, int32_t offset) {
   if (!Experimental60()) return;
   // Only the primary sim-dt slot (7172 == 0x1C04).
   if (offset != 7172) return;
-  f.f64 = double(kDt60);
+  const float step = StepDt();
+  f.f64 = double(step);
   if (base.u32 < 0x1000) return;
   auto* mem = rex::system::kernel_memory();
   if (!mem) return;
   uint32_t u;
-  std::memcpy(&u, &kDt60, 4);
+  std::memcpy(&u, &step, 4);
   rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(base.u32 + offset), u);
   ForceExperimentalPrimaryDt();
 }
 }  // namespace
 
 void AfroPresentIntervalHook(PPCRegister& r11) {
-  r11.u64 = static_cast<uint64_t>(ClampedPresentInterval());
+  r11.u64 = static_cast<uint64_t>(EffectiveInterval());
 }
 
 void AfroPresentIntervalHook2(PPCRegister& r11) {
-  r11.u64 = static_cast<uint64_t>(ClampedPresentInterval());
+  r11.u64 = static_cast<uint64_t>(EffectiveInterval());
 }
 
 void AfroPresentBitHook(PPCRegister& r10) {
-  if (REXCVAR_GET(afro_present_interval) == 1)
+  if (EffectiveInterval() == 1)
     r10.u64 = r10.u32 & ~uint32_t(0x200);
 }
 
 void AfroPresentIntervalConsumeHook(PPCRegister& r29) {
-  const int v = ClampedPresentInterval();
+  const int v = EffectiveInterval();
   r29.u64 = static_cast<uint64_t>(v);
   g_seen_interval.store(v, std::memory_order_relaxed);
   PlayerInvulnTick();
@@ -549,16 +630,42 @@ void AfroPlayerMeterDeathGate(PPCRegister& r3) {
   GuardPlayerMeter(r3.u32, player);
 }
 
-void AfroDtStore1C04a(PPCRegister& r28, PPCRegister& f0) { PatchPrimaryDtStore(r28, f0, 7172); }
-void AfroDtStore1C04b(PPCRegister& r28, PPCRegister& f31) { PatchPrimaryDtStore(r28, f31, 7172); }
-void AfroDtStore1C04c(PPCRegister& r28, PPCRegister& f31) { PatchPrimaryDtStore(r28, f31, 7172); }
+// sub_826A0xxx writes 0x828B1C04 three times per frame:
+//   a) a raw base value
+//   b) 0x828B1BEC x a / (frame-time terms): a fixed step per frame, 1/30 in the
+//      original game, smaller while focus slows time
+//   c) 0 while the game is frozen (flag 0x828E5697)
+// (a) is left alone. (b) is scaled by real frame time / (1/30), which keeps focus
+// and any other game time scale. (c) is left alone so the freeze stays.
+// Tested 2026-11-09: forcing all three lost focus slow motion; patching only (a)
+// made the whole game speed follow the frame rate.
+void AfroDtStore1C04a(PPCRegister& r28, PPCRegister& f0) {
+  if (REXCVAR_GET(afro_dt_force_all)) PatchPrimaryDtStore(r28, f0, 7172);
+}
+void AfroDtStore1C04b(PPCRegister& r28, PPCRegister& f31) {
+  if (REXCVAR_GET(afro_dt_force_all)) {
+    PatchPrimaryDtStore(r28, f31, 7172);
+    return;
+  }
+  if (!Experimental60() || r28.u32 < 0x1000) return;
+  const float scaled = float(f31.f64) * StepDt() * 30.f;
+  f31.f64 = double(scaled);
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  uint32_t u;
+  std::memcpy(&u, &scaled, 4);
+  rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(r28.u32 + 7172), u);
+}
+void AfroDtStore1C04c(PPCRegister& r28, PPCRegister& f31) {
+  if (REXCVAR_GET(afro_dt_force_all)) PatchPrimaryDtStore(r28, f31, 7172);
+}
 
 // Constant-pool 1/30 (0x820EB774) -> 1/60 when Experimental. Anim/cutscene timelines
 // that step once per present (or convert frame counts to seconds) need this; leaving
 // them at 1/30 with interval=1 made the intro unwatchably fast after 92f93d1.
 void AfroDt30Rewrite(PPCRegister& f) {
-  if (!Experimental60()) return;
-  f.f64 = double(kDt60);
+  if (!Experimental60() || !REXCVAR_GET(afro_dt30_rewrite)) return;
+  f.f64 = double(StepDt());
   static bool logged = false;
   if (!logged) {
     logged = true;
@@ -602,6 +709,15 @@ void AfroSwapHook(PPCRegister& r31) {
   PlayerInvulnTick();
   ForceDevicePresentInterval(r31.u32);
   ForceExperimentalPrimaryDt();
+  if (ClampedPresentInterval() == 1) {
+    static bool was_cine = false;
+    const bool cine = InCutscene();
+    if (cine != was_cine) {
+      was_cine = cine;
+      REXLOG_INFO("afro cutscene: {} -> {} FPS", cine ? "start" : "end",
+                  (cine && REXCVAR_GET(afro_cutscene_30)) ? 30 : 60);
+    }
+  }
   const int cap = REXCVAR_GET(afro_fps_cap);
   if (cap > 0) {
     const auto period = std::chrono::duration_cast<clk::duration>(
@@ -621,9 +737,19 @@ void AfroSwapHook(PPCRegister& r31) {
   }
   std::lock_guard lk(g_mu);
   auto now = clk::now();
-  if (g_frames) g_ft_ms = std::chrono::duration<double, std::milli>(now - g_last).count();
+  if (g_frames) {
+    g_ft_ms = std::chrono::duration<double, std::milli>(now - g_last).count();
+    // Step time for the next frame: average of the last 4 present intervals.
+    static double ring[4] = {1.0 / 60, 1.0 / 60, 1.0 / 60, 1.0 / 60};
+    static int ri = 0;
+    ring[ri] = std::clamp(g_ft_ms / 1000.0, 1.0 / 60, 1.0 / 30);
+    ri = (ri + 1) & 3;
+    g_step_dt.store(float((ring[0] + ring[1] + ring[2] + ring[3]) / 4),
+                    std::memory_order_relaxed);
+  }
   g_last = now;
   ++g_frames;
+  GlobalsDumpTick(g_frames);
   if (g_win_frames == 0) g_win_start = now;
   ++g_win_frames;
   double secs = std::chrono::duration<double>(now - g_win_start).count();
@@ -643,7 +769,9 @@ void AfroSwapHook(PPCRegister& r31) {
           "afro fps: guest {:.1f} FPS  dt@0x828B1C04={:.6f}s  dt@0x828B1BF0={:.6f}s  "
           "dt@0x828B1C08={:.6f}s  feed={}  present_interval cvar={} seen={}  "
           "tick_mode={}  host_cap={}  cine_modes(2s) 0={} 1={} 2={} 3={} 4={}{}",
-          g_fps, dt, dt_m, dt_s, Experimental60() ? "1/60@1C04+const" : "retail",
+          g_fps, dt, dt_m, dt_s,
+          Experimental60() ? (REXCVAR_GET(afro_dt_mode) == "fixed60" ? "fixed60" : "dynamic")
+                           : "retail",
           REXCVAR_GET(afro_present_interval), seen < 0 ? -1 : seen, TickModeName(), cap,
           m0, m1, m2, m3, m4, InvulnFpsSuffix());
     }
