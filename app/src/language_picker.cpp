@@ -327,6 +327,7 @@ constexpr int kIdSvFolder = 300, kIdSvOpen = 301, kIdSvBackup = 302, kIdSvList =
 void ApplyMainTexts(HWND h, int sel) {
   const UiText& t = kText[sel];
   SetWindowTextW(h, t.title);
+  SetDlgItemTextW(h, kIdLangLbl, t.lang);
   SetDlgItemTextW(h, kIdPlay, t.play);
   SetDlgItemTextW(h, kIdSettingsBtn, t.settings);
   SetDlgItemTextW(h, kIdSavesBtn, kSaveText[sel].manage);
@@ -444,7 +445,6 @@ void ApplySettingsTexts(HWND h, const SettingsState& st) {
   SetDlgItemTextW(h, kIdScaleLbl, t.scale);
   SetDlgItemTextW(h, kIdFpsLbl, t.fps);
   SetDlgItemTextW(h, kIdXVsyncLbl, t.vsync);
-  SetDlgItemTextW(h, kIdLangLbl, t.lang);
   SetDlgItemTextW(h, kIdCtrlLbl, t.ctrl);
   const wchar_t* mouse_lbl[3] = {t.mouse_sens, t.mouse_dz, t.mouse_win};
   for (int r = 0; r < 3; ++r) SetDlgItemTextW(h, kIdXMouseLbl + r, mouse_lbl[r]);
@@ -523,9 +523,6 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     const int id = LOWORD(w);
     if (id >= kIdTabBase && id < kIdTabBase + 3) {
       ShowTab(h, st, id - kIdTabBase);
-    } else if (id == kIdCombo && HIWORD(w) == CBN_SELCHANGE) {
-      st->sel = std::clamp(Cur(h, kIdCombo), 0, 3);
-      ApplySettingsTexts(h, *st);
     } else if (id == kIdFps && HIWORD(w) == CBN_SELCHANGE) {
       // VSync on rounds every frame that misses 60 down to 30: off suits 60.
       SetCur(h, kIdXVsync, Cur(h, kIdFps) == 1 ? 1 : 0);
@@ -613,12 +610,10 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   row(0, 142, kIdFpsLbl, kIdFps);
   row(0, 180, kIdXVsyncLbl, kIdXVsync);
   // Gameplay.
-  HWND lang = row(1, 66, kIdLangLbl, kIdCombo);
-  for (auto& lg : kLangs) SendMessageW(lang, CB_ADDSTRING, 0, (LPARAM)lg.label);
-  row(1, 104, kIdCtrlLbl, kIdCtrl);
+  row(1, 66, kIdCtrlLbl, kIdCtrl);
   for (int r = 0; r < 3; ++r) {
     const MouseSlider& ms = kMouse[r];
-    const int yy = 142 + r * 38;
+    const int yy = 104 + r * 38;
     const int v = std::clamp(opt.mouse[r], ms.lo, ms.hi);
     mk(1, L"STATIC", SS_CENTERIMAGE, lx, yy, lw, 26, kIdXMouseLbl + r);
     HWND tb = mk(1, TRACKBAR_CLASSW, WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 206, yy, 196, 26, kIdXMouse + r);
@@ -630,7 +625,7 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
     HWND val = mk(1, L"STATIC", SS_CENTERIMAGE | SS_RIGHT, 404, yy, 52, 26, kIdXMouseVal + r);
     SetWindowTextW(val, MouseText(r, v).c_str());
   }
-  mk(1, L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, lx, 262, 432, 26, kIdCheatInv);
+  mk(1, L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, lx, 224, 432, 26, kIdCheatInv);
   // Experimental.
   mk(2, L"STATIC", SS_SUNKEN, lx, 64, 432, 40, kIdXWarn);
   for (int i = 0; i < 5; ++i) row(2, 114 + i * 38, kIdFxLbl + i, kIdFx + i);
@@ -647,7 +642,6 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   SetCur(h, kIdScale, (opt.scale >= 1 && opt.scale <= 3) ? opt.scale - 1 : 0);
   SetCur(h, kIdFps, opt.fps == 60 ? 1 : 0);
   SetCur(h, kIdXVsync, opt.vsync ? 1 : 0);
-  SetCur(h, kIdCombo, sel);
   SetCur(h, kIdCtrl, std::clamp(opt.control, 0, 2));
   CheckDlgButton(h, kIdCheatInv, opt.invuln ? BST_CHECKED : BST_UNCHECKED);
   OptionsToExp(h, opt);
@@ -927,6 +921,9 @@ LRESULT CALLBACK PickProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         ShowSaves(h, st->sel);
       } else if (LOWORD(w) == kIdSettingsBtn) {
         if (ShowSettings(h, st->sel, st->remember, st->opt)) ApplyMainTexts(h, st->sel);
+      } else if (LOWORD(w) == kIdCombo && HIWORD(w) == CBN_SELCHANGE) {
+        st->sel = std::clamp(static_cast<int>(SendDlgItemMessageW(h, kIdCombo, CB_GETCURSEL, 0, 0)), 0, 3);
+        ApplyMainTexts(h, st->sel);
       } else if (LOWORD(w) == IDCANCEL) {  // Esc: same as closing the window
         PostMessageW(h, WM_CLOSE, 0, 0);
       } else if (LOWORD(w) == IDOK) {
@@ -943,7 +940,8 @@ LRESULT CALLBACK PickProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   return DefWindowProcW(h, m, w, l);
 }
 
-// Main window: Play, Settings, saved games.
+// Main window: language, Play, Settings, saved games. The language stays here so
+// a player who does not read English can find it.
 // Returns 0 when the window was closed (X, Alt+F4, Esc) instead of Play.
 unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   HINSTANCE inst = GetModuleHandleW(nullptr);
@@ -957,7 +955,7 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   const double sc = GetDpiForSystem() / 96.0;
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const DWORD style = WS_CAPTION | WS_SYSMENU;
-  RECT rc{0, 0, S(360), S(164)};
+  RECT rc{0, 0, S(360), S(204)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   const int W = rc.right - rc.left, H = rc.bottom - rc.top;
   int x = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
@@ -971,16 +969,22 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
   st.remember = *remember;
   for (int i = 0; i < 4; ++i) if (kLangs[i].id == initial) st.sel = i;
   SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&st));
-  auto mk = [&](DWORD st_, int cx, int cy, int cw, int ch, int id) {
-    HWND c = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | st_, S(cx),
-                             S(cy), S(cw), S(ch), h, reinterpret_cast<HMENU>(INT_PTR(id)), inst,
-                             nullptr);
+  auto mkc = [&](const wchar_t* cls, DWORD st_, int cx, int cy, int cw, int ch, int id) {
+    HWND c = CreateWindowExW(0, cls, L"", WS_CHILD | WS_VISIBLE | st_, S(cx), S(cy), S(cw), S(ch),
+                             h, reinterpret_cast<HMENU>(INT_PTR(id)), inst, nullptr);
     SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(UiFont()), TRUE);
     return c;
   };
-  HWND play = mk(BS_DEFPUSHBUTTON, 20, 20, 320, 46, kIdPlay);
-  mk(0, 20, 78, 320, 30, kIdSettingsBtn);
-  mk(0, 20, 116, 320, 30, kIdSavesBtn);
+  auto mk = [&](DWORD st_, int cx, int cy, int cw, int ch, int id) {
+    return mkc(L"BUTTON", WS_TABSTOP | st_, cx, cy, cw, ch, id);
+  };
+  mkc(L"STATIC", SS_CENTERIMAGE, 20, 20, 120, 26, kIdLangLbl);
+  HWND lang = mkc(L"COMBOBOX", WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL, 150, 20, 190, 200, kIdCombo);
+  for (auto& lg : kLangs) SendMessageW(lang, CB_ADDSTRING, 0, (LPARAM)lg.label);
+  SendMessageW(lang, CB_SETCURSEL, st.sel, 0);
+  HWND play = mk(BS_DEFPUSHBUTTON, 20, 60, 320, 46, kIdPlay);
+  mk(0, 20, 118, 320, 30, kIdSettingsBtn);
+  mk(0, 20, 156, 320, 30, kIdSavesBtn);
   ApplyMainTexts(h, st.sel);
   SetForegroundWindow(h);
   SetFocus(play);
