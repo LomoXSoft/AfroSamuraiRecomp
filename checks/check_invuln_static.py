@@ -183,21 +183,22 @@ def main() -> None:
     if "g_inv_hp_other" not in cpp or "WriteGuestFloat" in cpp[cpp.find("g_inv_hp_other"):cpp.find("g_inv_hp_other")+400]:
         fail("other-entity hp stores must be counted, not written")
 
-    if "Cheats\\u2026" not in picker and "Cheats…" not in picker:
-        fail("English Cheats button missing")
-    if "Trucos\\u2026" not in picker and "Trucos…" not in picker:
-        fail("Spanish Trucos button missing")
+    # 0.1.2: Invulnerability is a checkbox in Advanced settings; the former
+    # Cheats button opens the Experimental popup (frame rate, sepia).
+    if "Experimental\\u2026" not in picker and "Experimental…" not in picker:
+        fail("English Experimental button missing")
     cheat_btn = [ln for ln in picker.splitlines() if "kIdCheatInv" in ln and "BUTTON" in ln]
     if len(cheat_btn) != 1 or "BS_AUTOCHECKBOX" not in cheat_btn[0]:
         fail("invulnerability checkbox missing")
     if "kIdXInvuln" in picker:
         fail("inline invulnerability combo id still present")
-    if "30 (original)" not in picker or "60 (experimental)" not in picker:
+    if "30 (default)" not in picker or "60 (experimental)" not in picker:
         fail("frame-rate labels were not normalized")
-    if "RTV (original)" not in picker:
+    if "RTV (default)" not in picker:
         fail("RTV label was not normalized")
-    if "st->play" in picker[picker.find("int ShowCheats"):picker.find("LRESULT CALLBACK AdvProc")]:
-        fail("Cheats dialog must not start the game")
+    popup = picker[picker.find("void ShowExperimentalPopup"):picker.find("LRESULT CALLBACK AdvProc")]
+    if not popup or "st->play" in popup:
+        fail("Experimental popup must not start the game")
 
     print("static invuln checks: ok")
     print(f"  hooks: AfroPlayerHpStoreHook @ 0x826662D8 and 0x82666308")
