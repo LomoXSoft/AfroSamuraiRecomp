@@ -10,9 +10,9 @@ HDD installation can take a long time; SSD/NVMe recommended.
 
 `afrosetup-v0.2.0.exe`
 
-SHA-256 `TBD`
+SHA-256 `a8fb0e72e859878d051c90b96522a83c201e1d77a9cca4d2a995f3ab0f1db4d3`
 
-TBD bytes.
+1362450 bytes.
 
 Already on 0.1.x: run it, choose **Update** and pick your install folder.
 Your extracted game, saves and launcher settings stay.
@@ -62,9 +62,11 @@ Your extracted game, saves and launcher settings stay.
 
 - Played on the author's PC at 60: gameplay, the intro cutscene and in-level
   dialogue scenes at normal speed, at 1x and 2x internal resolution.
-- 30 FPS default session with the final build: TBD.
+- Update from a 0.1.2 install to 0.2.0, then a session at the 30 FPS default.
 - New launcher windows checked in English and Spanish.
-- Clean install and update from 0.1.2 with this `afrosetup-v0.2.0.exe`: TBD.
+- Clean install into a new folder with a 0.2.0 release candidate, then **Update**
+  of that folder with this `afrosetup-v0.2.0.exe`: language on the main window, the
+  hidden cursor in fullscreen with keyboard and mouse, and 60 FPS all checked in game.
 - The whole patch stack applies to a clean ReXGlue `bd833a2`.
 
 ## Still not claimed
@@ -72,7 +74,9 @@ Your extracted game, saves and launcher settings stay.
 - At 60, scenes that show two camera views at once can still drop below 60.
 - RB, Start, Back and the stick-click prompts keep the Xbox icon.
 - Keyboard icons show the default keys, not keys you rebind.
-- No install time is guaranteed on HDD, SSD, or NVMe.
+- No install time is guaranteed on HDD, SSD, or NVMe. **Update** rebuilds the whole
+  game even when little changed, so it takes about as long as the build part of a
+  fresh install.
 
 ## Next (0.2.1)
 
