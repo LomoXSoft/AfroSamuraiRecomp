@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 REXCVAR_DEFINE_INT32(afro_fps_cap, 0, "Afro",
                      "Guest frame cap in FPS (0 = off, the game's own pacing)");
@@ -30,7 +31,10 @@ REXCVAR_DEFINE_BOOL(afro_fps_log, true, "Afro",
 REXCVAR_DEFINE_INT32(afro_present_interval, 2, "Afro",
                      "Guest D3D present interval (2 = original 30 FPS, 1 = unlocked ~60)");
 
-REXCVAR_DEFINE_BOOL(afro_cutscene_30, true, "Afro",
+// Off by default: tested 2026-11-09, cutscenes and in-level dialogue play at normal
+// speed at 60. Their players add the step of channel 0 (see afro_cine_diag), which
+// AfroDtStore1C04b scales; the old 0.0.16 attempts only changed the stored copy.
+REXCVAR_DEFINE_BOOL(afro_cutscene_30, false, "Afro",
                     "Experimental (60): play in-engine cutscenes at the original 30 FPS");
 // Off by default: tested 2026-11-09, rewriting every 1/30 constant load lost the
 // loading-screen "Afro!" voice and broke scripted timing; leaving it alone kept
@@ -45,6 +49,9 @@ REXCVAR_DEFINE_STRING(afro_dt_mode, "dynamic", "Afro",
                       "Experimental (60) step time: dynamic = real frame time clamped to "
                       "1/60..1/30 (normal speed when a scene drops below 60), fixed60 = "
                       "always 1/60 (slow motion when the frame rate drops)");
+REXCVAR_DEFINE_BOOL(afro_cine_diag, false, "Afro",
+                    "Diagnostic: every 2 s, log the entity update functions the game ran, "
+                    "the time channel each one got and its average step");
 REXCVAR_DEFINE_BOOL(afro_globals_dump, false, "Afro",
                     "Diagnostic: write the guest globals 0x828A0000-0x82900000 to "
                     "afro_globals.bin next to the exe twice a second");
@@ -151,9 +158,9 @@ bool InCutscene() {
   return p[0] != 0 || p[1] != 0;
 }
 
-// Present interval the game should use now. Experimental (60) falls back to the
-// original 30 FPS (interval 2, the game's own 1/30 step) during cutscenes, which
-// step once per present and would otherwise play at double speed.
+// Present interval the game should use now. With afro_cutscene_30, Experimental
+// (60) falls back to the original 30 FPS (interval 2, the game's own 1/30 step)
+// during cutscenes.
 int EffectiveInterval() {
   const int v = ClampedPresentInterval();
   if (v == 1 && REXCVAR_GET(afro_cutscene_30) && InCutscene()) return 2;
@@ -392,6 +399,37 @@ std::atomic<int> g_seen_interval{-1};
 std::atomic<int> g_dt_feed_logged{0};
 // sub_82676300 timeType convert: mode0=*1/30, mode1=*1/60, mode2=passthrough, 3/4=other
 std::atomic<uint64_t> g_cine_mode_counts[5]{};
+
+// afro_cine_diag: per (update function, time channel, dispatch loop) call counts.
+// sub_826864A8 walks the entity updaters each frame and passes each one
+// channel[i] of 0x828B1C94: 0 = game step (0x828B1C04), 1 = real time clamped to
+// 1/60..1/15 (0x828B1C08), 2 = measured time (0x828B1BF0).
+struct UpdDiag { uint32_t fn; uint32_t ch; uint64_t n; double dt_sum; };
+std::mutex g_diag_mu;
+std::vector<UpdDiag> g_diag;
+void UpdDiagAdd(uint32_t fn, uint32_t ch, double dt) {
+  std::lock_guard lk(g_diag_mu);
+  for (auto& d : g_diag)
+    if (d.fn == fn && d.ch == ch) { ++d.n; d.dt_sum += dt; return; }
+  g_diag.push_back({fn, ch, 1, dt});
+}
+void UpdDiagFlush(bool cine) {
+  std::vector<UpdDiag> v;
+  {
+    std::lock_guard lk(g_diag_mu);
+    v.swap(g_diag);
+  }
+  std::sort(v.begin(), v.end(), [](const UpdDiag& a, const UpdDiag& b) { return a.n > b.n; });
+  std::string out;
+  for (size_t i = 0; i < v.size() && i < 32; ++i) {
+    char buf[96];
+    std::snprintf(buf, sizeof(buf), " %08X/%s%u x%llu dt=%.5f", v[i].fn,
+                  (v[i].ch & 0x100) ? "B" : "A", v[i].ch & 0xFF,
+                  (unsigned long long)v[i].n, v[i].dt_sum / double(v[i].n));
+    out += buf;
+  }
+  REXLOG_INFO("afro upd{}: {} kinds:{}", cine ? " (cutscene)" : "", v.size(), out);
+}
 
 // Experimental: primary sim dt at 0x828B1C04 + 1/30 const→1/60 loads.
 // feb8ba6 also forced 1BF0/1C08 (1C08 is sometimes 1.0 scale) → ~4x cutscenes.
@@ -703,6 +741,15 @@ void AfroCineTimeConvertHook(PPCRegister& r11, PPCRegister& f31) {
   }
 }
 
+// afro_cine_diag hooks on the two update loops of sub_826864A8, before mtctr:
+// r8 = update function, r9/r10 = channel index * 4, f1 = step passed in.
+void AfroUpdDiagA(PPCRegister& r8, PPCRegister& r9, PPCRegister& f1) {
+  if (REXCVAR_GET(afro_cine_diag)) UpdDiagAdd(r8.u32, r9.u32 >> 2, f1.f64);
+}
+void AfroUpdDiagB(PPCRegister& r8, PPCRegister& r10, PPCRegister& f1) {
+  if (REXCVAR_GET(afro_cine_diag)) UpdDiagAdd(r8.u32, 0x100 | (r10.u32 >> 2), f1.f64);
+}
+
 void AfroSwapHook(PPCRegister& r31) {
   TickModeOnce();
   FxTick();
@@ -782,6 +829,7 @@ void AfroSwapHook(PPCRegister& r31) {
           REXCVAR_GET(afro_present_interval), seen < 0 ? -1 : seen, TickModeName(), cap,
           m0, m1, m2, m3, m4, InvulnFpsSuffix());
     }
+    if (REXCVAR_GET(afro_cine_diag)) UpdDiagFlush(InCutscene());
     g_win_frames = 0;
   } else if (g_fps == 0 && secs >= 1.0) {
     g_fps = (g_win_frames - 1) / secs;
