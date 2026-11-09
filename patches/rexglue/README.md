@@ -198,6 +198,11 @@ after the first level's opening cutscene, about 6,000 draws per frame):
   render thread and the GPU thread hand off through these waits several times
   per frame, and the sleeps were about 22% of the thread. `0` restores the
   original behaviour.
+- Type-0 packets (the game's sequential register writes, ~17% of the thread
+  with one virtual call per value) go through `WriteRegisterRangeFromRing`,
+  like `SET_CONSTANT` already did: shader, fetch and bool/loop constant blocks
+  are copied at once and marked dirty once; any other range still calls
+  `WriteRegister` per value.
 
 Measured on the bridge with `--afro_perf_log=true`: GPU thread busy time per
 frame went from about 4.5 to 3.6–4.2 µs per draw, and the low points from
