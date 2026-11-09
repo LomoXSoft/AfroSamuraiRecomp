@@ -1734,10 +1734,11 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
   g_wnd = CreateWindowExW(0, wc.lpszClassName, kText[g_lang].title, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
                           CW_USEDEFAULT, CW_USEDEFAULT, Dpi(kClientW), Dpi(kBodyDip), nullptr, nullptr, inst,
                           nullptr);
-  HICON small = static_cast<HICON>(LoadImageW(inst, MAKEINTRESOURCEW(1), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),
-                                             GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
+  // Not named "small": the Windows SDK's rpcndr.h defines that as a macro.
+  HICON small_icon = static_cast<HICON>(LoadImageW(inst, MAKEINTRESOURCEW(1), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),
+                                                  GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
   SendMessageW(g_wnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(wc.hIcon));
-  SendMessageW(g_wnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(small ? small : wc.hIcon));
+  SendMessageW(g_wnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(small_icon ? small_icon : wc.hIcon));
   OutputDebugStringA(kArtCredit);
   g_dpi = GetDpiForWindow(g_wnd);
   FitWindow();
