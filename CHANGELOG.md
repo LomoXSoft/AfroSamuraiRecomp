@@ -2,6 +2,19 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.1.2 – Controller button prompts + keyboard and mouse
+- Setup program `afrosetup-v0.1.2.exe` (release asset, not committed). It carries this 0.1.2 source.
+- Button prompts follow the controller in use: PlayStation, Switch, Steam and
+  keyboard icons; Xbox keeps the original ones. Live switch mid-game. Replaced:
+  A, B, X, Y, LB, LT, RT, D-pad. New patch `zzzz-afro-button-glyphs`, icons in
+  `tools/artwork/glyphs` (copied to `game\glyphs` by setup).
+- Keyboard-as-controller crash fixed (`zzzzz-afro-input-lock`).
+- Keyboard and mouse defaults for an action game, mouse camera by speed with
+  dead-zone skip; `afro_mouse_deadzone`, `afro_mouse_window_ms`, `mnk_sensitivity`.
+- Launcher: Control row (Auto/Controller/Keyboard); Advanced settings has render
+  path, mouse sliders and Invulnerability; Experimental... has the warning, frame
+  rate and sepia. Labels say (default).
+
 ## 0.1.1
 - Setup program `afrosetup-v0.1.1.exe` (release asset, not committed). It carries this 0.1.1 source and does not clone public main.
 - ISO SHA-1 pin unchanged. A mismatch is logged and installation continues. A missing or unreadable ISO still stops the install.

@@ -7,7 +7,7 @@ Europe, title ID 4E4D07D8) to native Windows x64 using
 **This repository contains no game files.** You need your own original disc
 (or an ISO you dumped from it). The game executable is not released: it
 contains code translated from the game, so everyone builds it from their own copy.
-The only program attached to a release is `afrosetup-v0.1.1.exe`, the setup installer.
+The only program attached to a release is `afrosetup-v0.1.2.exe`, the setup installer.
 
 ## Quick start
 
@@ -17,13 +17,14 @@ The only program attached to a release is `afrosetup-v0.1.1.exe`, the setup inst
   (SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) or a folder you already
   extracted that contains `default.xex`. See [Getting your game files](#getting-your-game-files).
 - About 20 GB of free disk space and an internet connection (the build tools are downloaded).
-- A controller (Xbox or any controller Windows/SDL recognises).
+- A controller (Xbox, PlayStation, Switch, Steam Deck or any controller Windows/SDL
+  recognises), or keyboard and mouse.
 
 ### Install
-1. Download **[`afrosetup-v0.1.1.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.1.1.exe)**
+1. Download **[`afrosetup-v0.1.2.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.1.2.exe)**
    from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
    That file is the setup program, not the game. It builds the game on your PC from your disc.
-2. Run `afrosetup-v0.1.1.exe`. Choose a language, then **Install**.
+2. Run `afrosetup-v0.1.2.exe`. Choose a language, then **Install**.
 3. Choose a folder, then your Europe ISO or the extracted game folder (`default.xex` must be inside it).
 4. Accept the Microsoft Visual Studio Build Tools license (the box starts unchecked). Shortcuts are optional. You can keep the downloaded tools or delete them when setup finishes. Deleting them does not remove `game`, the extracted game, the logs, your ISO, or your saves.
 5. The window says this takes several minutes. It does not promise a fixed duration.
@@ -34,13 +35,13 @@ Nothing is installed system-wide and no admin rights are needed. To uninstall,
 delete the install folder and the shortcuts. Saves are not in that folder.
 
 ### Update
-Run `afrosetup-v0.1.1.exe` again, choose **Update**, and select the existing installation
+Run `afrosetup-v0.1.2.exe` again, choose **Update**, and select the existing installation
 folder (the one that contains `game\Play.bat`). Close the game first. If
 `gamedata\default.xex` is already there, the ISO is not asked for again. Tools
 still on disk are reused, and only missing tools are downloaded again. The
 extracted game, your saves, and `game\afro_language.cfg` stay. The program files
 are rebuilt and replaced only after that build succeeds, including when the
-folder is already 0.1.0 or 0.1.1.
+folder is already 0.1.0, 0.1.1 or 0.1.2.
 
 ### Your saves
 Paste this into File Explorer:
@@ -53,7 +54,7 @@ to show it again) use **Manage saved games...** to open, back up, restore or
 delete them. Details: [Saves](#saves).
 
 ### If something goes wrong
-- If the window says **Installation did not finish**, use **Show details** and read `install.log` in the install folder. Run `afrosetup-v0.1.1.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
+- If the window says **Installation did not finish**, use **Show details** and read `install.log` in the install folder. Run `afrosetup-v0.1.2.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
 - [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat) is a separate console fallback. See [Console installer](#console-installer). Without `-Ref` it builds `main`.
 - The game log is `afro.log` in the install folder.
 - Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with what
@@ -61,6 +62,32 @@ delete them. Details: [Saves](#saves).
   More help: [Troubleshooting](#troubleshooting).
 
 This is a preview. **30 (default)** is the default. **60 (experimental)** is incomplete and opt-in. See [Status and limitations](#status-and-limitations).
+
+## Improvements over the Xbox 360 version
+- **Native Windows x64** program, no emulator. Fullscreen or window.
+- **Up to 4K**: internal resolution 1x (native), 2x or 3x.
+- **Native multi-controller support**: Xbox, PlayStation (DualShock/DualSense, USB
+  and Bluetooth), Switch, Steam Deck and anything SDL recognises.
+- **Button prompts that follow your controller** (0.1.2): PlayStation, Switch,
+  Steam and keyboard icons replace the Xbox ones, and change mid-game when you
+  switch device. Xbox controllers keep the original icons.
+- **Keyboard and mouse** (0.1.2): mouse camera, left/right click attacks, Q block,
+  E kick, R focus, Esc menu, arrows for the D-pad. Mouse sensitivity, dead zone and
+  smoothing are sliders in the launcher.
+- **Launcher**: language (EN/ES/FR/IT), display, resolution, controls, render
+  path, sepia filter on/off, invulnerability, and save backup/restore.
+- **Fixes over earlier recompilation builds**: all cutscene voices, black frames,
+  and the headband texture.
+- **Experimental 60 FPS** (opt-in, incomplete).
+
+## Goals
+- Make 60 FPS fully working.
+- Launcher options in game, while playing.
+- Fix the loading screens: they hold short lore cutscenes that are skipped
+  entirely because the game now loads too fast.
+- One-hit kill cheat.
+- USA disc (`.iso`) support.
+- Linux, macOS and Android versions.
 
 ---
 
@@ -77,9 +104,9 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.1.1**). **30 (default)** remains the default. Tested: a clean install
-with the 0.1.0 setup started the game, and an update of that folder started it
-from Play. That is one install, not an independent playthrough of the whole game. **60 (experimental)** is an
+Preview (**0.1.2**). **30 (default)** remains the default. Tested: an update from
+0.1.1 to 0.1.2 built and started the game, and controller and keyboard play were
+tested on one PC. That is not an independent playthrough of the whole game. **60 (experimental)** is an
 **incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
 do not treat it as stable — cinematics can run fast and performance dips remain.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
@@ -103,6 +130,9 @@ do not treat it as stable — cinematics can run fast and performance dips remai
     largely unverified. Not a finished 60 FPS mode.
   - **Invulnerability** (Advanced settings) works in the tested build.
     It is not a guarantee for the whole game. It is off by default, lasts for that launch only, and is not saved.
+  - Button prompts: A, B, X, Y, LB, LT, RT and the D-pad are replaced. RB, Start,
+    Back and the stick clicks have not been found yet and keep the Xbox icon.
+    Keyboard icons show the default keys, not keys you rebind.
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -144,15 +174,15 @@ stays at the retail default (2).
 
 ### Console installer
 `install.bat` is a fallback for a source checkout. The program players download
-is [`afrosetup-v0.1.1.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.1.1.exe)
+is [`afrosetup-v0.1.2.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.1.2.exe)
 from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
 That setup builds the source stored inside the file. It does not clone public `main`.
 
 When it asks its questions interactively, `install.bat` with no `-Ref` builds the
 `main` branch. With `-NonInteractive` it refuses to build `main`, both with no
 `-Ref` and with `-Ref main`: pass an explicit `-Ref` that is not `main`, or
-`-LocalTree` with a 0.1.1 source tree. To build the tagged 0.1.1 source from the
-console installer, pass `-Ref v0.1.1`.
+`-LocalTree` with a 0.1.2 source tree. To build the tagged 0.1.2 source from the
+console installer, pass `-Ref v0.1.2`.
 
 1. Make an ISO of your own Afro Samurai (Europe) disc, or use an extracted folder
    that contains `default.xex` (see [Getting your game files](#getting-your-game-files)).
@@ -167,7 +197,7 @@ console installer, pass `-Ref v0.1.1`.
    records that language in `game\afro_language.cfg`.
 5. At the end it can delete the toolchain, ReXGlue SDK and source, build files, and
    downloads, and keep `<root>\game`, `<root>\gamedata`, and the logs. Your ISO and
-   your saves are not part of that delete. A later **Update** in `afrosetup-v0.1.1.exe`
+   your saves are not part of that delete. A later **Update** in `afrosetup-v0.1.2.exe`
    downloads again only the tools that are missing and keeps the extracted game.
 
 What the installer does (`tools/install.ps1`, run with the PowerShell execution
@@ -190,7 +220,7 @@ Visual Studio installer changes) and nothing is uploaded. Downloads are about
 and about 2 GB of ReXGlue source; the whole folder ends up around 12-13 GB
 (`<root>\downloads` can be deleted afterwards). A run takes several minutes; there is
 no fixed duration. The console shows its own progress lines. A normal console re-run
-skips steps already stamped in `<root>\.install`. **Update** in `afrosetup-v0.1.1.exe` clears
+skips steps already stamped in `<root>\.install`. **Update** in `afrosetup-v0.1.2.exe` clears
 the compile stamps and rebuilds the program. Neither path promises that an interrupted
 download always resumes. The log is `<root>\install.log`. To uninstall, delete the
 install folder and the shortcuts. Saves stay in `Documents\afrorecomp`
@@ -290,12 +320,33 @@ Hold **Shift** while starting to show the launcher again.
 
 #### Controls
 An Xbox controller or any other controller SDL recognises (XInput, DualShock/DualSense,
-etc.) works out of the box; the game was designed for a gamepad and prompts show
-Xbox buttons. Keyboard and mouse are **not** enabled by default. There is
-experimental keyboard emulation of a controller from ReXGlue, untested with this game:
-start with `tools\run_win.bat --mnk_mode=true` (WASD = left stick, arrow keys = right stick,
-Space = A, Backspace = B, L = X, P = Y, Q/E = triggers, 1/3 = bumpers, Enter = Start,
-Tab = Back, Shift+arrows = D-pad).
+Switch, Steam Deck, etc.) works out of the box. The button prompts follow the device
+you use last: Xbox icons for Xbox pads, and PlayStation, Switch, Steam or keyboard
+icons for the others (`--afro_button_glyphs=auto|xbox|playstation|nintendo|steam|keyboard`
+forces one).
+
+The launcher's **Control** row picks **Auto** (default: keyboard and mouse are on,
+and a controller takes over when it connects or is used), **Controller**, or
+**Keyboard**. Keyboard and mouse:
+
+| Action | Key | Pad button |
+|---|---|---|
+| Move | W A S D | left stick |
+| Camera | mouse (or Shift + arrows) | right stick |
+| Attack | left click | X |
+| Second attack | right click | Y |
+| Jump | Space | A |
+| Kick / menu back | E | B |
+| Block | Q | RT |
+| Focus | R | LT |
+| Bumpers | 1 / 3 | LB / RB |
+| D-pad | arrow keys | D-pad |
+| Start | Enter (or X) | Start |
+| Back menu | Esc | Back |
+| Stick clicks | F / K | L3 / R3 |
+
+Any `keybind_*` cvar overrides a key. Mouse sensitivity, dead zone and smoothing
+are sliders in **Advanced settings...**.
 
 #### Saves
 Saves are stored in `%USERPROFILE%\Documents\afrorecomp` (the save
@@ -382,14 +433,13 @@ unless a maintainer specifically asks.
 ### Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
-- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.1.1.exe`, not committed.
+- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.1.2.exe`, not committed.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
 - `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
 
 ### Plans
-- Performance work; controller and audio polish.
-- Possibly other game versions and Linux/Vulkan.
+See [Goals](#goals). Also: performance work and audio polish.
 
 ### License and legal notice
 The code in this repository is licensed under the **GNU GPL v3.0** (see
