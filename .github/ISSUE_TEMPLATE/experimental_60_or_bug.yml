@@ -1,5 +1,5 @@
-name: Bug or Experimental 60 feedback
-description: Report a bug or Experimental (60) test result. Attach afro.log after a privacy check. No game files.
+name: Bug or 60 FPS feedback
+description: Report a bug or a 60 FPS problem. Attach afro.log after a privacy check. No game files.
 title: "[bug] "
 labels: ["needs-triage"]
 body:
@@ -13,8 +13,8 @@ body:
     attributes:
       label: Frame rate mode
       options:
-        - Original (30)
-        - Experimental (60)
+        - 30 (original)
+        - 60
         - Not sure / mixed
     validations:
       required: true
@@ -59,7 +59,7 @@ body:
     attributes:
       label: Build version / commit
       description: App version from the launcher title (afrorecomp_v…) and/or `git log -1 --oneline` from the source checkout if you have one.
-      placeholder: "0.0.16 / <sha>"
+      placeholder: "0.2.0 / <sha>"
     validations:
       required: true
   - type: markdown

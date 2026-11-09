@@ -7,7 +7,7 @@ Europe, title ID 4E4D07D8) to native Windows x64 using
 **This repository contains no game files.** You need your own original disc
 (or an ISO you dumped from it). The game executable is not released: it
 contains code translated from the game, so everyone builds it from their own copy.
-The only program attached to a release is `afrosetup-v0.1.2.exe`, the setup installer.
+The only program attached to a release is `afrosetup-v0.2.0.exe`, the setup installer.
 
 ## Quick start
 
@@ -21,10 +21,10 @@ The only program attached to a release is `afrosetup-v0.1.2.exe`, the setup inst
   recognises), or keyboard and mouse.
 
 ### Install
-1. Download **[`afrosetup-v0.1.2.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.1.2.exe)**
+1. Download **[`afrosetup-v0.2.0.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.2.0.exe)**
    from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
    That file is the setup program, not the game. It builds the game on your PC from your disc.
-2. Run `afrosetup-v0.1.2.exe`. Choose a language, then **Install**.
+2. Run `afrosetup-v0.2.0.exe`. Choose a language, then **Install**.
 3. Choose a folder, then your Europe ISO or the extracted game folder (`default.xex` must be inside it).
 4. Accept the Microsoft Visual Studio Build Tools license (the box starts unchecked). Shortcuts are optional. You can keep the downloaded tools or delete them when setup finishes. Deleting them does not remove `game`, the extracted game, the logs, your ISO, or your saves.
 5. The window says this takes several minutes. It does not promise a fixed duration.
@@ -35,13 +35,13 @@ Nothing is installed system-wide and no admin rights are needed. To uninstall,
 delete the install folder and the shortcuts. Saves are not in that folder.
 
 ### Update
-Run `afrosetup-v0.1.2.exe` again, choose **Update**, and select the existing installation
+Run `afrosetup-v0.2.0.exe` again, choose **Update**, and select the existing installation
 folder (the one that contains `game\Play.bat`). Close the game first. If
 `gamedata\default.xex` is already there, the ISO is not asked for again. Tools
 still on disk are reused, and only missing tools are downloaded again. The
 extracted game, your saves, and `game\afro_language.cfg` stay. The program files
 are rebuilt and replaced only after that build succeeds, including when the
-folder is already 0.1.0, 0.1.1 or 0.1.2.
+folder is already 0.1.x or 0.2.0.
 
 ### Your saves
 Paste this into File Explorer:
@@ -54,14 +54,16 @@ to show it again) use **Manage saved games...** to open, back up, restore or
 delete them. Details: [Saves](#saves).
 
 ### If something goes wrong
-- If the window says **Installation did not finish**, use **Show details** and read `install.log` in the install folder. Run `afrosetup-v0.1.2.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
+- If the window says **Installation did not finish**, read the details (shown by default) and `install.log` in the install folder. Run `afrosetup-v0.2.0.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
 - [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat) is a separate console fallback. See [Console installer](#console-installer). Without `-Ref` it builds `main`.
 - The game log is `afro.log` in the install folder.
 - Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with what
   happened and the log. **Never attach game files** (ISO, extracted files).
   More help: [Troubleshooting](#troubleshooting).
 
-This is a preview. **30 (default)** is the default. **60 (experimental)** is incomplete and opt-in. See [Status and limitations](#status-and-limitations).
+This is a preview. The default is the original Xbox 360 experience: 720p (1x) at 30 FPS.
+**60 FPS** is a full option in **Settings**: gameplay, cutscenes and dialogue scenes all run
+at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitations).
 
 ## Improvements over the Xbox 360 version
 - **Native Windows x64** program, no emulator. Fullscreen or window.
@@ -74,14 +76,15 @@ This is a preview. **30 (default)** is the default. **60 (experimental)** is inc
 - **Keyboard and mouse** (0.1.2): mouse camera, left/right click attacks, Q block,
   E kick, R focus, Esc menu, arrows for the D-pad. Mouse sensitivity, dead zone and
   smoothing are sliders in the launcher.
-- **Launcher**: language (EN/ES/FR/IT), display, resolution, controls, render
-  path, sepia filter on/off, invulnerability, and save backup/restore.
+- **60 FPS** (0.2.0): the whole game, cutscenes included, at the right speed.
+- **Launcher**: Play, Settings and saved games. Settings has Graphics (display,
+  resolution, frame rate, VSync), Gameplay (language, controls, mouse,
+  invulnerability) and Experimental (effects, render path) tabs.
 - **Fixes over earlier recompilation builds**: all cutscene voices, black frames,
   and the headband texture.
-- **Experimental 60 FPS** (opt-in, incomplete).
 
 ## Goals
-- Make 60 FPS fully working.
+- Borderless window and key rebinding (planned for 0.2.1).
 - Launcher options in game, while playing.
 - Fix the loading screens: they hold short lore cutscenes that are skipped
   entirely because the game now loads too fast.
@@ -104,31 +107,26 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.1.2**). **30 (default)** remains the default. Tested: a clean install
-with the 0.1.2 setup and an update from 0.1.1 both built and ran the game, and
-controller and keyboard play were tested on one PC. That is not an independent playthrough of the whole game. **60 (experimental)** is an
-**incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
-do not treat it as stable — cinematics can run fast and performance dips remain.
+Preview (**0.2.0**). The default is the original 30 FPS at 720p. **60 FPS** is a
+supported option (see [60 FPS](#60-fps)): gameplay, cutscenes and dialogue scenes were
+played at 60 on one PC, also at 2x resolution. That is not an independent playthrough
+of the whole game.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
 - Default GPU path is **RTV (default)** (host render targets): correct image at a stable
   30 FPS with **30 (default)** (launcher default). The black frames of earlier versions
   are fixed by the `afro-edram-no-wrap` GPU plugin patch.
-- **ROV (experimental)** is still available as an optional fallback (correct image but slow,
-  can drop below 15 FPS): **Advanced settings...** or
+- **ROV** is still available as an optional fallback (correct image but slow,
+  can drop below 15 FPS): **Settings → Experimental** or
   `--render_target_path_d3d12=rov`.
 - Voices work, including all cinematic dialogue (0.0.13 `afro-xma-fix-log` and
   0.0.14 `afro-xma-frameless-chain` runtime patches).
 - Known issues (also apply at Original unless noted):
-  - FPS can dip, including below 30 and especially above native internal resolution.
-    Cause is **not proven** without profiling; do not assume a single GPU root cause.
+  - At 60 FPS, scenes that show two camera views at once can still drop below 60.
   - Tested: the headband looked correct in play of 0.1.1. Other black textures are not claimed fixed.
   - Occasional odd audio.
   - If two tutorial prompts appear at once, the first one can stay stuck on screen
     (original game behaviour; restarting the level clears it).
-  - **Experimental (60) only:** intro and cutscenes can run too fast and frames
-    can still drop. Other gameplay / Focus / combat timing may be wrong and is
-    largely unverified. Not a finished 60 FPS mode.
-  - **Invulnerability** (Advanced settings) works in the tested build.
+  - **Invulnerability** (Settings → Gameplay) works in the tested build.
     It is not a guarantee for the whole game. It is off by default, lasts for that launch only, and is not saved.
   - Button prompts: A, B, X, Y, LB, LT, RT and the D-pad are replaced. RB, Start,
     Back and the stick clicks have not been found yet and keep the Xbox icon.
@@ -138,31 +136,27 @@ do not treat it as stable — cinematics can run fast and performance dips remai
 - Windows x64 only for now (D3D12).
 - Expect bugs; saves and settings may change between versions.
 
-### Experimental 60 FPS (incomplete, opt-in)
-**Default remains Original (30).** Experimental (60) is for testers who want to help;
-it is **not** claimed smooth, complete, or timing-correct.
+### 60 FPS
+**The default stays the original 30 FPS.** To play at 60: **Settings → Graphics →
+Frame rate → 60**, then OK and Play. VSync switches to **Off** with it: with VSync on,
+every frame that misses 60 waits for the next refresh and shows at 30. Set VSync back
+to **On** if you see tearing and prefer it.
 
-**Enable:** Launcher → **Advanced settings...** → **Experimental...** → Frame rate →
-**60 (experimental)** → OK, OK, then Play. Tick **Remember** only if you want that
-choice kept.
-**Revert:** same dialog → **30 (default)**. The `fps=` line is in
-`afro_language.cfg` next to the executable (`game\afro_language.cfg` after setup),
-not in `Documents\afrorecomp`.
+How it works:
+- The game's present interval is unlocked and a host 60 FPS cap is applied.
+- The game's per-frame time step (1/30 s in the original, less during Focus) is
+  scaled by the real frame time. Game speed does not follow the frame rate, and Focus
+  slow motion and pauses still work.
+- Cutscenes and dialogue scenes get the same step, so they play at normal speed at 60.
+  `--afro_cutscene_30=true` drops them back to 30 if a scene ever needs it.
+- GPU side (ReXGlue patch `zzzzzz-afro-gpu-fast-path`): no per-write register lookup,
+  short spins before sleeping on GPU waits, and register blocks written in one batch.
+  Unchanged data is no longer re-uploaded every frame (`clear_memory_page_state=false`),
+  and rendered images are no longer copied back to the CPU.
 
-What it does (high level): unlocks the guest present interval (`afro_present_interval=1`),
-applies a host 60 FPS cap, and enables gated guest dt / 1/30→1/60 constant hooks.
-Original does **not** apply those Experimental dt/const patches; present interval
-stays at the retail default (2).
-
-**Tester guide (please report):**
-1. Confirm **Original (30)** still feels like previous releases for you.
-2. Switch to **Experimental (60)** for a short session (intro + one cutscene + a bit of gameplay).
-3. Note mode, internal resolution, CPU/GPU, Windows version, cutscene/location, and whether
-   you reverted to Original.
-4. Copy `afro.log` immediately after the run (it is overwritten next launch).
-5. Open a normal GitHub issue (see the issue template). Privacy: attach the log only after
-   a quick check that it has no personal paths you must redact; **never** attach ISO,
-   `gamedata`, saves, or other game files unless a maintainer specifically asks.
+If a scene runs too fast or too slow at 60, `--afro_cine_diag=true` logs which game
+parts were updated and the time step each one got (in `afro.log`, every 2 seconds).
+Please attach that log to the issue.
 
 ### Logs (where `afro.log` actually is)
 - **Installer / `game\Play.bat`:** `<install-root>\afro.log` (same folder as `install.log`).
@@ -174,15 +168,15 @@ stays at the retail default (2).
 
 ### Console installer
 `install.bat` is a fallback for a source checkout. The program players download
-is [`afrosetup-v0.1.2.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.1.2.exe)
+is [`afrosetup-v0.2.0.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.2.0.exe)
 from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
 That setup builds the source stored inside the file. It does not clone public `main`.
 
 When it asks its questions interactively, `install.bat` with no `-Ref` builds the
 `main` branch. With `-NonInteractive` it refuses to build `main`, both with no
 `-Ref` and with `-Ref main`: pass an explicit `-Ref` that is not `main`, or
-`-LocalTree` with a 0.1.2 source tree. To build the tagged 0.1.2 source from the
-console installer, pass `-Ref v0.1.2`.
+`-LocalTree` with a 0.2.0 source tree. To build the tagged 0.2.0 source from the
+console installer, pass `-Ref v0.2.0`.
 
 1. Make an ISO of your own Afro Samurai (Europe) disc, or use an extracted folder
    that contains `default.xex` (see [Getting your game files](#getting-your-game-files)).
@@ -197,7 +191,7 @@ console installer, pass `-Ref v0.1.2`.
    records that language in `game\afro_language.cfg`.
 5. At the end it can delete the toolchain, ReXGlue SDK and source, build files, and
    downloads, and keep `<root>\game`, `<root>\gamedata`, and the logs. Your ISO and
-   your saves are not part of that delete. A later **Update** in `afrosetup-v0.1.2.exe`
+   your saves are not part of that delete. A later **Update** in `afrosetup-v0.2.0.exe`
    downloads again only the tools that are missing and keeps the extracted game.
 
 What the installer does (`tools/install.ps1`, run with the PowerShell execution
@@ -220,7 +214,7 @@ Visual Studio installer changes) and nothing is uploaded. Downloads are about
 and about 2 GB of ReXGlue source; the whole folder ends up around 12-13 GB
 (`<root>\downloads` can be deleted afterwards). A run takes several minutes; there is
 no fixed duration. The console shows its own progress lines. A normal console re-run
-skips steps already stamped in `<root>\.install`. **Update** in `afrosetup-v0.1.2.exe` clears
+skips steps already stamped in `<root>\.install`. **Update** in `afrosetup-v0.2.0.exe` clears
 the compile stamps and rebuilds the program. Neither path promises that an interrupted
 download always resumes. The log is `<root>\install.log`. To uninstall, delete the
 install folder and the shortcuts. Saves stay in `Documents\afrorecomp`
@@ -346,7 +340,7 @@ and a controller takes over when it connects or is used), **Controller**, or
 | Stick clicks | F / K | L3 / R3 |
 
 Any `keybind_*` cvar overrides a key. Mouse sensitivity, dead zone and smoothing
-are sliders in **Advanced settings...**.
+are sliders in **Settings → Gameplay**.
 
 #### Saves
 Saves are stored in `%USERPROFILE%\Documents\afrorecomp` (the save
@@ -355,8 +349,8 @@ itself is under `<profile id>\4E4D07D8\00000001\AFRO_0.SAV`; the shader cache is
 `Documents\afrorecomp` folder while the game is closed; to restore, copy it back.
 Deleting or rebuilding the install folder does not touch your saves.
 
-The launcher (shown at start, or hold Shift) has a **Manage saved games...** button
-on that window, next to **Advanced settings...**. It opens a window with:
+The launcher (shown at start, or hold Shift) has a **Manage saved games...** button.
+It opens a window with:
 - **Open saves folder**: opens `Documents\afrorecomp` in Explorer (created if missing).
 - **Back up saves**: copies the saves (not the shader `cache`) to a new
   `Documents\afrorecomp-backups\saves-YYYYMMDD-HHMMSS\` folder. Never overwrites anything.
@@ -373,24 +367,26 @@ you can also restore one by hand (close the game, copy the contents of a `saves-
 folder back into `Documents\afrorecomp\`).
 
 ### Launcher and options
-The launcher (shown on first run, after each update, or with Shift) offers:
-language (English, Español, Français, Italiano), fullscreen or window, internal
-resolution (1x native by default / 2x / 3x) and "remember and don't ask again".
-**Control** picks Auto (keyboard and mouse, a controller takes over when used),
-Controller or Keyboard. **Advanced settings...** holds the tested options: render
-path (**RTV (default)** or **ROV (experimental)**), mouse sensitivity, mouse dead
-zone and mouse smoothing (sliders), and **Invulnerability**. Invulnerability starts
-off, lasts for that launch only, and is not written to `afro_language.cfg`.
-Its **Experimental...** button opens the options that are not fully tested:
-frame rate (**30 (default)** or **60 (experimental)**) and the sepia filter.
-Settings you keep with Remember are stored in `afro_language.cfg` next to the exe
-(`game\afro_language.cfg` after setup). Without Remember, the next start uses
-**30 (default)** and 1x resolution. A render-path change is written only when
-Remember is ticked. Saves are not in that file; they are in `Documents\afrorecomp`.
+The launcher (shown on first run, after each update, or with Shift) has three
+buttons: **Play**, **Settings...** and **Manage saved games...**. Settings has
+three tabs:
+- **Graphics**: fullscreen or window, internal resolution (1x native by default /
+  2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
+- **Gameplay**: language (English, Español, Français, Italiano), controls (Auto:
+  keyboard and mouse, a controller takes over when used; Controller; Keyboard), mouse
+  sensitivity, dead zone and smoothing, and **Invulnerability**. Invulnerability
+  starts off, lasts for that launch only, and is not written to `afro_language.cfg`.
+- **Experimental** (not fully tested): sepia filter, blood effect, depth of field,
+  bloom, focus effect, and the render path (**RTV (default)** or **ROV**).
+
+At the bottom, **Skip this window at launch** starts the game straight away next
+time (hold Shift to show the launcher again). Settings are saved in
+`afro_language.cfg` next to the exe (`game\afro_language.cfg` after setup) each time
+you press Play. Saves are not in that file; they are in `Documents\afrorecomp`.
 
 Developer options: start with `--advanced` (e.g. `tools\run_win.bat --advanced`)
-to show the "Advanced options..." button (render path, resolve readback, game
-effect toggles, GPU diagnostics). Any ReXGlue cvar can also be passed on the
+to show the "Advanced options..." button on the Experimental tab (resolve readback,
+GPU diagnostics). Any ReXGlue cvar can also be passed on the
 command line, e.g. `--render_target_path_d3d12=rov`.
 
 ### Troubleshooting
@@ -420,8 +416,8 @@ See [Logs](#logs-where-afrolog-actually-is). Copy the file right after the probl
 - `--afro_fps_log=false` – disable the bounded ~2s FPS/dt lines if the log grows too large.
 
 #### Reporting an issue
-Prefer the **Experimental 60 / bug report** issue template when relevant. Include:
-reproduction steps, frame-rate mode (Original vs Experimental), internal resolution,
+Prefer the **60 FPS / bug report** issue template when relevant. Include:
+reproduction steps, frame rate (30 or 60), internal resolution,
 CPU/GPU (+ driver), Windows version, cutscene or location, and `afro.log` as an
 **attachment** after a quick privacy review. Also useful: version or commit
 (`git log -1 --oneline` in the source checkout the installer used, when present)
@@ -433,7 +429,7 @@ unless a maintainer specifically asks.
 ### Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
-- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.1.2.exe`, not committed.
+- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.2.0.exe`, not committed.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
 - `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).

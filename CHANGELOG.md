@@ -2,6 +2,27 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.2.0 – 60 FPS
+- 60 FPS is a supported option, no longer experimental. The default stays the
+  original 30 FPS at 720p.
+- Game step scaled by the real frame time (1/60..1/30 s, average of 4 frames), so
+  game speed no longer follows the frame rate; Focus slow motion and pauses work.
+- Cutscenes and dialogue scenes play at 60 at normal speed (`afro_cutscene_30` now
+  off by default). The engine passes its game step to the cutscene players, and the
+  step hook now changes that copy too.
+- `afro_cine_diag`: logs the engine's update functions, their time channel and step.
+- GPU (`zzzzzz-afro-gpu-fast-path` patch): no register lookup per write, short spin
+  before GPU-wait sleeps, type-0 register blocks written in one batch.
+- No re-upload of unchanged data every frame (`clear_memory_page_state=false`) and
+  no copy of rendered images back to the CPU (`readback_resolve` left at none).
+- VSync option; off by default with 60. With it off, 30 FPS scenes are held at 30
+  by the frame limiter.
+- Launcher: Play, Settings and Manage saved games. Settings has Graphics, Gameplay and
+  Experimental tabs; "Skip this window at launch" moved into Settings. Settings are
+  saved on every Play. Raw GPU switches only with `--advanced`.
+- 0.1.x configs: a saved 60 stays 60 (with VSync off); old effect switches reset.
+- Setup shows its details (the install log) by default.
+
 ## 0.1.2 – Controller button prompts + keyboard and mouse
 - Setup program `afrosetup-v0.1.2.exe` (release asset, not committed). It carries this 0.1.2 source.
 - Button prompts follow the controller in use: PlayStation, Switch, Steam and
