@@ -104,9 +104,9 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.1.2**). **30 (default)** remains the default. Tested: an update from
-0.1.1 to 0.1.2 built and started the game, and controller and keyboard play were
-tested on one PC. That is not an independent playthrough of the whole game. **60 (experimental)** is an
+Preview (**0.1.2**). **30 (default)** remains the default. Tested: a clean install
+with the 0.1.2 setup and an update from 0.1.1 both built and ran the game, and
+controller and keyboard play were tested on one PC. That is not an independent playthrough of the whole game. **60 (experimental)** is an
 **incomplete opt-in** for public testing (see [Experimental 60 FPS](#experimental-60-fps-incomplete-opt-in));
 do not treat it as stable — cinematics can run fast and performance dips remain.
 - Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.

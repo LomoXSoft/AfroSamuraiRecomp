@@ -65,8 +65,10 @@ Your extracted game, saves and launcher settings stay.
 - Update from a 0.1.1 install to 0.1.2, run with the `install.ps1` command this
   setup uses and the source unpacked from this exact `afrosetup-v0.1.2.exe`:
   finished in 7 minutes, applied the two new patches, copied the icons, and the
-  game started. The graphical setup window was not clicked through, and a clean
-  (new folder) install of 0.1.2 was not run.
+  game started.
+- Clean install of 0.1.2 into a new folder with the published
+  `afrosetup-v0.1.2.exe`, through the graphical setup: finished in 14 minutes,
+  applied all nine patches, copied the icons, and the game ran correctly.
 - The whole patch stack applies to a clean ReXGlue `bd833a2`.
 
 ## Still not claimed
