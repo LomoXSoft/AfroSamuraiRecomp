@@ -1,4 +1,4 @@
-// Graphical installer for AfroSamuraiRecomp 0.1.2 development.
+// Graphical installer for AfroSamuraiRecomp 0.2.0 development.
 // Embedded source only. Closing the window never terminates a running build.
 // The header and icon are the supplied Lomorsin pixel art.
 static const char kArtCredit[] = "Lomorsin Afro header 1200x240";
@@ -201,7 +201,8 @@ bool g_keep = true;
 std::wstring g_log, g_status, g_heading, g_problem;
 int g_pct = 0;
 bool g_indeterminate = false;
-bool g_show_details = false;
+// Details (the install log) are shown by default; the button hides them.
+bool g_show_details = true;
 bool g_child_running = false;
 bool g_cancel = false;
 bool g_stopping = false;
@@ -869,7 +870,7 @@ void StartInstall() {
   g_status.clear();
   g_problem.clear();
   g_log.clear();
-  g_show_details = false;
+  g_show_details = true;
   Go(kProgress);
   std::string pending;
   auto drain = [&](bool flush_tail) {
