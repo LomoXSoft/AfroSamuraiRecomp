@@ -73,7 +73,7 @@ def main() -> None:
     version = version_path.read_text(encoding="utf-8").strip()
     doc = doc_path.read_text(encoding="utf-8")
 
-    if version != "0.1.2":
+    if version != "0.2.0":
         fail(f"VERSION is {version!r}")
     if "REXCVAR_DEFINE_BOOL(afro_player_invuln, false" not in cpp:
         fail("cvar default is not false")
@@ -183,22 +183,22 @@ def main() -> None:
     if "g_inv_hp_other" not in cpp or "WriteGuestFloat" in cpp[cpp.find("g_inv_hp_other"):cpp.find("g_inv_hp_other")+400]:
         fail("other-entity hp stores must be counted, not written")
 
-    # 0.1.2: Invulnerability is a checkbox in Advanced settings; the former
-    # Cheats button opens the Experimental popup (frame rate, sepia).
-    if "Experimental\\u2026" not in picker and "Experimental…" not in picker:
-        fail("English Experimental button missing")
+    # 0.2.0: Invulnerability is a checkbox on the Gameplay tab of Settings;
+    # the frame rate (30 / 60) is on the Graphics tab, no longer experimental.
+    if "L\"Experimental\"" not in picker:
+        fail("English Experimental tab missing")
     cheat_btn = [ln for ln in picker.splitlines() if "kIdCheatInv" in ln and "BUTTON" in ln]
     if len(cheat_btn) != 1 or "BS_AUTOCHECKBOX" not in cheat_btn[0]:
         fail("invulnerability checkbox missing")
     if "kIdXInvuln" in picker:
         fail("inline invulnerability combo id still present")
-    if "30 (default)" not in picker or "60 (experimental)" not in picker:
+    if "30 (original, default)" not in picker or "60 (experimental)" in picker:
         fail("frame-rate labels were not normalized")
     if "RTV (default)" not in picker:
         fail("RTV label was not normalized")
-    popup = picker[picker.find("void ShowExperimentalPopup"):picker.find("LRESULT CALLBACK AdvProc")]
-    if not popup or "st->play" in popup:
-        fail("Experimental popup must not start the game")
+    settings = picker[picker.find("LRESULT CALLBACK SettingsProc"):picker.find("LRESULT CALLBACK PickProc")]
+    if not settings or "st->play" in settings:
+        fail("Settings window must not start the game")
 
     print("static invuln checks: ok")
     print(f"  hooks: AfroPlayerHpStoreHook @ 0x826662D8 and 0x82666308")
