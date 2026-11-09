@@ -1208,14 +1208,14 @@ try {
     '@echo off',
     'rem Start Afro Samurai Recomp. Log: ..\afro.log. Hold Shift at start for the launcher.',
     'cd /d "%~dp0"',
-    'afrorecomp.exe --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --readback_resolve=fast --log_file="%~dp0..\afro.log" %*'
+    'afrorecomp.exe --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --log_file="%~dp0..\afro.log" %*'
   )
   $playNew = @(
     '@echo off',
     'rem Start Afro Samurai Recomp. Log: ..\afro.log. Hold Shift at start for the launcher.',
     'rem The game window is separate. This console closes unless start fails.',
     'cd /d "%~dp0"',
-    'start "" "%~dp0afrorecomp.exe" --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --readback_resolve=fast --log_file="%~dp0..\afro.log" %*',
+    'start "" "%~dp0afrorecomp.exe" --game_data_root="%~dp0..\gamedata" --gpu_plugin=xenos --log_file="%~dp0..\afro.log" %*',
     'if errorlevel 1 (',
     '  echo The game did not start. El juego no se ha iniciado. See ..\afro.log',
     '  if not defined AFRO_PLAY_NOPAUSE pause',

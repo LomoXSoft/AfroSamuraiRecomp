@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
                                                  afrosetup::PlayOutcome::kAccepted);
   Expect(!closed.launch && closed.close_window, "the window X closes and never launches");
   const std::wstring stock_args = afrosetup::StockGameArguments();
-  Expect(stock_args == L"--game_data_root=\"%~dp0..\\gamedata\" --gpu_plugin=xenos --readback_resolve=fast --log_file=\"%~dp0..\\afro.log\"",
+  Expect(stock_args == L"--game_data_root=\"%~dp0..\\gamedata\" --gpu_plugin=xenos --log_file=\"%~dp0..\\afro.log\"",
          "stock Play.bat arguments are the four the game requires");
   const std::wstring stock_bat = L"start \"\" \"%~dp0afrorecomp.exe\" " + stock_args +
                                  L"\r\nif not defined AFRO_PLAY_NOPAUSE pause\r\nexit /b 1\r\n";
@@ -604,7 +604,7 @@ int main(int argc, char** argv) {
              window_cpp.find("AFRO_PLAY_NOPAUSE") != std::string::npos &&
              window_cpp.find("PlayBatClosesItself") != std::string::npos,
          "Jugar runs Play.bat, hides the stock console, and inherits no installer handles");
-  Expect(script_text.find("start \"\" \"%~dp0afrorecomp.exe\" --game_data_root=\"%~dp0..\\gamedata\" --gpu_plugin=xenos --readback_resolve=fast --log_file=\"%~dp0..\\afro.log\"") !=
+  Expect(script_text.find("start \"\" \"%~dp0afrorecomp.exe\" --game_data_root=\"%~dp0..\\gamedata\" --gpu_plugin=xenos --log_file=\"%~dp0..\\afro.log\"") !=
                  std::string::npos &&
              script_text.find("if not defined AFRO_PLAY_NOPAUSE pause") != std::string::npos &&
              script_text.find("Play.bat left as the user wrote it") != std::string::npos,

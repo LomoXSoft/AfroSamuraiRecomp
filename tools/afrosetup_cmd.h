@@ -594,7 +594,7 @@ inline ResultAction ResultActionFor(ResultButton button, bool setup_ok, bool pla
 
 // Arguments the stock Play.bat passes to afrorecomp.exe. %~dp0 is the game folder.
 inline std::wstring StockGameArguments() {
-  return L"--game_data_root=\"%~dp0..\\gamedata\" --gpu_plugin=xenos --readback_resolve=fast --log_file=\"%~dp0..\\afro.log\"";
+  return L"--game_data_root=\"%~dp0..\\gamedata\" --gpu_plugin=xenos --log_file=\"%~dp0..\\afro.log\"";
 }
 
 // The stock bat uses start, so its console exits. Any other bat is run as written.
