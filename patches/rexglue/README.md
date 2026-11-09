@@ -185,6 +185,24 @@ at setup and shutdown, so the lock cannot wait on it.
 Tested: 3 minutes in the main menu and 2.5 minutes of play with the keyboard,
 no crash (before the patch: 3 crashes in 3 runs).
 
+## zzzzzz-afro-gpu-fast-path.patch (GPU plugin, `rexgpu-xenos.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last.
+Two changes to the GPU command thread (`src/graphics/command_processor.cpp`),
+found by sampling that thread on the heaviest stretch of the game (the bridge
+after the first level's opening cutscene, about 6,000 draws per frame):
+- Register writes no longer call `GetRegisterInfo` (a large switch) on every
+  write just to feed a debug log line nobody sees: about 9% of the thread.
+- `WAIT_REG_MEM` (the command stream waiting on a value the game writes) polls
+  with yields for up to `afro_wait_reg_spin_us` microseconds (default 2000)
+  before falling back to the original whole-millisecond `Sleep`. The game's
+  render thread and the GPU thread hand off through these waits several times
+  per frame, and the sleeps were about 22% of the thread. `0` restores the
+  original behaviour.
+
+Measured on the bridge with `--afro_perf_log=true`: GPU thread busy time per
+frame went from about 4.5 to 3.6–4.2 µs per draw, and the low points from
+21–25 FPS to about 30 FPS.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and
