@@ -222,6 +222,15 @@ releases and takes that capture again. The driver now does the same itself:
 Each time it logs `afro mnk: mouse capture taken again (startup|focus|resize)`.
 The next input poll withdraws the capture if the game no longer wants the mouse.
 
+## zzzzzzzz-afro-keyboard-glyph-binds.patch (GPU plugin, `rexgpu-xenos.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last.
+Keyboard button prompts (`src/graphics/afro_glyphs.cpp`) follow the key bindings.
+For each prompt it reads the matching `keybind_*` setting of the runtime; when the
+binding differs from the default it shows `glyphs\keyboard\key_<first key>.png`
+(modifiers dropped, so `Shift+Q` shows Q) instead of the drawn default icon. The
+key caps come from `tools/make_glyphs.ps1`. A missing cap keeps the default icon
+and logs a warning.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and

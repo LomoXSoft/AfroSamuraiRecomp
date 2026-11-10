@@ -135,7 +135,28 @@ std::string MouseCvarValue(int r, int v) {
   return buf;
 }
 
-struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* 0 off, 1 on — session test only, not persisted */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; };
+struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* 0 off, 1 on — session test only, not persisted */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ };
+
+struct KeyAction { const char* cvar; const char* def; };
+constexpr int kKeyN = 24;
+static_assert(kKeyN == sizeof(Options::keys) / sizeof(Options::keys[0]));
+const KeyAction kKeyActions[kKeyN] = {
+    {"keybind_lstick_up", "W"},           {"keybind_lstick_down", "S"},
+    {"keybind_lstick_left", "A"},         {"keybind_lstick_right", "D"},
+    {"keybind_x", "LMB"},                 {"keybind_y", "RMB"},
+    {"keybind_a", "Space"},               {"keybind_b", "E"},
+    {"keybind_right_trigger", "Q"},       {"keybind_left_trigger", "R"},
+    {"keybind_left_shoulder", "1"},       {"keybind_right_shoulder", "3"},
+    {"keybind_rstick_up", "Shift+Up"},    {"keybind_rstick_down", "Shift+Down"},
+    {"keybind_rstick_left", "Shift+Left"}, {"keybind_rstick_right", "Shift+Right"},
+    {"keybind_dpad_up", "Up"},            {"keybind_dpad_down", "Down"},
+    {"keybind_dpad_left", "Left"},        {"keybind_dpad_right", "Right"},
+    {"keybind_start", "X,Return"},        {"keybind_back", "Escape"},
+    {"keybind_lstick_press", "F"},        {"keybind_rstick_press", "K"},
+};
+// Config key for an action: bind_<cvar without "keybind_">.
+std::string KeyCfgName(int i) { return std::string("bind_") + (kKeyActions[i].cvar + 8); }
+
 
 // GPU-plugin cvars (rexgpu-xenos.dll) are registered only when the plugin is
 // loaded, after the launcher runs, and SetFlagByName rejects unknown names.
@@ -237,7 +258,7 @@ const UiText kText[] = {
 // Main window.
 constexpr int kIdPlay = IDOK, kIdSettingsBtn = 111, kIdSavesBtn = 116;
 // Settings window.
-constexpr int kIdTabBase = 140,  // 140..142 tab buttons
+constexpr int kIdTabBase = 170,  // 170..173 tab buttons
               kIdCombo = 101, kIdLangLbl = 103, kIdCheck = 102, kIdHint = 104,
               kIdFpsLbl = 105, kIdFps = 106, kIdDispLbl = 107, kIdDisp = 108,
               kIdScaleLbl = 109, kIdScale = 110, kIdAdvBtn = 112, kIdXWarn = 113,
@@ -249,6 +270,7 @@ constexpr int kIdTabBase = 140,  // 140..142 tab buttons
               kIdXMouseLbl = 143,  // 143..145 slider labels
               kIdFxLbl = 150,      // 150..154 effect labels
               kIdFx = 160,         // 160..164 effect combos
+              kIdKeysBtn = 146,    // Controls tab: Key bindings...
               kIdAdvBase = 200;
 
 constexpr int kFpsValues[] = {0, 60};  // 30 (original), 60
@@ -424,13 +446,268 @@ void ShowAdvanced(HWND owner, int sel, Options* o) {
   UnregisterClassW(wc.lpszClassName, inst);
 }
 
+// Key bindings (Settings -> Controls -> Key bindings...). Each action is one of
+// the runtime's keybind_* cvars; the value is a key name the runtime parses
+// (src/ui/keybinds.cpp), optionally with Shift+/Ctrl+/Alt+, alternatives
+// separated by commas. Empty in the config = the runtime default.
+struct KeyText {
+  const wchar_t *tab, *button, *title, *hint, *press, *reset;
+  const wchar_t* action[kKeyN];
+};
+const KeyText kKeyText[] = {
+    {L"Controls", L"Key bindings...", L"Key bindings",
+     L"Click an action, then press the new key or mouse button. Hold Shift, Ctrl or Alt for a "
+     L"combination. A key already in use moves to the action you changed.",
+     L"Press a key...", L"Restore defaults",
+     {L"Move forward", L"Move back", L"Move left", L"Move right", L"Attack", L"Second attack",
+      L"Jump", L"Kick / menu back", L"Block", L"Focus", L"LB button", L"RB button", L"Camera up",
+      L"Camera down", L"Camera left", L"Camera right", L"D-pad up", L"D-pad down", L"D-pad left",
+      L"D-pad right", L"Start", L"Back / menu", L"Left stick click", L"Right stick click"}},
+    {L"Controles", L"Asignar teclas...", L"Asignar teclas",
+     L"Haz clic en una acción y pulsa la nueva tecla o botón del ratón. Mantén "
+     L"Mayús, Ctrl o Alt para una combinación. Una tecla ya usada pasa a la acción "
+     L"que has cambiado.",
+     L"Pulsa una tecla...", L"Restablecer",
+     {L"Avanzar", L"Retroceder", L"Izquierda", L"Derecha", L"Ataque", L"Segundo ataque",
+      L"Saltar", L"Patada / atrás en menús", L"Bloquear", L"Concentración",
+      L"Botón LB", L"Botón RB", L"Cámara arriba", L"Cámara abajo",
+      L"Cámara izquierda", L"Cámara derecha", L"Cruceta arriba", L"Cruceta abajo",
+      L"Cruceta izquierda", L"Cruceta derecha", L"Start", L"Back / menú",
+      L"Clic stick izquierdo", L"Clic stick derecho"}},
+    {L"Contrôles", L"Touches...", L"Touches",
+     L"Clique sur une action, puis appuie sur la nouvelle touche ou le bouton de souris. Maintiens "
+     L"Maj, Ctrl ou Alt pour une combinaison. Une touche déjà utilisée passe à "
+     L"l'action modifiée.",
+     L"Appuie sur une touche...", L"Par défaut",
+     {L"Avancer", L"Reculer", L"Gauche", L"Droite", L"Attaque", L"Seconde attaque", L"Sauter",
+      L"Coup de pied / retour menu", L"Parer", L"Concentration", L"Bouton LB", L"Bouton RB",
+      L"Caméra haut", L"Caméra bas", L"Caméra gauche", L"Caméra droite",
+      L"Croix haut", L"Croix bas", L"Croix gauche", L"Croix droite", L"Start", L"Back / menu",
+      L"Clic stick gauche", L"Clic stick droit"}},
+    {L"Controlli", L"Assegna tasti...", L"Assegna tasti",
+     L"Fai clic su un'azione, poi premi il nuovo tasto o pulsante del mouse. Tieni premuto Maiusc, "
+     L"Ctrl o Alt per una combinazione. Un tasto già usato passa all'azione modificata.",
+     L"Premi un tasto...", L"Predefiniti",
+     {L"Avanti", L"Indietro", L"Sinistra", L"Destra", L"Attacco", L"Secondo attacco", L"Salto",
+      L"Calcio / indietro nei menu", L"Parata", L"Concentrazione", L"Tasto LB", L"Tasto RB",
+      L"Camera su", L"Camera giù", L"Camera sinistra", L"Camera destra", L"Croce su",
+      L"Croce giù", L"Croce sinistra", L"Croce destra", L"Start", L"Back / menu",
+      L"Clic stick sinistro", L"Clic stick destro"}},
+};
+
+// Windows virtual key -> the runtime's key name.
+const char* VkName(UINT vk) {
+  static const struct { UINT vk; const char* name; } kNames[] = {
+      {VK_SPACE, "Space"},     {VK_ESCAPE, "Escape"},     {VK_RETURN, "Return"},
+      {VK_TAB, "Tab"},         {VK_BACK, "Backspace"},    {VK_DELETE, "Delete"},
+      {VK_INSERT, "Insert"},   {VK_HOME, "Home"},         {VK_END, "End"},
+      {VK_PRIOR, "PageUp"},    {VK_NEXT, "PageDown"},     {VK_LEFT, "Left"},
+      {VK_RIGHT, "Right"},     {VK_UP, "Up"},             {VK_DOWN, "Down"},
+      {VK_OEM_3, "Backtick"},  {VK_OEM_MINUS, "Minus"},   {VK_OEM_PLUS, "Plus"},
+      {VK_OEM_COMMA, "Comma"}, {VK_OEM_PERIOD, "Period"}, {VK_OEM_1, "Semicolon"},
+      {VK_OEM_2, "Slash"},     {VK_OEM_5, "Backslash"},   {VK_OEM_4, "LBracket"},
+      {VK_OEM_6, "RBracket"},  {VK_OEM_7, "Quote"},       {VK_ADD, "NumpadPlus"},
+      {VK_SUBTRACT, "NumpadMinus"}, {VK_MULTIPLY, "NumpadStar"}, {VK_DIVIDE, "NumpadSlash"},
+      {VK_PAUSE, "Pause"},     {VK_CAPITAL, "CapsLock"},  {VK_NUMLOCK, "NumLock"},
+      {VK_SCROLL, "ScrollLock"}, {VK_LBUTTON, "LMB"},     {VK_RBUTTON, "RMB"},
+      {VK_MBUTTON, "MMB"},
+  };
+  static char buf[16];
+  if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9')) {
+    buf[0] = char(vk);
+    buf[1] = 0;
+    return buf;
+  }
+  if (vk >= VK_F1 && vk <= VK_F24) {
+    std::snprintf(buf, sizeof(buf), "F%u", vk - VK_F1 + 1);
+    return buf;
+  }
+  if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) {
+    std::snprintf(buf, sizeof(buf), "Numpad%u", vk - VK_NUMPAD0);
+    return buf;
+  }
+  for (auto& n : kNames)
+    if (n.vk == vk) return n.name;
+  return nullptr;
+}
+
+std::wstring KeyLabel(const std::string& v) {
+  std::wstring w;
+  for (char c : v) {
+    if (c == ',') w += L", ";
+    else w += wchar_t(c);
+  }
+  return w;
+}
+
+constexpr int kIdKeyBtn = 400;  // 400..423 one button per action
+constexpr int kIdKeyLbl = 430;  // 430..453 their labels
+constexpr int kIdKeyHint = 460, kIdKeyReset = 461, kIdKeyOk = 462, kIdKeyCancel = 463;
+
+struct KeysState {
+  bool done = false, accept = false;
+  int sel = 0, capturing = -1;
+  std::string keys[kKeyN];  // full values (defaults filled in)
+};
+
+void KeysRefresh(HWND h, const KeysState& st) {
+  for (int i = 0; i < kKeyN; ++i)
+    SetDlgItemTextW(h, kIdKeyBtn + i,
+                    st.capturing == i ? kKeyText[st.sel].press : KeyLabel(st.keys[i]).c_str());
+}
+
+// A key (or mouse button) was pressed while an action waits for one.
+void KeysAssign(HWND h, KeysState* st, UINT vk) {
+  if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU || vk == VK_LSHIFT ||
+      vk == VK_RSHIFT || vk == VK_LCONTROL || vk == VK_RCONTROL || vk == VK_LMENU ||
+      vk == VK_RMENU || vk == VK_LWIN || vk == VK_RWIN)
+    return;  // a bare modifier never fires in the runtime: wait for the key
+  const char* name = VkName(vk);
+  if (!name) return;
+  std::string v;
+  if (GetKeyState(VK_CONTROL) & 0x8000) v += "Ctrl+";
+  if (GetKeyState(VK_MENU) & 0x8000) v += "Alt+";
+  if (GetKeyState(VK_SHIFT) & 0x8000) v += "Shift+";
+  v += name;
+  const int i = st->capturing;
+  // The key moves here: the action that had it gets this action's old key.
+  for (int j = 0; j < kKeyN; ++j)
+    if (j != i && st->keys[j] == v) st->keys[j] = st->keys[i];
+  st->keys[i] = v;
+  st->capturing = -1;
+  KeysRefresh(h, *st);
+}
+
+LRESULT CALLBACK KeysProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+  auto* st = reinterpret_cast<KeysState*>(GetWindowLongPtrW(h, GWLP_USERDATA));
+  if (!st) return DefWindowProcW(h, m, w, l);
+  if (m == WM_CLOSE) {
+    st->done = true;
+    DestroyWindow(h);
+    return 0;
+  }
+  if (m == WM_COMMAND && HIWORD(w) == BN_CLICKED) {
+    const int id = LOWORD(w);
+    if (id >= kIdKeyBtn && id < kIdKeyBtn + kKeyN) {
+      st->capturing = id - kIdKeyBtn;
+      KeysRefresh(h, *st);
+    } else if (id == kIdKeyReset) {
+      for (int i = 0; i < kKeyN; ++i) st->keys[i] = kKeyActions[i].def;
+      st->capturing = -1;
+      KeysRefresh(h, *st);
+    } else if (id == kIdKeyOk) {
+      st->accept = true;
+      st->done = true;
+      DestroyWindow(h);
+    } else if (id == kIdKeyCancel) {
+      st->done = true;
+      DestroyWindow(h);
+    }
+    return 0;
+  }
+  return DefWindowProcW(h, m, w, l);
+}
+
+// Returns true on OK; then the options hold the new bindings (empty = default).
+bool ShowKeyBindings(HWND owner, int sel, Options& opt) {
+  const KeyText& t = kKeyText[sel];
+  HINSTANCE inst = GetModuleHandleW(nullptr);
+  WNDCLASSW wc{};
+  wc.lpfnWndProc = KeysProc;
+  wc.hInstance = inst;
+  wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+  wc.lpszClassName = L"AfroKeys";
+  RegisterClassW(&wc);
+  const double sc = GetDpiForSystem() / 96.0;
+  auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
+  const DWORD style = WS_CAPTION | WS_SYSMENU;
+  const int rows = kKeyN / 2, top = 70, rowH = 32, yBtn = top + rows * rowH + 16;
+  RECT rc{0, 0, S(640), S(yBtn + 32 + 14)};
+  AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
+  RECT orc{};
+  GetWindowRect(owner, &orc);
+  const int W = rc.right - rc.left, H = rc.bottom - rc.top;
+  const int x = std::max(0, static_cast<int>((orc.left + orc.right - W) / 2));
+  const int y = std::max(0, static_cast<int>((orc.top + orc.bottom - H) / 2));
+  HWND h = CreateWindowExW(WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, wc.lpszClassName, t.title, style,
+                           x, y, W, H, owner, nullptr, inst, nullptr);
+  if (!h) return false;
+  KeysState st;
+  st.sel = sel;
+  for (int i = 0; i < kKeyN; ++i) st.keys[i] = opt.keys[i].empty() ? kKeyActions[i].def : opt.keys[i];
+  SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&st));
+  auto mk = [&](const wchar_t* cls, const wchar_t* text, DWORD s_, int cx, int cy, int cw, int ch,
+                int id) {
+    HWND c = CreateWindowExW(0, cls, text, WS_CHILD | WS_VISIBLE | s_, S(cx), S(cy), S(cw), S(ch), h,
+                             reinterpret_cast<HMENU>(INT_PTR(id)), inst, nullptr);
+    SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(UiFont()), TRUE);
+    return c;
+  };
+  mk(L"STATIC", t.hint, 0, 16, 12, 608, 48, kIdKeyHint);
+  for (int i = 0; i < kKeyN; ++i) {
+    const int col = i / rows, r = i % rows;
+    const int cx = 16 + col * 312, cy = top + r * rowH;
+    mk(L"STATIC", t.action[i], SS_CENTERIMAGE, cx, cy, 160, 26, kIdKeyLbl + i);
+    mk(L"BUTTON", L"", WS_TABSTOP, cx + 164, cy, 132, 26, kIdKeyBtn + i);
+  }
+  mk(L"BUTTON", t.reset, WS_TABSTOP, 16, yBtn, 170, 32, kIdKeyReset);
+  mk(L"BUTTON", kText[sel].ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 354, yBtn, 130, 32, kIdKeyOk);
+  mk(L"BUTTON", kText[sel].cancel, WS_TABSTOP, 494, yBtn, 130, 32, kIdKeyCancel);
+  KeysRefresh(h, st);
+  ShowWindow(h, SW_SHOW);
+  EnableWindow(owner, FALSE);
+  MSG msg;
+  while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    // While an action waits for a key, the next key or mouse button press in
+    // this window is the new binding (Esc and Enter included).
+    if (st.capturing >= 0 && (msg.hwnd == h || IsChild(h, msg.hwnd))) {
+      UINT vk = 0;
+      switch (msg.message) {
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN: vk = static_cast<UINT>(msg.wParam); break;
+        case WM_LBUTTONDOWN:
+          // A left click on another button stops waiting and works as a click;
+          // on the waiting button itself (or the window) it binds the left button.
+          if (msg.hwnd != h && msg.hwnd != GetDlgItem(h, kIdKeyBtn + st.capturing)) {
+            st.capturing = -1;
+            KeysRefresh(h, st);
+            break;
+          }
+          vk = VK_LBUTTON;
+          break;
+        case WM_RBUTTONDOWN: vk = VK_RBUTTON; break;
+        case WM_MBUTTONDOWN: vk = VK_MBUTTON; break;
+        case WM_KEYUP: case WM_SYSKEYUP: case WM_CHAR: case WM_SYSCHAR:
+        case WM_RBUTTONUP: case WM_MBUTTONUP:
+          continue;  // swallowed while waiting
+      }
+      if (vk) {
+        KeysAssign(h, &st, vk);
+        continue;
+      }
+    }
+    if (!IsDialogMessageW(h, &msg)) {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
+  }
+  EnableWindow(owner, TRUE);
+  SetForegroundWindow(owner);
+  UnregisterClassW(wc.lpszClassName, inst);
+  if (!st.accept) return false;
+  for (int i = 0; i < kKeyN; ++i)
+    opt.keys[i] = st.keys[i] == kKeyActions[i].def ? std::string() : st.keys[i];
+  return true;
+}
+
 // Settings window. Every change is a draft until OK; Cancel, X and Esc drop it.
 struct SettingsState {
   bool done = false, accept = false;
   int sel = 0, tab = 0;
   bool remember = false;
   Options opt;
-  std::vector<HWND> tabs[3];
+  std::vector<HWND> tabs[4];
 };
 
 void ApplySettingsTexts(HWND h, const SettingsState& st) {
@@ -440,7 +717,9 @@ void ApplySettingsTexts(HWND h, const SettingsState& st) {
   SetWindowTextW(h, title.c_str());
   SetDlgItemTextW(h, kIdTabBase + 0, t.tab_gfx);
   SetDlgItemTextW(h, kIdTabBase + 1, t.tab_play);
-  SetDlgItemTextW(h, kIdTabBase + 2, t.tab_exp);
+  SetDlgItemTextW(h, kIdTabBase + 2, kKeyText[st.sel].tab);
+  SetDlgItemTextW(h, kIdTabBase + 3, t.tab_exp);
+  SetDlgItemTextW(h, kIdKeysBtn, kKeyText[st.sel].button);
   SetDlgItemTextW(h, kIdDispLbl, t.disp);
   SetDlgItemTextW(h, kIdScaleLbl, t.scale);
   SetDlgItemTextW(h, kIdFpsLbl, t.fps);
@@ -492,7 +771,7 @@ void OptionsToExp(HWND h, const Options& o) {
 
 void ShowTab(HWND h, SettingsState* st, int tab) {
   st->tab = tab;
-  for (int i = 0; i < 3; ++i) {
+  for (int i = 0; i < 4; ++i) {
     for (HWND c : st->tabs[i]) ShowWindow(c, i == tab ? SW_SHOW : SW_HIDE);
     CheckDlgButton(h, kIdTabBase + i, i == tab ? BST_CHECKED : BST_UNCHECKED);
   }
@@ -521,11 +800,13 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   }
   if (m == WM_COMMAND) {
     const int id = LOWORD(w);
-    if (id >= kIdTabBase && id < kIdTabBase + 3) {
+    if (id >= kIdTabBase && id < kIdTabBase + 4) {
       ShowTab(h, st, id - kIdTabBase);
     } else if (id == kIdFps && HIWORD(w) == CBN_SELCHANGE) {
       // VSync on rounds every frame that misses 60 down to 30: off suits 60.
       SetCur(h, kIdXVsync, Cur(h, kIdFps) == 1 ? 1 : 0);
+    } else if (id == kIdKeysBtn) {
+      ShowKeyBindings(h, st->sel, st->opt);
     } else if (id == kIdAdvBtn) {
       ExpToOptions(h, st->opt);
       ShowAdvanced(h, st->sel, &st->opt);
@@ -598,9 +879,9 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
     mk(tab, L"STATIC", SS_CENTERIMAGE, lx, yy, lw, 26, lbl_id);
     return mk(tab, L"COMBOBOX", cbs, cx, yy, cw, 220, ctl_id);
   };
-  for (int i = 0; i < 3; ++i)
+  for (int i = 0; i < 4; ++i)
     mk(-1, L"BUTTON", WS_TABSTOP | BS_AUTORADIOBUTTON | BS_PUSHLIKE | (i == 0 ? WS_GROUP : 0),
-       12 + i * 152, 12, 148, 30, kIdTabBase + i);
+       12 + i * 115, 12, 111, 30, kIdTabBase + i);
   mk(-1, L"STATIC", SS_ETCHEDHORZ, 12, 52, 456, 2, 0);
   // Graphics.
   row(0, 66, kIdDispLbl, kIdDisp);
@@ -610,27 +891,29 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   row(0, 142, kIdFpsLbl, kIdFps);
   row(0, 180, kIdXVsyncLbl, kIdXVsync);
   // Gameplay.
-  row(1, 66, kIdCtrlLbl, kIdCtrl);
+  mk(1, L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, lx, 66, 432, 26, kIdCheatInv);
+  // Controls.
+  row(2, 66, kIdCtrlLbl, kIdCtrl);
   for (int r = 0; r < 3; ++r) {
     const MouseSlider& ms = kMouse[r];
     const int yy = 104 + r * 38;
     const int v = std::clamp(opt.mouse[r], ms.lo, ms.hi);
-    mk(1, L"STATIC", SS_CENTERIMAGE, lx, yy, lw, 26, kIdXMouseLbl + r);
-    HWND tb = mk(1, TRACKBAR_CLASSW, WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 206, yy, 196, 26, kIdXMouse + r);
+    mk(2, L"STATIC", SS_CENTERIMAGE, lx, yy, lw, 26, kIdXMouseLbl + r);
+    HWND tb = mk(2, TRACKBAR_CLASSW, WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 206, yy, 196, 26, kIdXMouse + r);
     SendMessageW(tb, TBM_SETRANGEMIN, FALSE, ms.lo);
     SendMessageW(tb, TBM_SETRANGEMAX, FALSE, ms.hi);
     SendMessageW(tb, TBM_SETLINESIZE, 0, ms.step);
     SendMessageW(tb, TBM_SETPAGESIZE, 0, ms.step * 5);
     SendMessageW(tb, TBM_SETPOS, TRUE, v);
-    HWND val = mk(1, L"STATIC", SS_CENTERIMAGE | SS_RIGHT, 404, yy, 52, 26, kIdXMouseVal + r);
+    HWND val = mk(2, L"STATIC", SS_CENTERIMAGE | SS_RIGHT, 404, yy, 52, 26, kIdXMouseVal + r);
     SetWindowTextW(val, MouseText(r, v).c_str());
   }
-  mk(1, L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, lx, 224, 432, 26, kIdCheatInv);
+  mk(2, L"BUTTON", WS_TABSTOP, lx, 224, 432, 30, kIdKeysBtn);
   // Experimental.
-  mk(2, L"STATIC", SS_SUNKEN, lx, 64, 432, 40, kIdXWarn);
-  for (int i = 0; i < 5; ++i) row(2, 114 + i * 38, kIdFxLbl + i, kIdFx + i);
-  row(2, 304, kIdXGfxLbl, kIdXGfx);
-  if (adv) mk(2, L"BUTTON", WS_TABSTOP, lx, 344, 432, 28, kIdAdvBtn);
+  mk(3, L"STATIC", SS_SUNKEN, lx, 64, 432, 40, kIdXWarn);
+  for (int i = 0; i < 5; ++i) row(3, 114 + i * 38, kIdFxLbl + i, kIdFx + i);
+  row(3, 304, kIdXGfxLbl, kIdXGfx);
+  if (adv) mk(3, L"BUTTON", WS_TABSTOP, lx, 344, 432, 28, kIdAdvBtn);
   // Always shown.
   mk(-1, L"STATIC", SS_ETCHEDHORZ, 12, yLine2, 456, 2, 0);
   mk(-1, L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, lx, yCheck, 432, 22, kIdCheck);
@@ -1041,6 +1324,14 @@ unsigned ApplyStartupLanguage() {
           opt.adv[i] = std::clamp(std::atoi(line.c_str() + k.size()), 0, kAdv[i].n - 1);
       }
       if (line.rfind("scale=", 0) == 0) opt.scale = std::clamp(std::atoi(line.c_str() + 6), 1, 3);
+      for (int i = 0; i < kKeyN; ++i) {
+        std::string k = KeyCfgName(i) + "=";
+        if (line.rfind(k, 0) == 0) {
+          std::string v = line.substr(k.size());
+          while (!v.empty() && (v.back() == '\r' || v.back() == ' ')) v.pop_back();
+          opt.keys[i] = v;
+        }
+      }
     }
   }
   if (!Valid(lang)) { lang = 0; ask = true; }
@@ -1098,6 +1389,7 @@ unsigned ApplyStartupLanguage() {
         << "\nwindow=" << (opt.window ? 1 : 0) << "\ncontrol=" << opt.control
         << "\nscale=" << opt.scale << "\nversion=" << AFRO_VERSION << "\n";
     for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
+    for (int i = 0; i < kKeyN; ++i) out << KeyCfgName(i) << "=" << opt.keys[i] << "\n";
     // Diagnostic options keep their stored value unless --advanced showed them.
     for (int i = 0; i < kAdvN; ++i)
       out << kAdv[i].key << "="
@@ -1147,6 +1439,10 @@ unsigned ApplyStartupLanguage() {
   for (int r = 0; r < 3; ++r)
     if (!Explicit(kMouse[r].cvar))
       SetCvar(kMouse[r].cvar, MouseCvarValue(r, opt.mouse[r]).c_str());
+  // Key bindings (Settings -> Controls); the command line still wins.
+  for (int i = 0; i < kKeyN; ++i)
+    if (!opt.keys[i].empty() && !Explicit(kKeyActions[i].cvar))
+      SetCvar(kKeyActions[i].cvar, opt.keys[i]);
   if (opt.control == 2 && !Explicit("afro_button_glyphs"))
     SetCvar("afro_button_glyphs", "keyboard");
   for (int i = 0; i < kAdvN; ++i)

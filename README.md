@@ -78,8 +78,8 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
   smoothing are sliders in the launcher.
 - **60 FPS** (0.2.0): the whole game, cutscenes included, at the right speed.
 - **Launcher**: language, Play, Settings and saved games. Settings has Graphics
-  (display, resolution, frame rate, VSync), Gameplay (controls, mouse,
-  invulnerability) and Experimental (effects, render path) tabs.
+  (display, resolution, frame rate, VSync), Gameplay (invulnerability), Controls
+  (control mode, mouse, key bindings) and Experimental (effects, render path) tabs.
 - **Fixes over earlier recompilation builds**: all cutscene voices, black frames,
   and the headband texture.
 
@@ -130,7 +130,7 @@ of the whole game.
     It is not a guarantee for the whole game. It is off by default, lasts for that launch only, and is not saved.
   - Button prompts: A, B, X, Y, LB, LT, RT and the D-pad are replaced. RB, Start,
     Back and the stick clicks have not been found yet and keep the Xbox icon.
-    Keyboard icons show the default keys, not keys you rebind.
+    Keyboard icons follow the keys you rebind (the first key of each binding).
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -339,8 +339,12 @@ and a controller takes over when it connects or is used), **Controller**, or
 | Back menu | Esc | Back |
 | Stick clicks | F / K | L3 / R3 |
 
-Any `keybind_*` cvar overrides a key. Mouse sensitivity, dead zone and smoothing
-are sliders in **Settings → Gameplay**.
+Every key can be changed in **Settings → Controls → Key bindings...**: click an
+action, then press the new key or mouse button (hold Shift, Ctrl or Alt for a
+combination). A key already in use moves to the action you changed, and the keyboard
+button icons follow. The bindings are the runtime's `keybind_*` settings, saved as
+`bind_*` lines in `afro_language.cfg`; a `--keybind_*` on the command line still wins.
+Mouse sensitivity, dead zone and smoothing are sliders on the same tab.
 
 #### Saves
 Saves are stored in `%USERPROFILE%\Documents\afrorecomp` (the save
@@ -369,13 +373,14 @@ folder back into `Documents\afrorecomp\`).
 ### Launcher and options
 The launcher (shown on first run, after each update, or with Shift) has the
 language (English, Español, Français, Italiano) and three buttons: **Play**,
-**Settings...** and **Manage saved games...**. Settings has three tabs:
+**Settings...** and **Manage saved games...**. Settings has four tabs:
 - **Graphics**: fullscreen or window, internal resolution (1x native by default /
   2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
-- **Gameplay**: controls (Auto:
-  keyboard and mouse, a controller takes over when used; Controller; Keyboard), mouse
-  sensitivity, dead zone and smoothing, and **Invulnerability**. Invulnerability
-  starts off, lasts for that launch only, and is not written to `afro_language.cfg`.
+- **Gameplay**: **Invulnerability**. It starts off, lasts for that launch only,
+  and is not written to `afro_language.cfg`.
+- **Controls**: Auto (keyboard and mouse, a controller takes over when used),
+  Controller or Keyboard; mouse sensitivity, dead zone and smoothing; and
+  **Key bindings...**.
 - **Experimental** (not fully tested): sepia filter, blood effect, depth of field,
   bloom, focus effect, and the render path (**RTV (default)** or **ROV**).
 

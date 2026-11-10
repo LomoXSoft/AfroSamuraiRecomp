@@ -103,7 +103,7 @@ Pill "$st\BACK.png" 'VIEW' 28; Pill "$st\START.png" 'MENU' 28
 Letter-Disc "$st\LS.png" 'L3' 48; Letter-Disc "$st\RS.png" 'R3' 48; Dpad "$st\DPAD.png"
 
 # Keyboard (mnk_mode): key caps for the default bindings of the ReXGlue
-# keyboard driver (keybind_* cvars). Rebinding keys does not redraw these.
+# keyboard driver (keybind_* cvars). Rebound keys use the key_<Name>.png caps below.
 function KeyCap($path, $text, $px = 56) {
   $b, $g = New-Canvas 128 128
   $base = Rounded 8 14 112 106 26
@@ -130,3 +130,35 @@ KeyCap "$kb\A.png" 'SPACE' 31; KeyCap "$kb\B.png" 'E'; Mouse "$kb\X.png" $false;
 KeyCap "$kb\LB.png" '1'; KeyCap "$kb\RB.png" '3'; KeyCap "$kb\LT.png" 'R'; KeyCap "$kb\RT.png" 'Q'
 KeyCap "$kb\BACK.png" 'ESC' 44; KeyCap "$kb\START.png" 'ENTER' 31; KeyCap "$kb\LS.png" 'F'; KeyCap "$kb\RS.png" 'K'
 KeyCap "$kb\DPAD.png" ([string][char]0x2193) 64
+
+# Rebound keys (Settings -> Controls -> Key bindings): one key cap per key name the
+# runtime accepts (src/ui/keybinds.cpp), named key_<Name>.png. The GPU plugin shows
+# key_<first key of the binding>.png when a binding differs from the default.
+function KeyLabelPx($text) {
+  switch ($text.Length) { 1 { 56 } 2 { 46 } 3 { 38 } 4 { 31 } default { 26 } }
+}
+$keyLabels = [ordered]@{
+  'Space' = 'SPACE'; 'Escape' = 'ESC'; 'Return' = 'ENTER'; 'Tab' = 'TAB'; 'Backspace' = 'BKSP'
+  'Delete' = 'DEL'; 'Insert' = 'INS'; 'Home' = 'HOME'; 'End' = 'END'; 'PageUp' = 'PGUP'; 'PageDown' = 'PGDN'
+  'Left' = [string][char]0x2190; 'Up' = [string][char]0x2191; 'Right' = [string][char]0x2192; 'Down' = [string][char]0x2193
+  'Backtick' = '`'; 'Minus' = '-'; 'Plus' = '+'; 'Comma' = ','; 'Period' = '.'; 'Semicolon' = ';'
+  'Slash' = '/'; 'Backslash' = '\'; 'LBracket' = '['; 'RBracket' = ']'; 'Quote' = "'"
+  'NumpadPlus' = 'NUM+'; 'NumpadMinus' = 'NUM-'; 'NumpadStar' = 'NUM*'; 'NumpadSlash' = 'NUM/'
+  'PrintScreen' = 'PRTSC'; 'Pause' = 'PAUSE'; 'CapsLock' = 'CAPS'; 'NumLock' = 'NUMLK'; 'ScrollLock' = 'SCRLK'
+}
+foreach ($c in [char[]]'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') { $keyLabels["$c"] = "$c" }
+for ($i = 1; $i -le 24; $i++) { $keyLabels["F$i"] = "F$i" }
+for ($i = 0; $i -le 9; $i++) { $keyLabels["Numpad$i"] = "NUM$i" }
+foreach ($k in $keyLabels.Keys) {
+  $text = $keyLabels[$k]
+  KeyCap "$kb\key_$k.png" $text (KeyLabelPx $text)
+}
+Mouse "$kb\key_LMB.png" $false; Mouse "$kb\key_RMB.png" $true
+# Middle button: the wheel lit.
+$b, $g = New-Canvas 128 128
+$body = Rounded 28 6 72 116 36
+$g.FillPath((New-Object Drawing.SolidBrush $Dark), $body)
+$pen = New-Pen $Rim 5
+$g.DrawLine($pen, 30, 56, 98, 56); $g.DrawPath($pen, $body)
+$g.FillRectangle((New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 235, 235, 240))), 56, 14, 16, 34)
+Save-Png $b $g "$kb\key_MMB.png"

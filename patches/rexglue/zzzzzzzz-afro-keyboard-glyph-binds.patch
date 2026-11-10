@@ -1,0 +1,60 @@
+diff --git a/src/graphics/afro_glyphs.cpp b/src/graphics/afro_glyphs.cpp
+index 5c29ca5..7df5061 100644
+--- a/src/graphics/afro_glyphs.cpp
++++ b/src/graphics/afro_glyphs.cpp
+@@ -395,6 +395,39 @@ int32_t Identify(const GuestTexture& t) {
+   return glyph;
+ }
+ 
++// Keyboard prompts follow the key bindings (the runtime's keybind_* cvars, set
++// from the launcher's Key bindings window). A binding left at its default keeps
++// the drawn icon; otherwise keyboard\key_<first key>.png is shown, modifiers
++// dropped ("Shift+Q" shows Q). Indexed like kGlyphNames.
++struct KeyboardBind {
++  const char* cvar;
++  const char* def;
++};
++constexpr std::array<KeyboardBind, 13> kKeyboardBinds = {{
++    {"keybind_a", "Space"}, {"keybind_b", "E"}, {"keybind_x", "LMB"}, {"keybind_y", "RMB"},
++    {"keybind_left_shoulder", "1"}, {"keybind_right_shoulder", "3"},
++    {"keybind_left_trigger", "R"}, {"keybind_right_trigger", "Q"}, {"keybind_back", "Escape"},
++    {"keybind_start", "X,Return"}, {"keybind_lstick_press", "F"},
++    {"keybind_rstick_press", "K"}, {"keybind_dpad_down", "Down"},
++}};
++
++std::string KeyboardBoundKey(int32_t glyph) {
++  const KeyboardBind& b = kKeyboardBinds[size_t(glyph)];
++  std::string v = rex::cvar::GetFlagByName(b.cvar);
++  if (v.empty() || v == b.def) return {};
++  v = v.substr(0, v.find(','));
++  while (!v.empty() && v.front() == ' ') v.erase(v.begin());
++  while (!v.empty() && v.back() == ' ') v.pop_back();
++  if (size_t plus = v.rfind('+'); plus != std::string::npos && plus + 1 < v.size())
++    v = v.substr(plus + 1);
++  // Key names are letters and digits only; anything else is not a file name here.
++  if (v.empty() || !std::all_of(v.begin(), v.end(), [](char c) {
++        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
++      }))
++    return {};
++  return v;
++}
++
+ const std::vector<Level>* GetReplacement(int32_t family, int32_t glyph, uint32_t width,
+                                          uint32_t height, uint32_t level_count) {
+   if (glyph < 0 || glyph >= int32_t(kGlyphNames.size())) return nullptr;
+@@ -407,6 +440,15 @@ const std::vector<Level>* GetReplacement(int32_t family, int32_t glyph, uint32_t
+   // Xbox has no folder unless someone adds one: the original icons stay.
+   std::filesystem::path png =
+       ExeDir() / "glyphs" / FamilyDir(family) / (std::string(kGlyphNames[glyph]) + ".png");
++  if (family == kFamilyKeyboard) {
++    const std::string bound = KeyboardBoundKey(glyph);
++    if (!bound.empty()) {
++      std::filesystem::path cap = ExeDir() / "glyphs" / "keyboard" / ("key_" + bound + ".png");
++      std::error_code ec;
++      if (std::filesystem::exists(cap, ec)) png = cap;
++      else REXGPU_WARN("afro glyphs: no key cap {} for {}", cap.string(), kGlyphNames[glyph]);
++    }
++  }
+   std::vector<uint8_t> rgba;
+   int sw = 0, sh = 0;
+   if (!LoadPng(png, rgba, sw, sh) || sw <= 0 || sh <= 0) {

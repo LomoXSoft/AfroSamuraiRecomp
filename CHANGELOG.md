@@ -2,6 +2,16 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.2.1 (in progress)
+- Setup **Update** rebuilds only what changed (about 10 s instead of minutes when
+  little changed).
+- Key bindings: Settings has a **Controls** tab (control mode, mouse sliders, **Key
+  bindings...**). Every keyboard/mouse action can be rebound; a key in use moves to
+  the action you changed. Saved as `bind_*` lines in `afro_language.cfg`.
+- Keyboard button icons follow rebound keys: `key_<Name>.png` caps for every key
+  (`tools/make_glyphs.ps1`), picked by the new `zzzzzzzz-afro-keyboard-glyph-binds`
+  patch when a binding differs from the default.
+
 ## 0.2.0 – 60 FPS
 - 60 FPS is a supported option, no longer experimental. The default stays the
   original 30 FPS at 720p.
