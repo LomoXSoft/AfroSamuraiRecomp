@@ -620,7 +620,13 @@ void InterludeTick() {
                   std::chrono::duration<double>(now - t6).count());
     }
   }
-  if (!pending && state != 6 && state != 7) in6 = false;
+  // After the interlude the game fades out (7), fades the interlude back in while
+  // the "Afro!" screen gets ready (8, 9), then fades out again (10). Keep it
+  // faded through 8 and 9 so the lore does not flash back before the eyes.
+  if (in6 && (state == 8 || state == 9) && REXCVAR_GET(afro_interlude_full)) {
+    put(kFadeTarget, u32(0x82045F6C));  // the full-fade value states 7 and 10 use
+  }
+  if (!pending && state != 6 && state != 7 && state != 8 && state != 9) in6 = false;
   g_lore_hold.store(pending, std::memory_order_relaxed);
 }
 

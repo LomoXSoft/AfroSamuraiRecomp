@@ -30,7 +30,9 @@ Newest first. Versions are in `app/VERSION`.
 - Loading screens: the lore interlude shown while a level loads now plays one full
   pass instead of being cut after about a second (PC loads much faster than the
   360). Once the level is loaded the "Loading" text reads **Press any button to
-  continue** (in the game language) and a button skips it; Settings -> Gameplay ->
+  continue** (in the game language) and a button skips it. After it the screen
+  stays faded until the "Afro!" eyes, instead of showing the lore again for a
+  moment; Settings -> Gameplay ->
   **Loading screens** -> **Fast** restores the old behaviour. Runtime side in the
   new `zzzzzzzzzz-afro-interlude` patch (voice lines in play order, button presses).
 - Keyboard action names follow the manual (Light/Heavy attack, Guard, Overfocus,
