@@ -6,7 +6,7 @@ files are included.
 
 ## Highlights
 
-- Original (30) is the default. On the machines exercised by the author, the game starts from the installer and is playable.
+- Original (30) is the default. On the machines tested, the game starts from the installer and is playable.
 - A graphical setup program, `afrosetup-v0.1.0.exe`, in English, Español, Français, and Italiano. It can install, or update an existing 0.1.0 folder, without administrator rights and without changing PATH or the registry.
 - `install.bat` remains the console installer.
 - Launcher choices use the labels `30 (original)`, `60 (experimental)`, `RTV (original)`, and `ROV (experimental)`.
@@ -34,9 +34,9 @@ Run `afrosetup-v0.1.0.exe`, or `install.bat` from a source checkout. Both compil
 
 ## Tested on
 
-- One Windows PC: a clean install with the first 0.1.0 setup program. The author reports that the game works.
+- One Windows PC: a clean install with the first 0.1.0 setup program. The game works there.
 - The same PC: a same-version update with the later setup program. Jugar starts the game, and the result seemed fine.
-- This is the author's use, not an independent check of the whole game.
+- This is one tester's use, not an independent check of the whole game.
 - The Cheats warning text and the shorter installer progress line in this package were not run again on Windows after they were added.
 
 ## Legal

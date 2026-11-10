@@ -24,4 +24,6 @@ The installer copies `tools/artwork/glyphs` next to `afrorecomp.exe` as `glyphs\
   works: the image is fitted and centred.
 
 Identified in game so far: A, B, X, Y, LB, LT, RT and D-pad down. The others
-are ready for when their textures are found (`--afro_glyph_log=true`).
+are ready for when their textures are found (`--afro_glyph_log=true`). Checked
+in game with Xbox, DualSense, Switch and generic controllers; the `steam\` set
+has not been checked in game.

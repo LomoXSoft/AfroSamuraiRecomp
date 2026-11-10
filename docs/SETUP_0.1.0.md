@@ -69,9 +69,9 @@ Checked here:
   `install.ps1`, `install.bat`, and the meter-death hook
 - the earlier invulnerability static checks
 
-The author later ran a clean Windows install with the first 0.1.0 setup
+A clean Windows install was later run with the first 0.1.0 setup
 program, and a same-version update with a later one. Jugar started the game.
-That is the author's use, not an independent playthrough of the whole game.
+That is one tester's use, not an independent playthrough of the whole game.
 The Cheats warning and the shorter progress line shipped in this release were
 not run again on Windows after they were added.
 

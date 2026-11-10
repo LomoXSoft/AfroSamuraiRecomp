@@ -56,7 +56,7 @@ Your extracted game, saves and launcher settings stay.
 
 ## Tested
 
-- Played on the author's PC: PlayStation (DualSense) and keyboard icons, switching
+- Played on the test PC: PlayStation (DualSense) and keyboard icons, switching
   between controller and keyboard mid-game; the LB, LT and D-pad icons; keyboard and
   mouse play with the mouse camera and the arrow-key D-pad.
 - Switch icons were checked in the main menu with the icon set forced.

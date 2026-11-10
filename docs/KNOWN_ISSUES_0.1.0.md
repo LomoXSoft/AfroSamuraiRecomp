@@ -1,6 +1,6 @@
 # Known issues for 0.1.0
 
-`app/VERSION` is `0.1.0`. These are the user's reports, not an independent
+`app/VERSION` is `0.1.0`. These come from test reports, not an independent
 full playthrough from this environment.
 
 - Frame rate dips, especially above native internal resolution.

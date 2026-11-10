@@ -50,6 +50,11 @@ Newest first. Versions are in `app/VERSION`.
   is held.
 - Keyboard action names follow the manual (Light/Heavy attack, Guard, Overfocus,
   Dash, Center camera, Pause, Skill menu).
+- Docs: README controller and button-prompt text matches what was tested (Xbox,
+  DualShock 4/DualSense, Switch and generic controllers; Steam icons not checked
+  in game; RB, Start, Back and stick clicks still Xbox). Impersonal wording in the
+  0.2.0 notes. `docs/KNOWN_ISSUES_0.2.0.md` added; the 0.1.1 list is marked as
+  superseded.
 
 ## 0.2.0 – 60 FPS
 - 60 FPS is a supported option, no longer experimental. The default stays the
@@ -86,6 +91,9 @@ Newest first. Versions are in `app/VERSION`.
 - Launcher: Control row (Auto/Controller/Keyboard); Advanced settings has render
   path, mouse sliders and Invulnerability; Experimental... has the warning, frame
   rate and sepia. Labels say (default).
+- The `v0.1.2` tag points to the release source. Three later documentation-only
+  commits (release notes moved to `docs/releases`, tested results) are on `main`
+  only; the tag was not moved.
 
 ## 0.1.1
 - Setup program `afrosetup-v0.1.1.exe` (release asset, not committed). It carries this 0.1.1 source and does not clone public main.
@@ -108,11 +116,11 @@ Newest first. Versions are in `app/VERSION`.
 - Launcher labels: `30 (original)`, `60 (experimental)`, `RTV (original)`,
   `ROV (experimental)`. Cheats are a separate dialog.
 - Invulnerability (experimental) is off by default and is not saved. It does
-  not currently prevent death.
+  not currently prevent death. (Fixed later: it works in the tested build from 0.1.1.)
 - Known issues: FPS dips especially above native resolution, black textures
   including the headband, occasional odd audio, Experimental (60) can accelerate
   cutscenes and drop frames.
-- The author's Windows PC: a clean install with the first 0.1.0 setup started
+- One Windows test PC: a clean install with the first 0.1.0 setup started
   the game, and a same-version update started it from Jugar. Not an independent
   full playthrough. The Cheats warning and the shorter progress line were not
   run again on Windows after they were added.
