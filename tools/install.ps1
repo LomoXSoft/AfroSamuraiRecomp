@@ -1294,11 +1294,13 @@ try {
     }
     Say '    button icons copied to game\glyphs'
   }
-  # RecompLauncher (recomplauncher.com): its manifest next to afrorecomp.exe, so
-  # the game folder can be added there as a build (0.2.1).
+  # RecompLauncher (recomplauncher.com): its manifest in the installation root
+  # (where RecompLauncher installs the setup) and next to afrorecomp.exe (a game
+  # folder added there as a build). It handles both layouts (0.2.1).
   $rlSrc = Join-Path $REPO 'tools\recomplauncher.json'
   if (Test-Path -LiteralPath $rlSrc) {
     Copy-Item -LiteralPath $rlSrc (Join-Path $GAME 'recomplauncher.json') -Force
+    Copy-Item -LiteralPath $rlSrc (Join-Path $Root 'recomplauncher.json') -Force
   }
   $playBat = Join-Path $GAME 'Play.bat'
   # The old stock bat runs the exe in the foreground, so cmd stays open for the

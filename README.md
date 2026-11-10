@@ -416,10 +416,11 @@ GPU diagnostics). Any ReXGlue cvar can also be passed on the
 command line, e.g. `--render_target_path_d3d12=rov`.
 
 ### RecompLauncher
-The setup puts a `recomplauncher.json` next to `afrorecomp.exe`, so an installed game
-can be played from [RecompLauncher](https://recomplauncher.com): in RecompLauncher,
-Settings → Developers → Developer tools, then **Add a build** and pick the `game`
-folder of your installation. RecompLauncher starts the game and shows its settings
+The game can be played from [RecompLauncher](https://recomplauncher.com). Installing
+it there runs this project's setup (pick your disc image in it as usual). An
+installation you already have works too: in RecompLauncher, Settings → Developers →
+Developer tools, then **Add a build** and pick its `game` folder. The setup puts a
+`recomplauncher.json` in the installation folder and next to `afrorecomp.exe`. RecompLauncher starts the game and shows its settings
 (language, display, internal resolution, frame rate, VSync, difficulty, loading
 screens, controls), which it writes to `afro_language.cfg`; it also backs up the
 saves. Mouse sensitivity, dead zone and smoothing are sliders there, and a button

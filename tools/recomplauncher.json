@@ -5,12 +5,11 @@
   "repo": "LomoXSoft/AfroSamuraiRecomp",
   "start": {
     "program": [
+      "game/afrorecomp.exe",
       "afrorecomp.exe"
     ],
     "args": [
-      "--game_data_root={install}/../gamedata",
-      "--gpu_plugin=xenos",
-      "--log_file={install}/../afro.log"
+      "--gpu_plugin=xenos"
     ]
   },
   "config": [
@@ -18,6 +17,10 @@
       "id": "main",
       "format": "ini",
       "file": [
+        {
+          "path": "{install}/game/afro_language.cfg",
+          "if": "{install}/game/afrorecomp.exe"
+        },
         {
           "path": "{install}/afro_language.cfg"
         }
@@ -324,6 +327,10 @@
       }
     ],
     "logs": [
+      {
+        "path": "{install}",
+        "if": "{install}/game/afrorecomp.exe"
+      },
       {
         "path": "{install}/.."
       }

@@ -38,7 +38,10 @@ Newest first. Versions are in `app/VERSION`.
   new `zzzzzzzzzz-afro-interlude` patch (voice lines in play order, button presses).
 - RecompLauncher (recomplauncher.com): the setup installs `recomplauncher.json`
   next to `afrorecomp.exe`; the installed `game` folder can be added there as a
-  build, which starts the game and shows its main settings. Started from it
+  build, which starts the game and shows its main settings. Installing from
+  RecompLauncher runs the setup. `afrorecomp.exe` started without
+  `--game_data_root`/`--log_file` now uses `..\gamedata` and `..\afro.log` of a
+  setup install, like `Play.bat`. Started from it
   (`RECOMPLAUNCHER` set), the game's own launcher window stays closed unless Shift
   is held.
 - Keyboard action names follow the manual (Light/Heavy attack, Guard, Overfocus,
