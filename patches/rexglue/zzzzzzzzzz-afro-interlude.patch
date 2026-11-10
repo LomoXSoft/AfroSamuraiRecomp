@@ -28,7 +28,7 @@ index 84d1473..40ac2cf 100644
 +
  }  // namespace rex::input
 diff --git a/src/input/input_system.cpp b/src/input/input_system.cpp
-index f143348..1b2cf26 100644
+index f143348..350d69f 100644
 --- a/src/input/input_system.cpp
 +++ b/src/input/input_system.cpp
 @@ -10,8 +10,14 @@
@@ -46,7 +46,7 @@ index f143348..1b2cf26 100644
  
  #include <rex/dbg.h>
  #include <rex/input/device_assignment.h>
-@@ -51,8 +57,89 @@ constexpr uint32_t kSyntheticOrdinal = UINT32_MAX;
+@@ -51,8 +57,108 @@ constexpr uint32_t kSyntheticOrdinal = UINT32_MAX;
  // XN_SYS_INPUTDEVICESCHANGED
  constexpr uint32_t kXNotificationSystemInputDevicesChanged = 0x00000012;
  
@@ -123,6 +123,25 @@ index f143348..1b2cf26 100644
 +  return std::chrono::duration<double>(std::chrono::steady_clock::now() - afro_voice_end).count();
 +}
 +
++}  // namespace rex::input
++
++// afro: plain C exports of the helpers above. The app looks them up in
++// rexruntime.dll at run time: the setup links it against the prebuilt SDK, whose
++// import library does not have patch-added functions.
++extern "C" {
++#ifdef _WIN32
++#define AFRO_EXPORT __declspec(dllexport)
++#else
++#define AFRO_EXPORT __attribute__((visibility("default")))
++#endif
++AFRO_EXPORT uint32_t afro_button_presses() { return rex::input::AfroButtonPresses(); }
++AFRO_EXPORT uint32_t afro_dialog_open_count() { return rex::input::AfroDialogOpenCount(); }
++AFRO_EXPORT uint64_t afro_dialog_open_hash(uint32_t i) { return rex::input::AfroDialogOpenHash(i); }
++AFRO_EXPORT double afro_voice_silence_seconds() { return rex::input::AfroVoiceSilenceSeconds(); }
++}
++
++namespace rex::input {
++
 +uint32_t AfroDialogOpenCount() {
 +  std::lock_guard lock(afro_dialog_mutex);
 +  return uint32_t(afro_dialog_hashes.size());
@@ -136,7 +155,7 @@ index f143348..1b2cf26 100644
  InputSystem::InputSystem(rex::ui::Window* window) : window_(window) {}
  
  InputSystem::~InputSystem() = default;
-@@ -334,6 +421,12 @@ X_RESULT InputSystem::GetStateForUI(uint32_t user_index, X_INPUT_STATE* out_stat
+@@ -334,6 +440,12 @@ X_RESULT InputSystem::GetStateForUI(uint32_t user_index, X_INPUT_STATE* out_stat
    }
    UpdateConnectedUser(user_index, true);
    AdjustDeadzoneLevels(user_index, &merged.gamepad);

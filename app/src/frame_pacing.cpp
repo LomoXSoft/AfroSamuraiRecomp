@@ -23,6 +23,11 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 REXCVAR_DEFINE_INT32(afro_fps_cap, 0, "Afro",
                      "Guest frame cap in FPS (0 = off, the game's own pacing)");
 REXCVAR_DEFINE_BOOL(afro_fps_log, true, "Afro",
@@ -543,15 +548,41 @@ void LoadDiagTick(uint64_t frame) {
   REXLOG_INFO("afro load: frame {}{} count={}", frame, s, int32_t(count));
 }
 
-}  // namespace
-// In rexruntime (patches/rexglue/zzzzzzzzzz-afro-interlude.patch, input_system.h).
-namespace rex::input {
-uint32_t AfroButtonPresses();
-uint32_t AfroDialogOpenCount();
-uint64_t AfroDialogOpenHash(uint32_t index);
-double AfroVoiceSilenceSeconds();
-}  // namespace rex::input
-namespace {
+// The loading interlude helpers of rexruntime
+// (patches/rexglue/zzzzzzzzzz-afro-interlude.patch), looked up by name at run time:
+// the setup links this exe against the prebuilt SDK, whose import library does not
+// have patch-added functions. Without them the interlude is not held (as "Fast").
+namespace afro_rt {
+struct Fns {
+  uint32_t (*button_presses)() = nullptr;
+  uint32_t (*dialog_open_count)() = nullptr;
+  uint64_t (*dialog_open_hash)(uint32_t) = nullptr;
+  double (*voice_silence_seconds)() = nullptr;
+  bool ok = false;
+};
+const Fns& Get() {
+  static const Fns fns = [] {
+    Fns f;
+#ifdef _WIN32
+    if (HMODULE m = GetModuleHandleW(L"rexruntime.dll")) {
+      f.button_presses = reinterpret_cast<uint32_t (*)()>(GetProcAddress(m, "afro_button_presses"));
+      f.dialog_open_count = reinterpret_cast<uint32_t (*)()>(GetProcAddress(m, "afro_dialog_open_count"));
+      f.dialog_open_hash = reinterpret_cast<uint64_t (*)(uint32_t)>(GetProcAddress(m, "afro_dialog_open_hash"));
+      f.voice_silence_seconds = reinterpret_cast<double (*)()>(GetProcAddress(m, "afro_voice_silence_seconds"));
+    }
+#endif
+    f.ok = f.button_presses && f.dialog_open_count && f.dialog_open_hash && f.voice_silence_seconds;
+    if (!f.ok) REXLOG_WARN("afro interlude: rexruntime.dll lacks the interlude helpers; loading screens stay fast");
+    return f;
+  }();
+  return fns;
+}
+bool Available() { return Get().ok; }
+uint32_t AfroButtonPresses() { return Get().ok ? Get().button_presses() : 0; }
+uint32_t AfroDialogOpenCount() { return Get().ok ? Get().dialog_open_count() : 0; }
+uint64_t AfroDialogOpenHash(uint32_t i) { return Get().ok ? Get().dialog_open_hash(i) : 0; }
+double AfroVoiceSilenceSeconds() { return Get().ok ? Get().voice_silence_seconds() : 1e9; }
+}  // namespace afro_rt
 
 // True while InterludeTick holds the lore after the level loaded.
 std::atomic<bool> g_lore_hold{false};
@@ -584,13 +615,14 @@ void InterludeTick() {
     in6 = true;
     done = false;
     t6 = now;
-    dialog_base = rex::input::AfroDialogOpenCount();
+    dialog_base = afro_rt::AfroDialogOpenCount();
   }
   if (state == 6 && !pending) last_target = u32(kFadeTarget);
-  if (state == 7 && in6 && !pending && !done && REXCVAR_GET(afro_interlude_full)) {
+  if (state == 7 && in6 && !pending && !done && REXCVAR_GET(afro_interlude_full) &&
+      afro_rt::Available()) {
     pending = true;
     loaded = now;
-    press_base = rex::input::AfroButtonPresses();
+    press_base = afro_rt::AfroButtonPresses();
     pending_target = u32(kFadeTarget);
     put(kState, 6);
     put(kFadeTarget, last_target);
@@ -602,16 +634,16 @@ void InterludeTick() {
     if (u32(kState) != 6) {
       why = "state changed";
     } else {
-      const uint32_t n = rex::input::AfroDialogOpenCount();
+      const uint32_t n = afro_rt::AfroDialogOpenCount();
       if (n >= dialog_base + 2) {
-        const uint64_t first = rex::input::AfroDialogOpenHash(dialog_base);
-        if (rex::input::AfroDialogOpenHash(n - 1) == first) why = "full pass";
+        const uint64_t first = afro_rt::AfroDialogOpenHash(dialog_base);
+        if (afro_rt::AfroDialogOpenHash(n - 1) == first) why = "full pass";
       }
       // Linear lore (Okiku's) plays its lines once and then stays quiet; the
       // longest pause inside a looping one is about 7 s.
-      if (!why && n > dialog_base && rex::input::AfroVoiceSilenceSeconds() >= 9.0)
+      if (!why && n > dialog_base && afro_rt::AfroVoiceSilenceSeconds() >= 9.0)
         why = "lore ended";
-      if (!why && rex::input::AfroButtonPresses() != press_base) why = "button";
+      if (!why && afro_rt::AfroButtonPresses() != press_base) why = "button";
       if (!why && now - t6 >= std::chrono::seconds(std::max(REXCVAR_GET(afro_interlude_max_s), 5)))
         why = "time cap";
     }
