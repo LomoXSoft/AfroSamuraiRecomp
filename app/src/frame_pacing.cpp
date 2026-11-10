@@ -552,6 +552,9 @@ uint64_t AfroDialogOpenHash(uint32_t index);
 }  // namespace rex::input
 namespace {
 
+// True while InterludeTick holds the lore after the level loaded.
+std::atomic<bool> g_lore_hold{false};
+
 // Loading interlude (afro_interlude_full). While a level loads, the transition
 // state machine (sub_8265D4B8, state at 0x828E62C0) shows a lore interlude in
 // state 6; the level-loaded callback (sub_8265AEF0) sets state 7 and a new fade
@@ -618,6 +621,19 @@ void InterludeTick() {
     }
   }
   if (!pending && state != 6 && state != 7) in6 = false;
+  g_lore_hold.store(pending, std::memory_order_relaxed);
+}
+
+// "Press any button to continue" in the game language (user_language: 1 en,
+// 4 fr, 5 es, 6 it).
+const char16_t* LoreContinueText() {
+  const int lang = std::atoi(rex::cvar::GetFlagByName("user_language").c_str());
+  switch (lang) {
+    case 5: return u"Pulsa cualquier botón para continuar";
+    case 4: return u"Appuie sur un bouton pour continuer";
+    case 6: return u"Premi un tasto per continuare";
+    default: return u"Press any button to continue";
+  }
 }
 
 void PatchPrimaryDtStore(PPCRegister& base, PPCRegister& f, int32_t offset) {
@@ -867,6 +883,55 @@ void AfroUpdDiagA(PPCRegister& r8, PPCRegister& r9, PPCRegister& f1) {
 }
 void AfroUpdDiagB(PPCRegister& r8, PPCRegister& r10, PPCRegister& f1) {
   if (REXCVAR_GET(afro_cine_diag)) UpdDiagAdd(r8.u32, 0x100 | (r10.u32 >> 2), f1.f64);
+}
+
+// sub_826B8518 draws the "Loading" text of the loading screen (LOADING0..3, dots
+// animated); after 0x826B8674 (mr r9,r3) r9 is the resolved text it draws. While
+// the lore is held after the level loaded, show "Press any button to continue".
+void AfroLoadingTextHook(PPCRegister& r9) {
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  const uint32_t cur = r9.u32;
+  static bool logged = false;
+  static bool wide = true;
+  if (!logged && cur) {
+    logged = true;
+    const uint8_t* p = mem->TranslateVirtual<uint8_t*>(cur);
+    wide = p[0] == 0 && p[1] != 0;
+    std::string hex;
+    for (int i = 0; i < 24; ++i) hex += fmt::format("{:02X}", p[i]);
+    REXLOG_INFO("afro interlude: loading text at {:08X} ({}): {}", cur,
+                wide ? "UTF-16" : "8-bit", hex);
+  }
+  if (!g_lore_hold.load(std::memory_order_relaxed)) return;
+  static uint32_t buf = 0;
+  static const char16_t* written = nullptr;
+  const char16_t* text = LoreContinueText();
+  if (!buf) buf = mem->SystemHeapAlloc(256);
+  if (!buf) return;
+  if (written != text) {
+    written = text;
+    uint8_t* d = mem->TranslateVirtual<uint8_t*>(buf);
+    size_t n = 0;
+    if (wide) {
+      for (const char16_t* c = text; *c && n + 4 <= 256; ++c, n += 2) {
+        d[n] = uint8_t(*c >> 8);
+        d[n + 1] = uint8_t(*c);
+      }
+      d[n] = d[n + 1] = 0;
+    } else {
+      for (const char16_t* c = text; *c && n + 3 <= 256; ++c) {
+        if (*c < 0x80) {
+          d[n++] = uint8_t(*c);
+        } else {  // UTF-8, two bytes is enough for these texts
+          d[n++] = uint8_t(0xC0 | (*c >> 6));
+          d[n++] = uint8_t(0x80 | (*c & 0x3F));
+        }
+      }
+      d[n] = 0;
+    }
+  }
+  r9.u64 = buf;
 }
 
 void AfroSwapHook(PPCRegister& r31) {

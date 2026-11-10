@@ -196,3 +196,11 @@ registers = ["r8", "r9", "f1"]
 address = 0x8268661C
 name = "AfroUpdDiagB"
 registers = ["r8", "r10", "f1"]
+
+# Loading screen: "Press any button to continue" while the lore is held after the
+# level loaded (afro_interlude_full); r9 holds the resolved "Loading" text.
+[[midasm_hook]]
+address = 0x826B8674
+name = "AfroLoadingTextHook"
+registers = ["r9"]
+after_instruction = true

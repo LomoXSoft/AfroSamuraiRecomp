@@ -353,8 +353,8 @@ void FillCombo(HWND h, int id, std::initializer_list<const wchar_t*> items) {
 struct LoreText { const wchar_t *lbl, *full, *fast, *note; };
 const LoreText kLoreText[] = {
     {L"Loading screens:", L"Full lore (default)", L"Fast",
-     L"Full lore: the loading story plays one full pass, like on Xbox 360. Any button "
-     L"skips it once the level is loaded."},
+     L"Full lore: the loading story plays one full pass, like on Xbox 360. Once the "
+     L"level is loaded, any button continues."},
     {L"Pantallas de carga:", L"Historia completa (predeterminado)", L"R\u00e1pidas",
      L"Historia completa: la historia de la carga se ve entera, como en Xbox 360. "
      L"Cualquier bot\u00f3n la salta cuando el nivel ya ha cargado."},

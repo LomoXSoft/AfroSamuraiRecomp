@@ -393,8 +393,8 @@ language (English, Español, Français, Italiano) and three buttons: **Play**,
   Journalist**, which makes the player invulnerable. Saved like the other settings.
   **Loading screens**: **Full lore** (default) lets the story shown while a level
   loads play one full pass, as on Xbox 360 where loading took that long (on PC it
-  loads in about a second and the story was cut); any button skips it once the
-  level is loaded. **Fast** goes straight on.
+  loads in about a second and the story was cut). Once the level is loaded the
+  "Loading" text becomes **Press any button to continue**, and any button skips it. **Fast** goes straight on.
 - **Controls**: Auto (keyboard and mouse, a controller takes over when used),
   Controller or Keyboard; mouse sensitivity, dead zone and smoothing; and
   **Key bindings...**.
