@@ -8,6 +8,8 @@ Newest first. Versions are in `app/VERSION`.
 - Key bindings: Settings has a **Controls** tab (control mode, mouse sliders, **Key
   bindings...**). Every keyboard/mouse action can be rebound; a key in use moves to
   the action you changed. Saved as `bind_*` lines in `afro_language.cfg`.
+- Gameplay tab: the invulnerability checkbox is now a **Difficulty** drop-down,
+  **Normal** (default) or **Game Journalist** (invulnerable). Still for that launch only.
 - Keyboard button icons follow rebound keys: `key_<Name>.png` caps for every key
   (`tools/make_glyphs.ps1`), picked by the new `zzzzzzzz-afro-keyboard-glyph-binds`
   patch when a binding differs from the default.

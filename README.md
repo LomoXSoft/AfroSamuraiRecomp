@@ -78,7 +78,7 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
   smoothing are sliders in the launcher.
 - **60 FPS** (0.2.0): the whole game, cutscenes included, at the right speed.
 - **Launcher**: language, Play, Settings and saved games. Settings has Graphics
-  (display, resolution, frame rate, VSync), Gameplay (invulnerability), Controls
+  (display, resolution, frame rate, VSync), Gameplay (difficulty), Controls
   (control mode, mouse, key bindings) and Experimental (effects, render path) tabs.
 - **Fixes over earlier recompilation builds**: all cutscene voices, black frames,
   and the headband texture.
@@ -126,7 +126,8 @@ of the whole game.
   - Occasional odd audio.
   - If two tutorial prompts appear at once, the first one can stay stuck on screen
     (original game behaviour; restarting the level clears it).
-  - **Invulnerability** (Settings → Gameplay) works in the tested build.
+  - **Invulnerability** (Settings → Gameplay → Difficulty → **Game Journalist**)
+    works in the tested build.
     It is not a guarantee for the whole game. It is off by default, lasts for that launch only, and is not saved.
   - Button prompts: A, B, X, Y, LB, LT, RT and the D-pad are replaced. RB, Start,
     Back and the stick clicks have not been found yet and keep the Xbox icon.
@@ -376,8 +377,9 @@ language (English, Español, Français, Italiano) and three buttons: **Play**,
 **Settings...** and **Manage saved games...**. Settings has four tabs:
 - **Graphics**: fullscreen or window, internal resolution (1x native by default /
   2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
-- **Gameplay**: **Invulnerability**. It starts off, lasts for that launch only,
-  and is not written to `afro_language.cfg`.
+- **Gameplay**: **Difficulty**: **Normal** (default, the game as it is) or **Game
+  Journalist**, which makes the player invulnerable. It goes back to Normal at each
+  launch and is not written to `afro_language.cfg`.
 - **Controls**: Auto (keyboard and mouse, a controller takes over when used),
   Controller or Keyboard; mouse sensitivity, dead zone and smoothing; and
   **Key bindings...**.

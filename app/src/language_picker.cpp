@@ -189,7 +189,7 @@ bool Explicit(const char* name) {
 struct UiText {
   const wchar_t *title, *play, *settings, *remember, *hint, *tab_gfx, *tab_play, *tab_exp,
       *lang, *disp, *full, *win, *scale, *fps, *fps30, *fps60, *vsync, *vsync_on, *vsync_off,
-      *ctrl, *ctrl_auto, *ctrl_pad, *ctrl_kb, *mouse_sens, *mouse_dz, *mouse_win, *invuln,
+      *ctrl, *ctrl_auto, *ctrl_pad, *ctrl_kb, *mouse_sens, *mouse_dz, *mouse_win, *diff, *diff_normal, *diff_journo, *diff_note,
       *xwarn, *sepia, *blood, *dof, *bloom, *focus, *fx_on, *fx_off, *gfx, *gfx_rtv, *gfx_rov,
       *adv, *def, *off, *on, *ok, *cancel;
 };
@@ -202,7 +202,8 @@ const UiText kText[] = {
      L"VSync:", L"On", L"Off (recommended at 60)",
      L"Controls:", L"Auto (keyboard + controller)", L"Controller", L"Keyboard",
      L"Mouse sensitivity:", L"Mouse dead zone:", L"Mouse smoothing:",
-     L"Invulnerability (this session only)",
+     L"Difficulty:", L"Normal (default)", L"Game Journalist",
+     L"Game Journalist: you can't die. Only for this launch, not saved.",
      L"These options are not fully tested. They may cause visual problems.",
      L"Sepia filter:", L"Blood effect:", L"Depth of field:", L"Bloom:", L"Focus effect:",
      L"On (default)", L"Off",
@@ -216,7 +217,8 @@ const UiText kText[] = {
      L"VSync:", L"Activado", L"Desactivado (recomendado a 60)",
      L"Control:", L"Autom\u00e1tico (teclado + mando)", L"Mando", L"Teclado",
      L"Sensibilidad del rat\u00f3n:", L"Zona muerta del rat\u00f3n:", L"Suavizado del rat\u00f3n:",
-     L"Invulnerabilidad (solo esta sesi\u00f3n)",
+     L"Dificultad:", L"Normal (por defecto)", L"Periodista de videojuegos",
+     L"Periodista de videojuegos: no puedes morir. Solo para esta partida, no se guarda.",
      L"Estas opciones no est\u00e1n probadas del todo. Pueden causar fallos visuales.",
      L"Filtro sepia:", L"Efecto de sangre:", L"Profundidad de campo:", L"Resplandor (bloom):",
      L"Efecto de concentraci\u00f3n:",
@@ -232,7 +234,8 @@ const UiText kText[] = {
      L"VSync :", L"Activ\u00e9e", L"D\u00e9sactiv\u00e9e (conseill\u00e9 \u00e0 60)",
      L"Contr\u00f4les :", L"Auto (clavier + manette)", L"Manette", L"Clavier",
      L"Sensibilit\u00e9 souris :", L"Zone morte souris :", L"Lissage souris :",
-     L"Invuln\u00e9rabilit\u00e9 (cette session seulement)",
+     L"Difficult\u00e9 :", L"Normal (par d\u00e9faut)", L"Journaliste jeu vid\u00e9o",
+     L"Journaliste jeu vid\u00e9o : tu ne peux pas mourir. Pour ce lancement seulement, non enregistr\u00e9.",
      L"Ces options ne sont pas enti\u00e8rement test\u00e9es. Elles peuvent causer des d\u00e9fauts visuels.",
      L"Filtre s\u00e9pia :", L"Effet de sang :", L"Profondeur de champ :", L"Bloom :",
      L"Effet de concentration :",
@@ -247,7 +250,8 @@ const UiText kText[] = {
      L"VSync:", L"Attivato", L"Disattivato (consigliato a 60)",
      L"Controlli:", L"Automatico (tastiera + controller)", L"Controller", L"Tastiera",
      L"Sensibilit\u00e0 mouse:", L"Zona morta mouse:", L"Smussatura mouse:",
-     L"Invulnerabilit\u00e0 (solo questa sessione)",
+     L"Difficolt\u00e0:", L"Normale (predefinito)", L"Giornalista di videogiochi",
+     L"Giornalista di videogiochi: non puoi morire. Solo per questo avvio, non salvato.",
      L"Queste opzioni non sono del tutto testate. Possono causare difetti visivi.",
      L"Filtro seppia:", L"Effetto sangue:", L"Profondit\u00e0 di campo:", L"Bloom:",
      L"Effetto concentrazione:",
@@ -262,7 +266,7 @@ constexpr int kIdTabBase = 170,  // 170..173 tab buttons
               kIdCombo = 101, kIdLangLbl = 103, kIdCheck = 102, kIdHint = 104,
               kIdFpsLbl = 105, kIdFps = 106, kIdDispLbl = 107, kIdDisp = 108,
               kIdScaleLbl = 109, kIdScale = 110, kIdAdvBtn = 112, kIdXWarn = 113,
-              kIdXGfxLbl = 117, kIdXGfx = 118, kIdCheatInv = 122, kIdSetOk = 123,
+              kIdXGfxLbl = 117, kIdXGfx = 118, kIdCheatInv = 122 /* Difficulty combo */, kIdSetOk = 123,
               kIdSetCancel = 124, kIdCtrlLbl = 125, kIdCtrl = 126,
               kIdXMouse = 130,     // 130..132 sliders
               kIdXMouseVal = 133,  // 133..135 their values
@@ -271,6 +275,7 @@ constexpr int kIdTabBase = 170,  // 170..173 tab buttons
               kIdFxLbl = 150,      // 150..154 effect labels
               kIdFx = 160,         // 160..164 effect combos
               kIdKeysBtn = 146,    // Controls tab: Key bindings...
+              kIdDiffLbl = 147, kIdDiffNote = 148,
               kIdAdvBase = 200;
 
 constexpr int kFpsValues[] = {0, 60};  // 30 (original), 60
@@ -727,7 +732,9 @@ void ApplySettingsTexts(HWND h, const SettingsState& st) {
   SetDlgItemTextW(h, kIdCtrlLbl, t.ctrl);
   const wchar_t* mouse_lbl[3] = {t.mouse_sens, t.mouse_dz, t.mouse_win};
   for (int r = 0; r < 3; ++r) SetDlgItemTextW(h, kIdXMouseLbl + r, mouse_lbl[r]);
-  SetDlgItemTextW(h, kIdCheatInv, t.invuln);
+  SetDlgItemTextW(h, kIdDiffLbl, t.diff);
+  FillCombo(h, kIdCheatInv, {t.diff_normal, t.diff_journo});
+  SetDlgItemTextW(h, kIdDiffNote, t.diff_note);
   SetDlgItemTextW(h, kIdXWarn, t.xwarn);
   const wchar_t* fx_lbl[5] = {t.sepia, t.blood, t.dof, t.bloom, t.focus};
   for (int i = 0; i < 5; ++i) {
@@ -821,7 +828,7 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       for (int r = 0; r < 3; ++r)
         o.mouse[r] = std::clamp(static_cast<int>(SendDlgItemMessageW(h, kIdXMouse + r, TBM_GETPOS, 0, 0)),
                                 kMouse[r].lo, kMouse[r].hi);
-      o.invuln = IsDlgButtonChecked(h, kIdCheatInv) == BST_CHECKED ? 1 : 0;
+      o.invuln = Cur(h, kIdCheatInv) == 1 ? 1 : 0;  // Game Journalist
       ExpToOptions(h, o);
       st->remember = IsDlgButtonChecked(h, kIdCheck) == BST_CHECKED;
       finish(true);
@@ -891,7 +898,9 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   row(0, 142, kIdFpsLbl, kIdFps);
   row(0, 180, kIdXVsyncLbl, kIdXVsync);
   // Gameplay.
-  mk(1, L"BUTTON", WS_TABSTOP | BS_AUTOCHECKBOX, lx, 66, 432, 26, kIdCheatInv);
+  // Difficulty: Game Journalist turns on the player invulnerability (session only).
+  row(1, 66, kIdDiffLbl, kIdCheatInv);
+  mk(1, L"STATIC", 0, lx, 104, 432, 40, kIdDiffNote);
   // Controls.
   row(2, 66, kIdCtrlLbl, kIdCtrl);
   for (int r = 0; r < 3; ++r) {
@@ -926,7 +935,7 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   SetCur(h, kIdFps, opt.fps == 60 ? 1 : 0);
   SetCur(h, kIdXVsync, opt.vsync ? 1 : 0);
   SetCur(h, kIdCtrl, std::clamp(opt.control, 0, 2));
-  CheckDlgButton(h, kIdCheatInv, opt.invuln ? BST_CHECKED : BST_UNCHECKED);
+  SetCur(h, kIdCheatInv, opt.invuln ? 1 : 0);
   OptionsToExp(h, opt);
   CheckDlgButton(h, kIdCheck, remember ? BST_CHECKED : BST_UNCHECKED);
   ShowTab(h, &st, 0);
@@ -1419,8 +1428,8 @@ unsigned ApplyStartupLanguage() {
   // caught by the page write watches; this only drops the extra re-upload.
   if (!Explicit("clear_memory_page_state"))
     SetCvar("clear_memory_page_state", "false");
-  // Invulnerability: session-only. Never read/written in the config; default OFF each
-  // launch unless ticked in Settings for this run (or the cvar is passed).
+  // Invulnerability (Difficulty: Game Journalist): session-only. Never read/written in
+  // the config; Normal each launch unless chosen in Settings (or the cvar is passed).
   if (opt.invuln && !Explicit("afro_player_invuln"))
     SetCvar("afro_player_invuln", "true");
   if (opt.invuln)

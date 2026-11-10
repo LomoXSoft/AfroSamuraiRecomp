@@ -183,13 +183,14 @@ def main() -> None:
     if "g_inv_hp_other" not in cpp or "WriteGuestFloat" in cpp[cpp.find("g_inv_hp_other"):cpp.find("g_inv_hp_other")+400]:
         fail("other-entity hp stores must be counted, not written")
 
-    # 0.2.0: Invulnerability is a checkbox on the Gameplay tab of Settings;
+    # 0.2.1: Invulnerability is the "Game Journalist" Difficulty on the Gameplay tab;
     # the frame rate (30 / 60) is on the Graphics tab, no longer experimental.
     if "L\"Experimental\"" not in picker:
         fail("English Experimental tab missing")
-    cheat_btn = [ln for ln in picker.splitlines() if "kIdCheatInv" in ln and "BUTTON" in ln]
-    if len(cheat_btn) != 1 or "BS_AUTOCHECKBOX" not in cheat_btn[0]:
-        fail("invulnerability checkbox missing")
+    if "row(1, 66, kIdDiffLbl, kIdCheatInv);" not in picker or "L\"Game Journalist\"" not in picker:
+        fail("Difficulty (Game Journalist) selector missing")
+    if "o.invuln = Cur(h, kIdCheatInv) == 1" not in picker:
+        fail("Game Journalist does not turn on invulnerability")
     if "kIdXInvuln" in picker:
         fail("inline invulnerability combo id still present")
     if "30 (original, default)" not in picker or "60 (experimental)" in picker:
