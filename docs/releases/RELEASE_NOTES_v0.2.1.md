@@ -10,9 +10,9 @@ HDD installation can take a long time; SSD/NVMe recommended.
 
 `afrosetup-v0.2.1.exe`
 
-SHA-256 `c21a4a71dfb9dfbd61d47450f51f9265e50091d16df2e0a9739af5e8f9d124b4`
+SHA-256 `ea941b8bbca7561b9e09111ece003d49a20ae3ee53fe26b2f39b327599a899ed`
 
-1841035 bytes.
+1845049 bytes.
 
 Already on 0.1.x or 0.2.0: run it, choose **Update** and pick your install folder.
 Your extracted game, saves and launcher settings stay. **Update** now rebuilds only
