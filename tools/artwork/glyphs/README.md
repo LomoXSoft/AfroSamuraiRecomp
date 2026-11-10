@@ -3,8 +3,8 @@
 Replacement icons for the game's Xbox button prompts, used by
 `patches/rexglue/zzzz-afro-button-glyphs.patch` when the controller is not an
 Xbox pad. They are original art drawn by `tools/make_glyphs.ps1` (same license
-as the repository). Xbox pads keep the game's own icons, so there is no `xbox`
-folder.
+as the repository). Xbox pads keep the game's own icons; the `xbox` folder is
+used only for buttons remapped in the launcher's Key bindings window.
 
 The installer copies `tools/artwork/glyphs` next to `afrorecomp.exe` as `glyphs\`.
 
@@ -15,7 +15,8 @@ The installer copies `tools/artwork/glyphs` next to `afrorecomp.exe` as `glyphs\
   Down arrow).
 - Files are named by the Xbox button POSITION the game asks for: `A`, `B`, `X`,
   `Y`, `LB`, `RB`, `LT`, `RT`, `BACK`, `START`, `LS`, `RS`, `DPAD` (the game's
-  only D-pad prompt found so far is the pad with down lit).
+  only D-pad prompt found so far is the pad with down lit). `DPAD_UP`,
+  `DPAD_LEFT` and `DPAD_RIGHT` are shown when an action is remapped to that arm.
 - On Nintendo the label is the one at that position: `A.png` shows **B**,
   `B.png` shows **A**, `X.png` shows **Y**, `Y.png` shows **X**.
 - Triggers are 128x256 because the game's trigger prompt is 64x128, shoulders

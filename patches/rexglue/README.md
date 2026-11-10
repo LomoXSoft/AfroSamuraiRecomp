@@ -231,6 +231,19 @@ binding differs from the default it shows `glyphs\keyboard\key_<first key>.png`
 key caps come from `tools/make_glyphs.ps1`. A missing cap keeps the default icon
 and logs a warning.
 
+## zzzzzzzzz-afro-pad-remap.patch (runtime `rexruntime.dll`, GPU plugin `rexgpu-xenos.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last.
+Controller button remap set by the launcher's Key bindings window. Three new runtime
+settings, `afro_padmap_xbox` (also generic pads and Steam), `afro_padmap_playstation`
+and `afro_padmap_nintendo`, each 16 button names (Xbox positions) giving, for
+A,B,X,Y,LB,RB,LT,RT,Back,Start,LS,RS,Up,Down,Left,Right, the physical button that
+drives it; empty leaves the pad as it is. The SDL driver
+(`src/input/sdl/sdl_input_driver.cpp`) applies it to the state and keystrokes of each
+pad by its family (a trigger driving a button counts past 30/255, a button driving a
+trigger gives 0 or 255). The button prompts (`src/graphics/afro_glyphs.cpp`) show the
+icon of the physical button: `glyphs\<family>\<button>.png`, with `glyphs\xbox`
+used only for remapped Xbox buttons and `DPAD_UP/LEFT/RIGHT.png` for the other arms.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and

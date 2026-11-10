@@ -135,7 +135,7 @@ std::string MouseCvarValue(int r, int v) {
   return buf;
 }
 
-struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ };
+struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ };
 
 struct KeyAction { const char* cvar; const char* def; };
 constexpr int kKeyN = 24;
@@ -156,6 +156,48 @@ const KeyAction kKeyActions[kKeyN] = {
 };
 // Config key for an action: bind_<cvar without "keybind_">.
 std::string KeyCfgName(int i) { return std::string("bind_") + (kKeyActions[i].cvar + 8); }
+
+// Controller remap (Key bindings -> Controller). The runtime's afro_padmap_<family>
+// cvar lists, for each button the game reads (kPadOut order), the physical button
+// that drives it, both named by Xbox position. Xbox also covers generic pads and
+// the Steam Deck; Nintendo positions are physical (the bottom button is Xbox A).
+constexpr int kPadOutN = 16;
+const char* const kPadOut[kPadOutN] = {"A",    "B",     "X",  "Y",  "LB", "RB",   "LT",   "RT",
+                                       "Back", "Start", "LS", "RS", "Up", "Down", "Left", "Right"};
+const char* const kPadFamilies[3] = {"xbox", "playstation", "nintendo"};
+// Rows of the window: the manual's actions, each the game button it presses.
+const int kPadRows[kPadOutN] = {2, 3, 1, 0, 10, 4, 6, 7, 5, 11, 13, 12, 14, 15, 9, 8};
+
+void PadIdentity(uint8_t m[kPadOutN]) {
+  for (int i = 0; i < kPadOutN; ++i) m[i] = uint8_t(i);
+}
+// "A,B,..." -> map; anything that is not 16 known names leaves the pad as it is.
+void PadParse(const std::string& s, uint8_t m[kPadOutN]) {
+  PadIdentity(m);
+  if (s.empty()) return;
+  uint8_t t[kPadOutN];
+  size_t pos = 0;
+  for (int o = 0; o < kPadOutN; ++o) {
+    size_t end = s.find(',', pos);
+    if ((end == std::string::npos) != (o == kPadOutN - 1)) return;
+    std::string tok = s.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+    int found = -1;
+    for (int k = 0; k < kPadOutN; ++k)
+      if (tok == kPadOut[k]) found = k;
+    if (found < 0) return;
+    t[o] = uint8_t(found);
+    pos = end + 1;
+  }
+  std::copy(t, t + kPadOutN, m);
+}
+std::string PadString(const uint8_t m[kPadOutN]) {
+  bool identity = true;
+  for (int i = 0; i < kPadOutN; ++i) identity = identity && m[i] == i;
+  if (identity) return {};
+  std::string s;
+  for (int i = 0; i < kPadOutN; ++i) s += std::string(i ? "," : "") + kPadOut[m[i]];
+  return s;
+}
 
 
 // GPU-plugin cvars (rexgpu-xenos.dll) are registered only when the plugin is
@@ -464,41 +506,116 @@ const KeyText kKeyText[] = {
      L"Click an action, then press the new key or mouse button. Hold Shift, Ctrl or Alt for a "
      L"combination. A key already in use moves to the action you changed.",
      L"Press a key...", L"Restore defaults",
-     {L"Move forward", L"Move back", L"Move left", L"Move right", L"Attack", L"Second attack",
-      L"Jump", L"Kick / menu back", L"Block", L"Focus", L"LB button", L"RB button", L"Camera up",
-      L"Camera down", L"Camera left", L"Camera right", L"D-pad up", L"D-pad down", L"D-pad left",
-      L"D-pad right", L"Start", L"Back / menu", L"Left stick click", L"Right stick click"}},
+     {L"Move forward", L"Move back", L"Move left", L"Move right", L"Light attack", L"Heavy attack",
+      L"Jump", L"Kick / menu back", L"Guard", L"Focus", L"Overfocus", L"RB button", L"Camera up",
+      L"Camera down", L"Camera left", L"Camera right", L"D-pad up", L"D-pad down (compass)",
+      L"D-pad left", L"D-pad right", L"Pause (Start)", L"Skill menu (Back)", L"Dash",
+      L"Center camera"}},
     {L"Controles", L"Asignar teclas...", L"Asignar teclas",
      L"Haz clic en una acción y pulsa la nueva tecla o botón del ratón. Mantén "
      L"Mayús, Ctrl o Alt para una combinación. Una tecla ya usada pasa a la acción "
      L"que has cambiado.",
      L"Pulsa una tecla...", L"Restablecer",
-     {L"Avanzar", L"Retroceder", L"Izquierda", L"Derecha", L"Ataque", L"Segundo ataque",
+     {L"Avanzar", L"Retroceder", L"Izquierda", L"Derecha", L"Ataque ligero", L"Ataque fuerte",
       L"Saltar", L"Patada / atrás en menús", L"Bloquear", L"Concentración",
-      L"Botón LB", L"Botón RB", L"Cámara arriba", L"Cámara abajo",
-      L"Cámara izquierda", L"Cámara derecha", L"Cruceta arriba", L"Cruceta abajo",
-      L"Cruceta izquierda", L"Cruceta derecha", L"Start", L"Back / menú",
-      L"Clic stick izquierdo", L"Clic stick derecho"}},
+      L"Sobreconcentración", L"Botón RB", L"Cámara arriba", L"Cámara abajo",
+      L"Cámara izquierda", L"Cámara derecha", L"Cruceta arriba", L"Cruceta abajo (brújula)",
+      L"Cruceta izquierda", L"Cruceta derecha", L"Pausa (Start)", L"Técnicas (Back)",
+      L"Esprintar", L"Centrar cámara"}},
     {L"Contrôles", L"Touches...", L"Touches",
      L"Clique sur une action, puis appuie sur la nouvelle touche ou le bouton de souris. Maintiens "
      L"Maj, Ctrl ou Alt pour une combinaison. Une touche déjà utilisée passe à "
      L"l'action modifiée.",
      L"Appuie sur une touche...", L"Par défaut",
-     {L"Avancer", L"Reculer", L"Gauche", L"Droite", L"Attaque", L"Seconde attaque", L"Sauter",
-      L"Coup de pied / retour menu", L"Parer", L"Concentration", L"Bouton LB", L"Bouton RB",
+     {L"Avancer", L"Reculer", L"Gauche", L"Droite", L"Attaque légère", L"Attaque lourde", L"Sauter",
+      L"Coup de pied / retour menu", L"Parer", L"Concentration", L"Surconcentration", L"Bouton RB",
       L"Caméra haut", L"Caméra bas", L"Caméra gauche", L"Caméra droite",
-      L"Croix haut", L"Croix bas", L"Croix gauche", L"Croix droite", L"Start", L"Back / menu",
-      L"Clic stick gauche", L"Clic stick droit"}},
+      L"Croix haut", L"Croix bas (boussole)", L"Croix gauche", L"Croix droite", L"Pause (Start)",
+      L"Techniques (Back)", L"Sprint", L"Centrer la caméra"}},
     {L"Controlli", L"Assegna tasti...", L"Assegna tasti",
      L"Fai clic su un'azione, poi premi il nuovo tasto o pulsante del mouse. Tieni premuto Maiusc, "
      L"Ctrl o Alt per una combinazione. Un tasto già usato passa all'azione modificata.",
      L"Premi un tasto...", L"Predefiniti",
-     {L"Avanti", L"Indietro", L"Sinistra", L"Destra", L"Attacco", L"Secondo attacco", L"Salto",
-      L"Calcio / indietro nei menu", L"Parata", L"Concentrazione", L"Tasto LB", L"Tasto RB",
+     {L"Avanti", L"Indietro", L"Sinistra", L"Destra", L"Attacco leggero", L"Attacco pesante", L"Salto",
+      L"Calcio / indietro nei menu", L"Parata", L"Concentrazione", L"Iperconcentrazione", L"Tasto RB",
       L"Camera su", L"Camera giù", L"Camera sinistra", L"Camera destra", L"Croce su",
-      L"Croce giù", L"Croce sinistra", L"Croce destra", L"Start", L"Back / menu",
-      L"Clic stick sinistro", L"Clic stick destro"}},
+      L"Croce giù (bussola)", L"Croce sinistra", L"Croce destra", L"Pausa (Start)",
+      L"Abilità (Back)", L"Scatto", L"Centra la camera"}},
 };
+
+// Controller page of the Key bindings window. action[] follows kPadRows.
+struct PadText {
+  const wchar_t *dev_lbl, *dev[4], *hint, *action[kPadOutN], *dpad[4], *ls, *rs, *face_ps[4],
+      *back_xb, *start_xb, *back_ps;
+};
+const PadText kPadText[] = {
+    {L"Controller:",
+     {L"Keyboard and mouse", L"Xbox, generic pads and Steam Deck", L"PlayStation (DualSense, DualShock)",
+      L"Nintendo Switch"},
+     L"Choose the button for each action. A button already in use swaps with the action you "
+     L"changed. Buttons are named as printed on that controller.",
+     {L"Light attack", L"Heavy attack", L"Kick / menu back", L"Jump", L"Dash", L"Overfocus", L"Focus",
+      L"Guard", L"RB button", L"Center camera", L"Ninja Ninja compass", L"D-pad up", L"D-pad left",
+      L"D-pad right", L"Pause", L"Skill menu"},
+     {L"D-pad up", L"D-pad down", L"D-pad left", L"D-pad right"},
+     L"Left stick click", L"Right stick click", {L"Cross", L"Circle", L"Square", L"Triangle"},
+     L"Back / View", L"Start / Menu", L"Create / Share"},
+    {L"Mando:",
+     {L"Teclado y ratón", L"Xbox, mandos genéricos y Steam Deck", L"PlayStation (DualSense, DualShock)",
+      L"Nintendo Switch"},
+     L"Elige el botón de cada acción. Un botón ya usado se intercambia con la acción que has "
+     L"cambiado. Los botones se llaman como aparecen en ese mando.",
+     {L"Ataque ligero", L"Ataque fuerte", L"Patada / atrás en menús", L"Saltar", L"Esprintar",
+      L"Sobreconcentración", L"Concentración", L"Bloquear", L"Botón RB", L"Centrar cámara",
+      L"Brújula de Ninja Ninja", L"Cruceta arriba", L"Cruceta izquierda", L"Cruceta derecha",
+      L"Pausa", L"Menú de técnicas"},
+     {L"Cruceta arriba", L"Cruceta abajo", L"Cruceta izquierda", L"Cruceta derecha"},
+     L"Clic stick izquierdo", L"Clic stick derecho", {L"Equis", L"Círculo", L"Cuadrado", L"Triángulo"},
+     L"Back / Vista", L"Start / Menú", L"Crear / Share"},
+    {L"Manette :",
+     {L"Clavier et souris", L"Xbox, manettes génériques et Steam Deck",
+      L"PlayStation (DualSense, DualShock)", L"Nintendo Switch"},
+     L"Choisis le bouton de chaque action. Un bouton déjà utilisé est échangé avec l'action "
+     L"modifiée. Les boutons portent le nom inscrit sur cette manette.",
+     {L"Attaque légère", L"Attaque lourde", L"Coup de pied / retour menu", L"Sauter", L"Sprint",
+      L"Surconcentration", L"Concentration", L"Parer", L"Bouton RB", L"Centrer la caméra",
+      L"Boussole de Ninja Ninja", L"Croix haut", L"Croix gauche", L"Croix droite", L"Pause",
+      L"Menu des techniques"},
+     {L"Croix haut", L"Croix bas", L"Croix gauche", L"Croix droite"},
+     L"Clic stick gauche", L"Clic stick droit", {L"Croix", L"Rond", L"Carré", L"Triangle"},
+     L"Back / Affichage", L"Start / Menu", L"Créer / Share"},
+    {L"Controller:",
+     {L"Tastiera e mouse", L"Xbox, controller generici e Steam Deck",
+      L"PlayStation (DualSense, DualShock)", L"Nintendo Switch"},
+     L"Scegli il tasto per ogni azione. Un tasto già usato viene scambiato con l'azione "
+     L"modificata. I tasti hanno il nome stampato su quel controller.",
+     {L"Attacco leggero", L"Attacco pesante", L"Calcio / indietro nei menu", L"Salto", L"Scatto",
+      L"Iperconcentrazione", L"Concentrazione", L"Parata", L"Tasto RB", L"Centra la camera",
+      L"Bussola di Ninja Ninja", L"Croce su", L"Croce sinistra", L"Croce destra", L"Pausa",
+      L"Menu abilità"},
+     {L"Croce su", L"Croce giù", L"Croce sinistra", L"Croce destra"},
+     L"Clic stick sinistro", L"Clic stick destro", {L"Croce", L"Cerchio", L"Quadrato", L"Triangolo"},
+     L"Back / Visualizza", L"Start / Menu", L"Crea / Share"},
+};
+
+// Name of physical button s (Xbox position) on pad family fam, as printed on it.
+std::wstring PadButtonName(int sel, int fam, int s) {
+  const PadText& p = kPadText[sel];
+  if (s >= 12) return p.dpad[s - 12];
+  static const wchar_t* const kXb[8] = {L"A", L"B", L"X", L"Y", L"LB", L"RB", L"LT", L"RT"};
+  static const wchar_t* const kPs[8] = {nullptr, nullptr, nullptr, nullptr, L"L1", L"R1", L"L2", L"R2"};
+  static const wchar_t* const kNx[8] = {L"B", L"A", L"Y", L"X", L"L", L"R", L"ZL", L"ZR"};
+  if (s < 8) {
+    if (fam == 1) return s < 4 ? p.face_ps[s] : kPs[s];
+    return fam == 2 ? kNx[s] : kXb[s];
+  }
+  switch (s) {
+    case 8: return fam == 1 ? p.back_ps : fam == 2 ? L"− (-)" : p.back_xb;
+    case 9: return fam == 1 ? L"Options" : fam == 2 ? L"+" : p.start_xb;
+    case 10: return fam == 1 ? L"L3" : p.ls;
+    default: return fam == 1 ? L"R3" : p.rs;
+  }
+}
 
 // Windows virtual key -> the runtime's key name.
 const char* VkName(UINT vk) {
@@ -548,17 +665,46 @@ std::wstring KeyLabel(const std::string& v) {
 constexpr int kIdKeyBtn = 400;  // 400..423 one button per action
 constexpr int kIdKeyLbl = 430;  // 430..453 their labels
 constexpr int kIdKeyHint = 460, kIdKeyReset = 461, kIdKeyOk = 462, kIdKeyCancel = 463;
+constexpr int kIdKeyDev = 464, kIdKeyDevLbl = 465;
+constexpr int kIdPadLbl = 470;    // 470..485 controller action labels
+constexpr int kIdPadCombo = 490;  // 490..505 their button lists
 
 struct KeysState {
   bool done = false, accept = false;
   int sel = 0, capturing = -1;
+  int dev = 0;  // 0 keyboard, 1.. pad family + 1 (kPadFamilies)
   std::string keys[kKeyN];  // full values (defaults filled in)
+  uint8_t pad[3][kPadOutN];  // per family: game button -> physical button
 };
 
 void KeysRefresh(HWND h, const KeysState& st) {
   for (int i = 0; i < kKeyN; ++i)
     SetDlgItemTextW(h, kIdKeyBtn + i,
                     st.capturing == i ? kKeyText[st.sel].press : KeyLabel(st.keys[i]).c_str());
+  if (st.dev > 0)
+    for (int r = 0; r < kPadOutN; ++r)
+      SendDlgItemMessageW(h, kIdPadCombo + r, CB_SETCURSEL, st.pad[st.dev - 1][kPadRows[r]], 0);
+}
+
+// Keyboard page or the page of one controller family.
+void KeysShowDevice(HWND h, KeysState& st) {
+  st.capturing = -1;
+  const bool kb = st.dev == 0;
+  for (int i = 0; i < kKeyN; ++i) {
+    ShowWindow(GetDlgItem(h, kIdKeyBtn + i), kb ? SW_SHOW : SW_HIDE);
+    ShowWindow(GetDlgItem(h, kIdKeyLbl + i), kb ? SW_SHOW : SW_HIDE);
+  }
+  for (int r = 0; r < kPadOutN; ++r) {
+    HWND c = GetDlgItem(h, kIdPadCombo + r);
+    ShowWindow(c, kb ? SW_HIDE : SW_SHOW);
+    ShowWindow(GetDlgItem(h, kIdPadLbl + r), kb ? SW_HIDE : SW_SHOW);
+    if (kb) continue;
+    SendMessageW(c, CB_RESETCONTENT, 0, 0);
+    for (int s = 0; s < kPadOutN; ++s)
+      SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)PadButtonName(st.sel, st.dev - 1, s).c_str());
+  }
+  SetDlgItemTextW(h, kIdKeyHint, kb ? kKeyText[st.sel].hint : kPadText[st.sel].hint);
+  KeysRefresh(h, st);
 }
 
 // A key (or mouse button) was pressed while an action waits for one.
@@ -591,13 +737,35 @@ LRESULT CALLBACK KeysProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     DestroyWindow(h);
     return 0;
   }
+  if (m == WM_COMMAND && HIWORD(w) == CBN_SELCHANGE) {
+    const int id = LOWORD(w);
+    const int cur = static_cast<int>(SendMessageW(reinterpret_cast<HWND>(l), CB_GETCURSEL, 0, 0));
+    if (id == kIdKeyDev && cur >= 0 && cur <= 3) {
+      st->dev = cur;
+      KeysShowDevice(h, *st);
+    } else if (id >= kIdPadCombo && id < kIdPadCombo + kPadOutN && st->dev > 0 && cur >= 0 &&
+               cur < kPadOutN) {
+      // The button moves here: the action that had it gets this action's old button.
+      uint8_t* m_ = st->pad[st->dev - 1];
+      const int o = kPadRows[id - kIdPadCombo];
+      for (int j = 0; j < kPadOutN; ++j)
+        if (j != o && m_[j] == cur) m_[j] = m_[o];
+      m_[o] = uint8_t(cur);
+      KeysRefresh(h, *st);
+    }
+    return 0;
+  }
   if (m == WM_COMMAND && HIWORD(w) == BN_CLICKED) {
     const int id = LOWORD(w);
     if (id >= kIdKeyBtn && id < kIdKeyBtn + kKeyN) {
       st->capturing = id - kIdKeyBtn;
       KeysRefresh(h, *st);
     } else if (id == kIdKeyReset) {
-      for (int i = 0; i < kKeyN; ++i) st->keys[i] = kKeyActions[i].def;
+      // Only the page shown (keyboard or that controller).
+      if (st->dev == 0)
+        for (int i = 0; i < kKeyN; ++i) st->keys[i] = kKeyActions[i].def;
+      else
+        PadIdentity(st->pad[st->dev - 1]);
       st->capturing = -1;
       KeysRefresh(h, *st);
     } else if (id == kIdKeyOk) {
@@ -627,7 +795,7 @@ bool ShowKeyBindings(HWND owner, int sel, Options& opt) {
   const double sc = GetDpiForSystem() / 96.0;
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const DWORD style = WS_CAPTION | WS_SYSMENU;
-  const int rows = kKeyN / 2, top = 70, rowH = 32, yBtn = top + rows * rowH + 16;
+  const int rows = kKeyN / 2, top = 108, rowH = 32, yBtn = top + rows * rowH + 16;
   RECT rc{0, 0, S(640), S(yBtn + 32 + 14)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   RECT orc{};
@@ -641,6 +809,7 @@ bool ShowKeyBindings(HWND owner, int sel, Options& opt) {
   KeysState st;
   st.sel = sel;
   for (int i = 0; i < kKeyN; ++i) st.keys[i] = opt.keys[i].empty() ? kKeyActions[i].def : opt.keys[i];
+  for (int f = 0; f < 3; ++f) PadParse(opt.padmap[f], st.pad[f]);
   SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&st));
   auto mk = [&](const wchar_t* cls, const wchar_t* text, DWORD s_, int cx, int cy, int cw, int ch,
                 int id) {
@@ -649,13 +818,28 @@ bool ShowKeyBindings(HWND owner, int sel, Options& opt) {
     SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(UiFont()), TRUE);
     return c;
   };
-  mk(L"STATIC", t.hint, 0, 16, 12, 608, 48, kIdKeyHint);
+  const PadText& pt = kPadText[sel];
+  mk(L"STATIC", pt.dev_lbl, SS_CENTERIMAGE, 16, 12, 120, 26, kIdKeyDevLbl);
+  HWND dev = mk(L"COMBOBOX", L"", WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL, 140, 12, 320, 200,
+                kIdKeyDev);
+  for (const wchar_t* d : pt.dev) SendMessageW(dev, CB_ADDSTRING, 0, (LPARAM)d);
+  SendMessageW(dev, CB_SETCURSEL, 0, 0);
+  mk(L"STATIC", t.hint, 0, 16, 50, 608, 48, kIdKeyHint);
   for (int i = 0; i < kKeyN; ++i) {
     const int col = i / rows, r = i % rows;
     const int cx = 16 + col * 312, cy = top + r * rowH;
     mk(L"STATIC", t.action[i], SS_CENTERIMAGE, cx, cy, 160, 26, kIdKeyLbl + i);
     mk(L"BUTTON", L"", WS_TABSTOP, cx + 164, cy, 132, 26, kIdKeyBtn + i);
   }
+  // Controller pages: one list per action, 8 rows per column.
+  for (int r = 0; r < kPadOutN; ++r) {
+    const int col = r / 8, rr = r % 8;
+    const int cx = 16 + col * 312, cy = top + rr * rowH;
+    mk(L"STATIC", pt.action[r], SS_CENTERIMAGE, cx, cy, 160, 26, kIdPadLbl + r);
+    mk(L"COMBOBOX", L"", WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL, cx + 164, cy, 132, 320,
+       kIdPadCombo + r);
+  }
+  KeysShowDevice(h, st);
   mk(L"BUTTON", t.reset, WS_TABSTOP, 16, yBtn, 170, 32, kIdKeyReset);
   mk(L"BUTTON", kText[sel].ok, WS_TABSTOP | BS_DEFPUSHBUTTON, 354, yBtn, 130, 32, kIdKeyOk);
   mk(L"BUTTON", kText[sel].cancel, WS_TABSTOP, 494, yBtn, 130, 32, kIdKeyCancel);
@@ -703,6 +887,7 @@ bool ShowKeyBindings(HWND owner, int sel, Options& opt) {
   if (!st.accept) return false;
   for (int i = 0; i < kKeyN; ++i)
     opt.keys[i] = st.keys[i] == kKeyActions[i].def ? std::string() : st.keys[i];
+  for (int f = 0; f < 3; ++f) opt.padmap[f] = PadString(st.pad[f]);
   return true;
 }
 
@@ -1342,6 +1527,16 @@ unsigned ApplyStartupLanguage() {
           opt.keys[i] = v;
         }
       }
+      for (int f = 0; f < 3; ++f) {
+        std::string k = std::string("padmap_") + kPadFamilies[f] + "=";
+        if (line.rfind(k, 0) == 0) {
+          std::string v = line.substr(k.size());
+          while (!v.empty() && (v.back() == '\r' || v.back() == ' ')) v.pop_back();
+          uint8_t m[kPadOutN];
+          PadParse(v, m);
+          opt.padmap[f] = PadString(m);  // anything unreadable = the pad as it is
+        }
+      }
     }
   }
   if (!Valid(lang)) { lang = 0; ask = true; }
@@ -1401,6 +1596,7 @@ unsigned ApplyStartupLanguage() {
         << "\nversion=" << AFRO_VERSION << "\n";
     for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
     for (int i = 0; i < kKeyN; ++i) out << KeyCfgName(i) << "=" << opt.keys[i] << "\n";
+    for (int f = 0; f < 3; ++f) out << "padmap_" << kPadFamilies[f] << "=" << opt.padmap[f] << "\n";
     // Diagnostic options keep their stored value unless --advanced showed them.
     for (int i = 0; i < kAdvN; ++i)
       out << kAdv[i].key << "="
@@ -1454,6 +1650,11 @@ unsigned ApplyStartupLanguage() {
   for (int i = 0; i < kKeyN; ++i)
     if (!opt.keys[i].empty() && !Explicit(kKeyActions[i].cvar))
       SetCvar(kKeyActions[i].cvar, opt.keys[i]);
+  // Controller remap (Key bindings -> Controller), one per pad family.
+  for (int f = 0; f < 3; ++f) {
+    const std::string cvar = std::string("afro_padmap_") + kPadFamilies[f];
+    if (!opt.padmap[f].empty() && !Explicit(cvar.c_str())) SetCvar(cvar.c_str(), opt.padmap[f]);
+  }
   if (opt.control == 2 && !Explicit("afro_button_glyphs"))
     SetCvar("afro_button_glyphs", "keyboard");
   for (int i = 0; i < kAdvN; ++i)

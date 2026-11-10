@@ -1,0 +1,228 @@
+diff --git a/src/graphics/afro_glyphs.cpp b/src/graphics/afro_glyphs.cpp
+index 7df5061..d0e04f7 100644
+--- a/src/graphics/afro_glyphs.cpp
++++ b/src/graphics/afro_glyphs.cpp
+@@ -4,6 +4,7 @@
+ 
+ #include <algorithm>
+ #include <array>
++#include <cctype>
+ #include <cmath>
+ #include <cstring>
+ #include <filesystem>
+@@ -428,6 +429,47 @@ std::string KeyboardBoundKey(int32_t glyph) {
+   return v;
+ }
+ 
++// Pad prompts follow the controller remap (the runtime's afro_padmap_* cvars, set
++// from the launcher's Key bindings window): for the button the game asks for, the
++// file of the physical button that drives it. The cvar lists 16 physical names
++// (Xbox positions) for A,B,X,Y,LB,RB,LT,RT,Back,Start,LS,RS,Up,Down,Left,Right.
++std::string PadBoundIcon(int32_t family, int32_t glyph) {
++  static constexpr std::array<const char*, 16> kNames = {
++      "A", "B", "X", "Y", "LB", "RB", "LT", "RT", "Back", "Start", "LS", "RS",
++      "Up", "Down", "Left", "Right"};
++  static constexpr std::array<const char*, 16> kIcons = {
++      "A", "B", "X", "Y", "LB", "RB", "LT", "RT", "BACK", "START", "LS", "RS",
++      "DPAD_UP", "DPAD", "DPAD_LEFT", "DPAD_RIGHT"};
++  const char* cvar = family == kFamilyPlayStation ? "afro_padmap_playstation"
++                     : family == kFamilyNintendo  ? "afro_padmap_nintendo"
++                                                  : "afro_padmap_xbox";
++  // The game's only D-pad prompt is D-pad down.
++  const size_t out = glyph == kDpad ? 13 : size_t(glyph);
++  const std::string v = rex::cvar::GetFlagByName(cvar);
++  size_t pos = 0;
++  for (size_t o = 0; o < 16 && pos <= v.size(); ++o) {
++    size_t end = v.find(',', pos);
++    if (o == out) {
++      std::string tok = v.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
++      while (!tok.empty() && tok.front() == ' ') tok.erase(tok.begin());
++      while (!tok.empty() && tok.back() == ' ') tok.pop_back();
++      for (size_t k = 0; k < 16; ++k) {
++        std::string n = kNames[k];
++        if (n.size() == tok.size() &&
++            std::equal(n.begin(), n.end(), tok.begin(), [](char a, char b) {
++              return std::tolower(static_cast<unsigned char>(a)) ==
++                     std::tolower(static_cast<unsigned char>(b));
++            }))
++          return kIcons[k];
++      }
++      break;
++    }
++    if (end == std::string::npos) break;
++    pos = end + 1;
++  }
++  return kGlyphNames[glyph];
++}
++
+ const std::vector<Level>* GetReplacement(int32_t family, int32_t glyph, uint32_t width,
+                                          uint32_t height, uint32_t level_count) {
+   if (glyph < 0 || glyph >= int32_t(kGlyphNames.size())) return nullptr;
+@@ -437,9 +479,14 @@ const std::vector<Level>* GetReplacement(int32_t family, int32_t glyph, uint32_t
+   Key key{family, glyph, width, height, level_count};
+   if (auto it = cache.find(key); it != cache.end()) return &it->second;
+   if (missing.count(key)) return nullptr;
+-  // Xbox has no folder unless someone adds one: the original icons stay.
+-  std::filesystem::path png =
+-      ExeDir() / "glyphs" / FamilyDir(family) / (std::string(kGlyphNames[glyph]) + ".png");
++  // A remapped pad shows the icon of the button that now does the action.
++  const std::string stem = family == kFamilyKeyboard ? kGlyphNames[glyph] : PadBoundIcon(family, glyph);
++  // Xbox keeps the game's own icons; its folder is only for remapped buttons.
++  if (family == kFamilyXbox && stem == kGlyphNames[glyph]) {
++    missing.insert(key);
++    return nullptr;
++  }
++  std::filesystem::path png = ExeDir() / "glyphs" / FamilyDir(family) / (stem + ".png");
+   if (family == kFamilyKeyboard) {
+     const std::string bound = KeyboardBoundKey(glyph);
+     if (!bound.empty()) {
+diff --git a/src/input/sdl/sdl_input_driver.cpp b/src/input/sdl/sdl_input_driver.cpp
+index 69b05c5..089ae77 100644
+--- a/src/input/sdl/sdl_input_driver.cpp
++++ b/src/input/sdl/sdl_input_driver.cpp
+@@ -12,6 +12,7 @@
+ #include <algorithm>
+ #include <array>
+ #include <cctype>
++#include <cstring>
+ #include <filesystem>
+ #include <string_view>
+ 
+@@ -30,6 +31,16 @@ REXCVAR_DEFINE_INT32(afro_pad_family, 0, "Input",
+                      "afro: family of the controller used last, set by the SDL driver: "
+                      "0 none yet, 1 Xbox, 2 PlayStation, 3 Nintendo, 4 Steam, "
+                      "5 keyboard (set by the mnk driver)");
++// afro: controller button remap, set by the launcher's Key bindings window.
++// For each button the game reads, in the order
++// A,B,X,Y,LB,RB,LT,RT,Back,Start,LS,RS,Up,Down,Left,Right, the physical button
++// (named by its Xbox position) that drives it. Empty = the pad as it is.
++REXCVAR_DEFINE_STRING(afro_padmap_xbox, "", "Input",
++                      "afro: button remap for Xbox, generic and Steam pads (16 names)");
++REXCVAR_DEFINE_STRING(afro_padmap_playstation, "", "Input",
++                      "afro: button remap for PlayStation pads (16 names)");
++REXCVAR_DEFINE_STRING(afro_padmap_nintendo, "", "Input",
++                      "afro: button remap for Nintendo pads (16 names)");
+ 
+ namespace rex::input::sdl {
+ 
+@@ -193,6 +204,97 @@ void AfroNotePadFamily(SDL_Gamepad* gamepad) {
+   }
+ }
+ 
++// afro: button remap (see the afro_padmap_* cvars).
++constexpr std::array<const char*, 16> kAfroPadNames = {
++    "A", "B", "X", "Y", "LB", "RB", "LT", "RT", "Back", "Start", "LS", "RS",
++    "Up", "Down", "Left", "Right"};
++constexpr std::array<uint16_t, 16> kAfroPadMask = {
++    0x1000, 0x2000, 0x4000, 0x8000, 0x0100, 0x0200, 0, 0, 0x0020, 0x0010, 0x0040, 0x0080,
++    0x0001, 0x0002, 0x0004, 0x0008};
++constexpr uint8_t kAfroTriggerOn = 30;  // XINPUT_GAMEPAD_TRIGGER_THRESHOLD
++
++struct AfroPadMap {
++  bool identity = true;
++  std::array<uint8_t, 16> src{};
++};
++
++AfroPadMap ParseAfroPadMap(const std::string& s, const char* which) {
++  AfroPadMap m;
++  for (uint8_t i = 0; i < 16; ++i) m.src[i] = i;
++  if (s.empty()) return m;
++  size_t pos = 0;
++  for (size_t o = 0; o < 16; ++o) {
++    size_t end = s.find(',', pos);
++    std::string tok = s.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
++    while (!tok.empty() && tok.front() == ' ') tok.erase(tok.begin());
++    while (!tok.empty() && tok.back() == ' ') tok.pop_back();
++    int found = -1;
++    for (int k = 0; k < 16; ++k) {
++      if (tok.size() == std::strlen(kAfroPadNames[k]) &&
++          std::equal(tok.begin(), tok.end(), kAfroPadNames[k], [](char a, char b) {
++            return std::tolower(static_cast<unsigned char>(a)) ==
++                   std::tolower(static_cast<unsigned char>(b));
++          })) {
++        found = k;
++      }
++    }
++    if (found < 0 || (end == std::string::npos && o != 15)) {
++      REXLOG_WARN("afro: afro_padmap_{} \"{}\" is not 16 button names; pad left as it is",
++                  which, s);
++      for (uint8_t i = 0; i < 16; ++i) m.src[i] = i;
++      return m;
++    }
++    m.src[o] = static_cast<uint8_t>(found);
++    pos = end + 1;
++  }
++  m.identity = true;
++  for (uint8_t i = 0; i < 16; ++i) m.identity = m.identity && m.src[i] == i;
++  if (!m.identity) REXLOG_INFO("afro: {} pad buttons remapped: {}", which, s);
++  return m;
++}
++
++// Xbox, generic and Steam pads share one map.
++const AfroPadMap& AfroMapForFamily(int32_t family) {
++  static std::string last[3] = {"\x01", "\x01", "\x01"};
++  static AfroPadMap maps[3];
++  const int k = family == 2 ? 1 : family == 3 ? 2 : 0;
++  static const char* const kWhich[3] = {"xbox", "playstation", "nintendo"};
++  const std::string& v = k == 0   ? REXCVAR_GET(afro_padmap_xbox)
++                         : k == 1 ? REXCVAR_GET(afro_padmap_playstation)
++                                  : REXCVAR_GET(afro_padmap_nintendo);
++  if (v != last[k]) {
++    last[k] = v;
++    maps[k] = ParseAfroPadMap(v, kWhich[k]);
++  }
++  return maps[k];
++}
++
++void AfroRemap(X_INPUT_GAMEPAD& gp, const AfroPadMap& m) {
++  if (m.identity) return;
++  const uint16_t in = gp.buttons;
++  const uint8_t lt = gp.left_trigger, rt = gp.right_trigger;
++  auto level = [&](uint8_t s) -> uint8_t {
++    if (s == 6) return lt;
++    if (s == 7) return rt;
++    return (in & kAfroPadMask[s]) ? 255 : 0;
++  };
++  uint16_t all = 0;
++  for (uint16_t mask : kAfroPadMask) all |= mask;
++  uint16_t out = static_cast<uint16_t>(in & ~all);  // guide and the rest stay
++  for (size_t o = 0; o < 16; ++o) {
++    const uint8_t s = m.src[o];
++    const uint8_t v = level(s);
++    if (o == 6) {
++      gp.left_trigger = v;
++    } else if (o == 7) {
++      gp.right_trigger = v;
++    } else if ((s == 6 || s == 7) ? v > kAfroTriggerOn : v != 0) {
++      out |= kAfroPadMask[o];
++    }
++  }
++  gp.buttons = out;
++}
++
+ }  // namespace
+ 
+ SDLInputDriver::SDLInputDriver(rex::ui::Window* window, size_t window_z_order)
+@@ -384,6 +486,8 @@ X_RESULT SDLInputDriver::GetDeviceState(DeviceId id, X_INPUT_STATE* out_state) {
+     // Simulate an "untouched" controller. When we become active again the
+     // pressed buttons aren't lost and will be visible again.
+     std::memset(&out_state->gamepad, 0, sizeof(out_state->gamepad));
++  } else {
++    AfroRemap(out_state->gamepad, AfroMapForFamily(AfroPadFamily(controller->sdl)));
+   }
+   return X_ERROR_SUCCESS;
+ }
+@@ -478,9 +582,11 @@ X_RESULT SDLInputDriver::GetDeviceKeystroke(DeviceId id, uint32_t flags,
+   // If input is not active (e.g. due to a dialog overlay), force buttons to
+   // "unpressed". The algorithm will automatically send UP events when
+   // 'is_active()' goes low and DOWN events when it goes high again.
++  X_INPUT_GAMEPAD afro_pad = controller->state.gamepad;  // afro: remapped like GetState
++  AfroRemap(afro_pad, AfroMapForFamily(AfroPadFamily(controller->sdl)));
+   const uint64_t curr_butts =
+-      is_active ? (static_cast<uint64_t>(static_cast<uint16_t>(controller->state.gamepad.buttons)) |
+-                   AnalogToKeyfield(controller->state.gamepad))
++      is_active ? (static_cast<uint64_t>(static_cast<uint16_t>(afro_pad.buttons)) |
++                   AnalogToKeyfield(afro_pad))
+                 : uint64_t(0);
+   KeystrokeState& last = controller->keystroke;
+ 

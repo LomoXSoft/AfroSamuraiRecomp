@@ -14,6 +14,14 @@ Newest first. Versions are in `app/VERSION`.
 - Keyboard button icons follow rebound keys: `key_<Name>.png` caps for every key
   (`tools/make_glyphs.ps1`), picked by the new `zzzzzzzz-afro-keyboard-glyph-binds`
   patch when a binding differs from the default.
+- Controller remap: the Key bindings window has a **Controller** list (Keyboard and
+  mouse; Xbox, generic pads and Steam Deck; PlayStation; Nintendo Switch). Each pad
+  family has its own layout, one button list per action, with the names from the
+  original manual. Button icons in game follow the remap (new `xbox` icon set, used
+  only for remapped Xbox buttons, and D-pad up/left/right icons). New
+  `zzzzzzzzz-afro-pad-remap` patch; saved as `padmap_*` lines.
+- Keyboard action names follow the manual (Light/Heavy attack, Guard, Overfocus,
+  Dash, Center camera, Pause, Skill menu).
 
 ## 0.2.0 – 60 FPS
 - 60 FPS is a supported option, no longer experimental. The default stays the

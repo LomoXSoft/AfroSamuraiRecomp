@@ -328,23 +328,34 @@ and a controller takes over when it connects or is used), **Controller**, or
 |---|---|---|
 | Move | W A S D | left stick |
 | Camera | mouse (or Shift + arrows) | right stick |
-| Attack | left click | X |
-| Second attack | right click | Y |
+| Light attack | left click | X |
+| Heavy attack | right click | Y |
 | Jump | Space | A |
 | Kick / menu back | E | B |
-| Block | Q | RT |
-| Focus | R | LT |
-| Bumpers | 1 / 3 | LB / RB |
-| D-pad | arrow keys | D-pad |
-| Start | Enter (or X) | Start |
-| Back menu | Esc | Back |
-| Stick clicks | F / K | L3 / R3 |
+| Guard | Q | RT |
+| Focus (hold) | R | LT |
+| Overfocus (full Focus meter) / RB | 1 / 3 | LB / RB |
+| D-pad (down: Ninja Ninja compass) | arrow keys | D-pad |
+| Pause | Enter (or X) | Start |
+| Skill menu | Esc | Back |
+| Dash / center camera | F / K | L3 / R3 |
+
+The action names are the ones in the original manual.
 
 Every key can be changed in **Settings → Controls → Key bindings...**: click an
 action, then press the new key or mouse button (hold Shift, Ctrl or Alt for a
 combination). A key already in use moves to the action you changed, and the keyboard
 button icons follow. The bindings are the runtime's `keybind_*` settings, saved as
 `bind_*` lines in `afro_language.cfg`; a `--keybind_*` on the command line still wins.
+
+The **Controller** list at the top of that window also remaps the pad buttons, one
+layout per family: **Xbox, generic pads and Steam Deck**, **PlayStation (DualSense,
+DualShock)** and **Nintendo Switch**. Pick the button for each action; a button in use
+swaps with the action you changed, and the button icons in game follow. Buttons are
+named as printed on that pad (on Switch the bottom button is B, which is the Xbox A
+position). Saved as `padmap_xbox`, `padmap_playstation` and `padmap_nintendo` in
+`afro_language.cfg` (the runtime's `afro_padmap_*` settings). This works with the
+default SDL input; the `--input_backend=xinput` option is not remapped.
 Mouse sensitivity, dead zone and smoothing are sliders on the same tab.
 
 #### Saves
