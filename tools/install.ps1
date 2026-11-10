@@ -72,6 +72,9 @@ $DL = @{
   pmsvc  = @{ url = 'https://gist.githubusercontent.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977/raw/49b58850aa5e5c1e65f090d4651ee76607883e11/portable-msvc.py'; sha = '1791cccca594ff083ce8d3e0a139e6156d2c312e24332a909e608010f0230a51'; file = 'portable-msvc.py' }
   rexsdk = @{ url = 'https://github.com/rexglue/rexglue-sdk/releases/download/nightly-20261002-bd833a2a/rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip'; sha = '1e19d7ec9be0d9d7e1a0088a34a33b068d4dea520181e81318528ef3b37627e7'; file = 'rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip' }
 }
+# portable-msvc.py otherwise takes the newest; MSVC 14.52's C++ library needs Clang 22.
+$MSVC_VERSION = '14.51'
+$WINSDK_VERSION = '28000'
 $REXGLUE_GIT = 'https://github.com/rexglue/rexglue-sdk.git'
 $REXGLUE_COMMIT = 'bd833a2'
 
@@ -973,6 +976,23 @@ try {
   }
   Finish 'iso-hash'
 
+  # MSVC is pinned ($MSVC_VERSION): from 14.52 its C++ library refuses Clang 20
+  # (STL1000, "expected Clang 22 or newer"). An install that got another version
+  # (setups before 0.2.1 took the newest) gets the pinned one again, and the
+  # builds made with the other headers are redone.
+  $msvcDir = Join-Path $TOOLS 'msvc\VC\Tools\MSVC'
+  if ((Done 'msvc') -and (Test-Path -LiteralPath $msvcDir) -and
+      -not (Get-ChildItem -LiteralPath $msvcDir -Directory | Where-Object { $_.Name -like "$MSVC_VERSION.*" })) {
+    $had = (@(Get-ChildItem -LiteralPath $msvcDir -Directory | ForEach-Object { $_.Name }) -join ',')
+    Say "MSVC $had is not the pinned $MSVC_VERSION; installing $MSVC_VERSION again"
+    Remove-Item -LiteralPath (Join-Path $TOOLS 'msvc') -Recurse -Force
+    Remove-Item -LiteralPath (Join-Path $STAMPS 'msvc.done') -Force
+    foreach ($n in 'build-app', 'build-gpu') { Remove-Item -LiteralPath (Join-Path $STAMPS "$n.done") -Force -ErrorAction SilentlyContinue }
+    foreach ($rel in 'afrorecomp\app\out', 'rexglue-sdk\out') {
+      Remove-Item -LiteralPath (Join-Path $Root $rel) -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
   # Microsoft license for the portable MSVC compiler + Windows SDK (only if not installed yet).
   $script:STEP = 'Microsoft license'
   $needMsvc = -not (Done 'msvc')
@@ -1033,7 +1053,7 @@ try {
     $py = Join-Path $TOOLS 'python\python.exe'
     Say ('    ' + (T 'lic1')); Say ('    ' + (T 'lic2'))
     if (-not $AcceptMsvcLicense) { throw (T 'lic_not') }   # asked at the start
-    Run $py @('portable-msvc.py', '--accept-license') $TOOLS
+    Run $py @('portable-msvc.py', '--accept-license', '--msvc-version', $MSVC_VERSION, '--sdk-version', $WINSDK_VERSION) $TOOLS
     if (-not (Test-Path -LiteralPath (Join-Path $TOOLS 'msvc\setup_x64.bat'))) { throw (T 'missing1' 'msvc\setup_x64.bat') }
     Remove-Item -LiteralPath (Join-Path $TOOLS 'downloads') -Recurse -Force -ErrorAction SilentlyContinue
   }
