@@ -86,8 +86,7 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
 ## Goals
 - Borderless window and key rebinding: done in 0.2.1.
 - Launcher options in game, while playing.
-- Fix the loading screens: they hold short lore cutscenes that are skipped
-  entirely because the game now loads too fast.
+- Loading screens: their lore cutscenes play in full again (0.2.1).
 - One-hit kill cheat.
 - USA disc (`.iso`) support.
 - Linux, macOS and Android versions.
@@ -392,6 +391,10 @@ language (English, Español, Français, Italiano) and three buttons: **Play**,
   2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
 - **Gameplay**: **Difficulty**: **Normal** (default, the game as it is) or **Game
   Journalist**, which makes the player invulnerable. Saved like the other settings.
+  **Loading screens**: **Full lore** (default) lets the story shown while a level
+  loads play one full pass, as on Xbox 360 where loading took that long (on PC it
+  loads in about a second and the story was cut); any button skips it once the
+  level is loaded. **Fast** goes straight on.
 - **Controls**: Auto (keyboard and mouse, a controller takes over when used),
   Controller or Keyboard; mouse sensitivity, dead zone and smoothing; and
   **Key bindings...**.

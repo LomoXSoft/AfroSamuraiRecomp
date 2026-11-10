@@ -52,6 +52,13 @@ REXCVAR_DEFINE_STRING(afro_dt_mode, "dynamic", "Afro",
 REXCVAR_DEFINE_BOOL(afro_cine_diag, false, "Afro",
                     "Diagnostic: every 2 s, log the entity update functions the game ran, "
                     "the time channel each one got and its average step");
+REXCVAR_DEFINE_BOOL(afro_load_diag, false, "Afro",
+                    "Diagnostic: log the level loading state machine when it changes");
+REXCVAR_DEFINE_BOOL(afro_interlude_full, true, "Afro",
+                    "Loading screens: let the lore interlude play one full pass (a button "
+                    "skips it once the level is loaded)");
+REXCVAR_DEFINE_INT32(afro_interlude_max_s, 60, "Afro",
+                     "Loading screens: longest the lore interlude is held, in seconds");
 REXCVAR_DEFINE_BOOL(afro_globals_dump, false, "Afro",
                     "Diagnostic: write the guest globals 0x828A0000-0x82900000 to "
                     "afro_globals.bin next to the exe twice a second");
@@ -501,6 +508,118 @@ void GlobalsDumpTick(uint64_t frame) {
   std::fflush(f);
 }
 
+// Diagnostic (afro_load_diag): logs the level transition state machine
+// (sub_8265D4B8, state at 0x828E62C0) and its companions whenever one changes.
+void LoadDiagTick(uint64_t frame) {
+  if (!REXCVAR_GET(afro_load_diag)) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  struct W { uint32_t addr; int size; const char* name; };
+  static const W kW[] = {
+      {0x828E62C0, 4, "state"},   {0x828B3068, 4, "obj3068"}, {0x828E62BC, 4, "obj62BC"},
+      {0x828E62A5, 1, "b62A5"},   {0x828E62A7, 1, "b62A7"},   {0x828B2D39, 1, "b2D39"},
+      {0x82897B20, 1, "b7B20"},   {0x828B2E5C, 4, "w2E5C"},   {0x828E62DA, 1, "b62DA"},
+      {0x828B2E50, 4, "cb2E50"},
+  };
+  static uint32_t last[sizeof(kW) / sizeof(kW[0])];
+  static bool init = false;
+  bool changed = !init;
+  uint32_t now[sizeof(kW) / sizeof(kW[0])];
+  for (size_t i = 0; i < sizeof(kW) / sizeof(kW[0]); ++i) {
+    now[i] = kW[i].size == 4
+                 ? rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kW[i].addr))
+                 : *mem->TranslateVirtual<uint8_t*>(kW[i].addr);
+    changed = changed || now[i] != last[i];
+  }
+  if (!changed) return;
+  init = true;
+  std::string s;
+  for (size_t i = 0; i < sizeof(kW) / sizeof(kW[0]); ++i) {
+    s += fmt::format(" {}={:X}", kW[i].name, now[i]);
+    last[i] = now[i];
+  }
+  const uint32_t count =
+      rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(0x828B3070));
+  REXLOG_INFO("afro load: frame {}{} count={}", frame, s, int32_t(count));
+}
+
+}  // namespace
+// In rexruntime (patches/rexglue/zzzzzzzzzz-afro-interlude.patch, input_system.h).
+namespace rex::input {
+uint32_t AfroButtonPresses();
+uint32_t AfroDialogOpenCount();
+uint64_t AfroDialogOpenHash(uint32_t index);
+}  // namespace rex::input
+namespace {
+
+// Loading interlude (afro_interlude_full). While a level loads, the transition
+// state machine (sub_8265D4B8, state at 0x828E62C0) shows a lore interlude in
+// state 6; the level-loaded callback (sub_8265AEF0) sets state 7 and a new fade
+// target at once, so on PC (loads in ~1 s) the lore is cut. The interlude loops
+// its voice lines for loads of any length: hold state 6 (and its fade target)
+// until the first voice line comes round again (one full pass), a button is
+// pressed after the level loaded, or the time cap; then apply what the callback
+// set.
+void InterludeTick() {
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  auto u32 = [&](uint32_t a) {
+    return rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(a));
+  };
+  auto put = [&](uint32_t a, uint32_t v) {
+    rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(a), v);
+  };
+  constexpr uint32_t kState = 0x828E62C0, kFadeTarget = 0x82898D7C;
+  static bool in6 = false, pending = false, done = false;
+  static uint32_t last_target = 0, pending_target = 0, dialog_base = 0, press_base = 0;
+  static clk::time_point t6{}, loaded{};
+  const uint32_t state = u32(kState);
+  const auto now = clk::now();
+  if (state == 6 && !in6) {
+    in6 = true;
+    done = false;
+    t6 = now;
+    dialog_base = rex::input::AfroDialogOpenCount();
+  }
+  if (state == 6 && !pending) last_target = u32(kFadeTarget);
+  if (state == 7 && in6 && !pending && !done && REXCVAR_GET(afro_interlude_full)) {
+    pending = true;
+    loaded = now;
+    press_base = rex::input::AfroButtonPresses();
+    pending_target = u32(kFadeTarget);
+    put(kState, 6);
+    put(kFadeTarget, last_target);
+    REXLOG_INFO("afro interlude: level loaded after {:.1f} s, the lore keeps playing",
+                std::chrono::duration<double>(now - t6).count());
+  }
+  if (pending) {
+    const char* why = nullptr;
+    if (u32(kState) != 6) {
+      why = "state changed";
+    } else {
+      const uint32_t n = rex::input::AfroDialogOpenCount();
+      if (n >= dialog_base + 2) {
+        const uint64_t first = rex::input::AfroDialogOpenHash(dialog_base);
+        if (rex::input::AfroDialogOpenHash(n - 1) == first) why = "full pass";
+      }
+      if (!why && rex::input::AfroButtonPresses() != press_base) why = "button";
+      if (!why && now - t6 >= std::chrono::seconds(std::max(REXCVAR_GET(afro_interlude_max_s), 5)))
+        why = "time cap";
+    }
+    if (why) {
+      pending = false;
+      done = true;
+      if (u32(kState) == 6) {
+        put(kFadeTarget, pending_target);
+        put(kState, 7);
+      }
+      REXLOG_INFO("afro interlude: continue ({}) after {:.1f} s", why,
+                  std::chrono::duration<double>(now - t6).count());
+    }
+  }
+  if (!pending && state != 6 && state != 7) in6 = false;
+}
+
 void PatchPrimaryDtStore(PPCRegister& base, PPCRegister& f, int32_t offset) {
   if (!Experimental60()) return;
   // Only the primary sim-dt slot (7172 == 0x1C04).
@@ -804,6 +923,8 @@ void AfroSwapHook(PPCRegister& r31) {
   g_last = now;
   ++g_frames;
   GlobalsDumpTick(g_frames);
+  LoadDiagTick(g_frames);
+  InterludeTick();
   if (g_win_frames == 0) g_win_start = now;
   ++g_win_frames;
   double secs = std::chrono::duration<double>(now - g_win_start).count();

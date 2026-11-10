@@ -246,6 +246,18 @@ trigger gives 0 or 255). The button prompts (`src/graphics/afro_glyphs.cpp`) sho
 icon of the physical button: `glyphs\<family>\<button>.png`, with `glyphs\xbox`
 used only for remapped Xbox buttons and `DPAD_UP/LEFT/RIGHT.png` for the other arms.
 
+## zzzzzzzzzz-afro-interlude.patch (runtime, `rexruntime.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last.
+Two small helpers for the app's loading interlude (`app/src/frame_pacing.cpp`,
+`afro_interlude_full`), declared in `include/rex/input/input_system.h`:
+- `AfroNoteDialogOpen` / `AfroDialogOpenCount` / `AfroDialogOpenHash`: every voice
+  line the game opens (`.xma` under `\dialog\`, ambient "noise" lines left out,
+  a reopen within 0.5 s counted once), in order. `NtCreateFile`
+  (`src/kernel/xboxkrnl/xboxkrnl_io.cpp`) reports them. The interlude loops its
+  lines, so the first one coming round again marks one full pass.
+- `AfroButtonPresses`: A, B, X, Y, Start and Back presses on any pad (the keyboard
+  pad included), counted in `InputSystem::GetStateForUI`, to skip the interlude.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and

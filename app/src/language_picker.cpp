@@ -135,7 +135,7 @@ std::string MouseCvarValue(int r, int v) {
   return buf;
 }
 
-struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ };
+struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ int lore = 0; /* Loading screens: 0 full lore (default), 1 fast */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ };
 
 struct KeyAction { const char* cvar; const char* def; };
 constexpr int kKeyN = 24;
@@ -349,6 +349,24 @@ void FillCombo(HWND h, int id, std::initializer_list<const wchar_t*> items) {
 
 // Save management (same language order as kText).
 // Third Display choice (the first two are kText full / win).
+// Gameplay -> Loading screens (label, full, fast, note).
+struct LoreText { const wchar_t *lbl, *full, *fast, *note; };
+const LoreText kLoreText[] = {
+    {L"Loading screens:", L"Full lore (default)", L"Fast",
+     L"Full lore: the loading story plays one full pass, like on Xbox 360. Any button "
+     L"skips it once the level is loaded."},
+    {L"Pantallas de carga:", L"Historia completa (predeterminado)", L"R\u00e1pidas",
+     L"Historia completa: la historia de la carga se ve entera, como en Xbox 360. "
+     L"Cualquier bot\u00f3n la salta cuando el nivel ya ha cargado."},
+    {L"\u00c9crans de chargement :", L"Histoire compl\u00e8te (par d\u00e9faut)", L"Rapides",
+     L"Histoire compl\u00e8te : l'histoire du chargement est jou\u00e9e en entier, comme "
+     L"sur Xbox 360. N'importe quel bouton la passe une fois le niveau charg\u00e9."},
+    {L"Schermate di caricamento:", L"Storia completa (predefinito)", L"Veloci",
+     L"Storia completa: la storia del caricamento viene mostrata per intero, come su "
+     L"Xbox 360. Qualsiasi tasto la salta quando il livello \u00e8 caricato."},
+};
+constexpr int kIdLoreLbl = 175, kIdLore = 176, kIdLoreNote = 177;
+
 const wchar_t* const kExclText[] = {L"Exclusive fullscreen", L"Pantalla completa exclusiva",
                                     L"Plein écran exclusif", L"Schermo intero esclusivo"};
 
@@ -924,6 +942,9 @@ void ApplySettingsTexts(HWND h, const SettingsState& st) {
   SetDlgItemTextW(h, kIdDiffLbl, t.diff);
   FillCombo(h, kIdCheatInv, {t.diff_normal, t.diff_journo});
   SetDlgItemTextW(h, kIdDiffNote, t.diff_note);
+  SetDlgItemTextW(h, kIdLoreLbl, kLoreText[st.sel].lbl);
+  FillCombo(h, kIdLore, {kLoreText[st.sel].full, kLoreText[st.sel].fast});
+  SetDlgItemTextW(h, kIdLoreNote, kLoreText[st.sel].note);
   SetDlgItemTextW(h, kIdXWarn, t.xwarn);
   const wchar_t* fx_lbl[5] = {t.sepia, t.blood, t.dof, t.bloom, t.focus};
   for (int i = 0; i < 5; ++i) {
@@ -1019,6 +1040,7 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         o.mouse[r] = std::clamp(static_cast<int>(SendDlgItemMessageW(h, kIdXMouse + r, TBM_GETPOS, 0, 0)),
                                 kMouse[r].lo, kMouse[r].hi);
       o.invuln = Cur(h, kIdCheatInv) == 1 ? 1 : 0;  // Game Journalist
+      o.lore = Cur(h, kIdLore) == 1 ? 1 : 0;
       ExpToOptions(h, o);
       st->remember = IsDlgButtonChecked(h, kIdCheck) == BST_CHECKED;
       finish(true);
@@ -1088,9 +1110,12 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   row(0, 142, kIdFpsLbl, kIdFps);
   row(0, 180, kIdXVsyncLbl, kIdXVsync);
   // Gameplay.
-  // Difficulty: Game Journalist turns on the player invulnerability (session only).
+  // Difficulty: Game Journalist turns on the player invulnerability. Loading
+  // screens: Fast turns off the full lore interlude (afro_interlude_full).
   row(1, 66, kIdDiffLbl, kIdCheatInv);
   mk(1, L"STATIC", 0, lx, 104, 432, 40, kIdDiffNote);
+  row(1, 152, kIdLoreLbl, kIdLore);
+  mk(1, L"STATIC", 0, lx, 190, 432, 56, kIdLoreNote);
   // Controls.
   row(2, 66, kIdCtrlLbl, kIdCtrl);
   for (int r = 0; r < 3; ++r) {
@@ -1126,6 +1151,7 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   SetCur(h, kIdXVsync, opt.vsync ? 1 : 0);
   SetCur(h, kIdCtrl, std::clamp(opt.control, 0, 2));
   SetCur(h, kIdCheatInv, opt.invuln ? 1 : 0);
+  SetCur(h, kIdLore, opt.lore ? 1 : 0);
   OptionsToExp(h, opt);
   CheckDlgButton(h, kIdCheck, remember ? BST_CHECKED : BST_UNCHECKED);
   ShowTab(h, &st, 0);
@@ -1513,6 +1539,7 @@ unsigned ApplyStartupLanguage() {
       if (line.rfind("tick=", 0) == 0) opt.tick = std::clamp(std::atoi(line.c_str() + 5), 0, 3);
       if (line.rfind("window=", 0) == 0) opt.window = line[7] == '1';
       if (line.rfind("exclusive=", 0) == 0) opt.exclusive = line[10] == '1';
+      if (line.rfind("lore=", 0) == 0) opt.lore = line[5] == '1' ? 1 : 0;
       if (line.rfind("control=", 0) == 0) opt.control = std::clamp(std::atoi(line.c_str() + 8), 0, 2);
       for (int r = 0; r < 3; ++r) {
         std::string k = std::string(kMouse[r].key) + "=";
@@ -1598,7 +1625,7 @@ unsigned ApplyStartupLanguage() {
     out << "language=" << lang << "\nask=" << (remember ? 0 : 1) << "\nfps=" << opt.fps
         << "\nsepia=" << opt.sepia << "\nvsync=" << opt.vsync << "\ntick=0"
         << "\nwindow=" << (opt.window ? 1 : 0) << "\nexclusive=" << (opt.exclusive ? 1 : 0)
-        << "\ncontrol=" << opt.control
+        << "\nlore=" << opt.lore << "\ncontrol=" << opt.control
         << "\nscale=" << opt.scale << "\ndifficulty=" << opt.invuln
         << "\nversion=" << AFRO_VERSION << "\n";
     for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
@@ -1644,6 +1671,8 @@ unsigned ApplyStartupLanguage() {
     SetCvar("fullscreen", opt.window ? "false" : "true");
   // Display: the default fullscreen is a borderless window over the whole screen
   // (no mode change, instant Alt+Tab); Exclusive fullscreen takes the display.
+  if (opt.lore && !Explicit("afro_interlude_full"))
+    SetCvar("afro_interlude_full", "false");
   if (!opt.window && opt.exclusive && !Explicit("fullscreen_exclusive"))
     SetCvar("fullscreen_exclusive", "true");
   // Controls. Auto: the keyboard plays as a pad and its key caps are shown until

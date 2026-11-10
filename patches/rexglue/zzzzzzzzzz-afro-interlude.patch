@@ -1,0 +1,124 @@
+diff --git a/include/rex/input/input_system.h b/include/rex/input/input_system.h
+index 84d1473..2fc523f 100644
+--- a/include/rex/input/input_system.h
++++ b/include/rex/input/input_system.h
+@@ -15,6 +15,7 @@
+ #include <bitset>
+ #include <memory>
+ #include <mutex>
++#include <string_view>
+ #include <utility>
+ #include <vector>
+ 
+@@ -115,4 +116,13 @@ class InputSystem : public system::IInputSystem {
+ /// In tool mode, only the NOP driver is added.
+ std::unique_ptr<InputSystem> CreateDefaultInputSystem(bool tool_mode);
+ 
++// afro: for the loading interlude (app frame_pacing.cpp). Presses of A, B, X, Y,
++// Start or Back on any pad (the keyboard pad too), counted as they go down.
++uint32_t AfroButtonPresses();
++// Voice lines (files under \dialog\, ambient "noise" lines left out) in the order
++// they were opened; the same file opened again within 0.5 s counts once.
++void AfroNoteDialogOpen(std::string_view path);
++uint32_t AfroDialogOpenCount();
++uint64_t AfroDialogOpenHash(uint32_t index);
++
+ }  // namespace rex::input
+diff --git a/src/input/input_system.cpp b/src/input/input_system.cpp
+index f143348..42058b8 100644
+--- a/src/input/input_system.cpp
++++ b/src/input/input_system.cpp
+@@ -10,8 +10,11 @@
+  */
+ 
+ #include <algorithm>
++#include <cctype>
++#include <chrono>
+ #include <cmath>
+ #include <cstring>
++#include <string>
+ 
+ #include <rex/dbg.h>
+ #include <rex/input/device_assignment.h>
+@@ -51,8 +54,45 @@ constexpr uint32_t kSyntheticOrdinal = UINT32_MAX;
+ // XN_SYS_INPUTDEVICESCHANGED
+ constexpr uint32_t kXNotificationSystemInputDevicesChanged = 0x00000012;
+ 
++// afro: loading interlude helpers (see input_system.h).
++std::atomic<uint32_t> afro_presses{0};
++std::array<uint16_t, kMaxGuestUsers> afro_prev_buttons = {};
++std::mutex afro_dialog_mutex;
++std::vector<uint64_t> afro_dialog_hashes;
++uint64_t afro_last_hash = 0;
++std::chrono::steady_clock::time_point afro_last_open{};
++
+ }  // namespace
+ 
++uint32_t AfroButtonPresses() {
++  return afro_presses.load(std::memory_order_relaxed);
++}
++
++void AfroNoteDialogOpen(std::string_view path) {
++  std::string p(path);
++  std::transform(p.begin(), p.end(), p.begin(),
++                 [](unsigned char c) { return char(std::tolower(c)); });
++  if (p.find("\\dialog\\") == std::string::npos || p.find("noise") != std::string::npos) return;
++  uint64_t h = 1469598103934665603ull;
++  for (unsigned char c : p) h = (h ^ c) * 1099511628211ull;
++  std::lock_guard lock(afro_dialog_mutex);
++  const auto now = std::chrono::steady_clock::now();
++  if (h == afro_last_hash && now - afro_last_open < std::chrono::milliseconds(500)) return;
++  afro_last_hash = h;
++  afro_last_open = now;
++  afro_dialog_hashes.push_back(h);
++}
++
++uint32_t AfroDialogOpenCount() {
++  std::lock_guard lock(afro_dialog_mutex);
++  return uint32_t(afro_dialog_hashes.size());
++}
++
++uint64_t AfroDialogOpenHash(uint32_t index) {
++  std::lock_guard lock(afro_dialog_mutex);
++  return index < afro_dialog_hashes.size() ? afro_dialog_hashes[index] : 0;
++}
++
+ InputSystem::InputSystem(rex::ui::Window* window) : window_(window) {}
+ 
+ InputSystem::~InputSystem() = default;
+@@ -334,6 +374,12 @@ X_RESULT InputSystem::GetStateForUI(uint32_t user_index, X_INPUT_STATE* out_stat
+   }
+   UpdateConnectedUser(user_index, true);
+   AdjustDeadzoneLevels(user_index, &merged.gamepad);
++  if (user_index < kMaxGuestUsers) {
++    // afro: A, B, X, Y, Start, Back going down (loading interlude skip).
++    const uint16_t now_b = static_cast<uint16_t>(merged.gamepad.buttons) & 0xF030;
++    if (now_b & ~afro_prev_buttons[user_index]) afro_presses.fetch_add(1, std::memory_order_relaxed);
++    afro_prev_buttons[user_index] = now_b;
++  }
+   if (static_cast<uint16_t>(merged.gamepad.buttons) != 0 && user_index < kMaxGuestUsers) {
+     last_used_user_ = user_index;
+   }
+diff --git a/src/kernel/xboxkrnl/xboxkrnl_io.cpp b/src/kernel/xboxkrnl/xboxkrnl_io.cpp
+index bab7236..b6f46d3 100644
+--- a/src/kernel/xboxkrnl/xboxkrnl_io.cpp
++++ b/src/kernel/xboxkrnl/xboxkrnl_io.cpp
+@@ -30,6 +30,7 @@
+ #include <rex/thread/mutex.h>
+ 
+ namespace rex::audio { bool AfroXmaLogOn(); }
++namespace rex::input { void AfroNoteDialogOpen(std::string_view path); }
+ 
+ namespace rex::kernel::xboxkrnl {
+ using namespace rex::system;
+@@ -170,6 +171,10 @@ u32 NtCreateFile_entry(mapped_u32 handle_out, u32 desired_access,
+   }
+ 
+   *handle_out = handle;
++  // afro: voice lines in play order, for the loading interlude.
++  if (XSUCCEEDED(result) && target_path.find(".xma") != std::string::npos) {
++    rex::input::AfroNoteDialogOpen(target_path);
++  }
+   if (target_path.find(".xma") != std::string::npos && rex::audio::AfroXmaLogOn()) {
+     REXKRNL_INFO("afro xma open '{}' -> {:#x} handle={:#x}", target_path, (uint32_t)result,
+                  (uint32_t)handle);
