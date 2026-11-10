@@ -66,7 +66,7 @@ This is a preview. The default is the original Xbox 360 experience: 720p (1x) at
 at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitations).
 
 ## Improvements over the Xbox 360 version
-- **Native Windows x64** program, no emulator. Fullscreen or window.
+- **Native Windows x64** program, no emulator. Borderless fullscreen, window or exclusive fullscreen.
 - **Up to 4K**: internal resolution 1x (native), 2x or 3x.
 - **Native multi-controller support**: Xbox, PlayStation (DualShock/DualSense, USB
   and Bluetooth), Switch, Steam Deck and anything SDL recognises.
@@ -84,7 +84,7 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
   and the headband texture.
 
 ## Goals
-- Borderless window and key rebinding (planned for 0.2.1).
+- Borderless window and key rebinding: done in 0.2.1.
 - Launcher options in game, while playing.
 - Fix the loading screens: they hold short lore cutscenes that are skipped
   entirely because the game now loads too fast.
@@ -386,7 +386,9 @@ folder back into `Documents\afrorecomp\`).
 The launcher (shown on first run, after each update, or with Shift) has the
 language (English, Español, Français, Italiano) and three buttons: **Play**,
 **Settings...** and **Manage saved games...**. Settings has four tabs:
-- **Graphics**: fullscreen or window, internal resolution (1x native by default /
+- **Graphics**: display (**Borderless fullscreen**, the default: a window over the
+  whole screen, no display mode change, instant Alt+Tab; **Window**; or **Exclusive
+  fullscreen**, which takes the display), internal resolution (1x native by default /
   2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
 - **Gameplay**: **Difficulty**: **Normal** (default, the game as it is) or **Game
   Journalist**, which makes the player invulnerable. Saved like the other settings.

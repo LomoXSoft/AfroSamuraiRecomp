@@ -20,6 +20,10 @@ Newest first. Versions are in `app/VERSION`.
   original manual. Button icons in game follow the remap (new `xbox` icon set, used
   only for remapped Xbox buttons, and D-pad up/left/right icons). New
   `zzzzzzzzz-afro-pad-remap` patch; saved as `padmap_*` lines.
+- Display has three choices: **Borderless fullscreen** (default, what "Fullscreen"
+  already was: a window over the whole screen, instant Alt+Tab), **Window** and
+  **Exclusive fullscreen** (the runtime's `fullscreen_exclusive`, saved as
+  `exclusive=1`).
 - Keyboard action names follow the manual (Light/Heavy attack, Guard, Overfocus,
   Dash, Center camera, Pause, Skill menu).
 

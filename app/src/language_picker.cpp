@@ -135,7 +135,7 @@ std::string MouseCvarValue(int r, int v) {
   return buf;
 }
 
-struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ };
+struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ };
 
 struct KeyAction { const char* cvar; const char* def; };
 constexpr int kKeyN = 24;
@@ -239,7 +239,7 @@ const UiText kText[] = {
     {L"afrorecomp_v" AFRO_VERSION_W L" - Launcher", L"Play", L"Settings...",
      L"Skip this window at launch", L"Hold Shift at launch to show it again.",
      L"Graphics", L"Gameplay", L"Experimental",
-     L"Language:", L"Display:", L"Fullscreen", L"Window", L"Internal resolution:",
+     L"Language:", L"Display:", L"Borderless fullscreen", L"Window", L"Internal resolution:",
      L"Frame rate:", L"30 (original, default)", L"60",
      L"VSync:", L"On", L"Off (recommended at 60)",
      L"Controls:", L"Auto (keyboard + controller)", L"Controller", L"Keyboard",
@@ -254,7 +254,7 @@ const UiText kText[] = {
     {L"afrorecomp_v" AFRO_VERSION_W L" - Lanzador", L"Jugar", L"Ajustes...",
      L"Saltar esta ventana al iniciar", L"Mant\u00e9n May\u00fas al iniciar para volver a verla.",
      L"Gr\u00e1ficos", L"Jugabilidad", L"Experimental",
-     L"Idioma:", L"Pantalla:", L"Pantalla completa", L"Ventana", L"Resoluci\u00f3n interna:",
+     L"Idioma:", L"Pantalla:", L"Pantalla completa sin bordes", L"Ventana", L"Resoluci\u00f3n interna:",
      L"Fotogramas:", L"30 (original, por defecto)", L"60",
      L"VSync:", L"Activado", L"Desactivado (recomendado a 60)",
      L"Control:", L"Autom\u00e1tico (teclado + mando)", L"Mando", L"Teclado",
@@ -271,7 +271,7 @@ const UiText kText[] = {
      L"Ne plus afficher cette fen\u00eatre au d\u00e9marrage",
      L"Maintenez Maj au d\u00e9marrage pour la revoir.",
      L"Graphismes", L"Jouabilit\u00e9", L"Exp\u00e9rimental",
-     L"Langue :", L"Affichage :", L"Plein \u00e9cran", L"Fen\u00eatre", L"R\u00e9solution interne :",
+     L"Langue :", L"Affichage :", L"Plein \u00e9cran sans bordure", L"Fen\u00eatre", L"R\u00e9solution interne :",
      L"Images/s :", L"30 (original, par d\u00e9faut)", L"60",
      L"VSync :", L"Activ\u00e9e", L"D\u00e9sactiv\u00e9e (conseill\u00e9 \u00e0 60)",
      L"Contr\u00f4les :", L"Auto (clavier + manette)", L"Manette", L"Clavier",
@@ -287,7 +287,7 @@ const UiText kText[] = {
     {L"afrorecomp_v" AFRO_VERSION_W L" - Avvio", L"Gioca", L"Impostazioni...",
      L"Salta questa finestra all'avvio", L"Tieni premuto Maiusc all'avvio per rivederla.",
      L"Grafica", L"Gameplay", L"Sperimentale",
-     L"Lingua:", L"Schermo:", L"Schermo intero", L"Finestra", L"Risoluzione interna:",
+     L"Lingua:", L"Schermo:", L"Schermo intero senza bordi", L"Finestra", L"Risoluzione interna:",
      L"Fotogrammi:", L"30 (originale, predefinito)", L"60",
      L"VSync:", L"Attivato", L"Disattivato (consigliato a 60)",
      L"Controlli:", L"Automatico (tastiera + controller)", L"Controller", L"Tastiera",
@@ -348,6 +348,10 @@ void FillCombo(HWND h, int id, std::initializer_list<const wchar_t*> items) {
 }
 
 // Save management (same language order as kText).
+// Third Display choice (the first two are kText full / win).
+const wchar_t* const kExclText[] = {L"Exclusive fullscreen", L"Pantalla completa exclusiva",
+                                    L"Plein écran exclusif", L"Schermo intero esclusivo"};
+
 struct SaveText {
   const wchar_t *manage, *folder, *open, *backup, *list, *restore, *del, *close, *done, *empty,
       *fail, *pick, *restore_q, *restore_ok, *del_q, *del_ok, *running, *none, *openbk;
@@ -932,7 +936,7 @@ void ApplySettingsTexts(HWND h, const SettingsState& st) {
   SetDlgItemTextW(h, kIdHint, t.hint);
   SetDlgItemTextW(h, kIdSetOk, t.ok);
   SetDlgItemTextW(h, kIdSetCancel, t.cancel);
-  FillCombo(h, kIdDisp, {t.full, t.win});
+  FillCombo(h, kIdDisp, {t.full, t.win, kExclText[st.sel]});
   FillCombo(h, kIdFps, {t.fps30, t.fps60});
   FillCombo(h, kIdXVsync, {t.vsync_on, t.vsync_off});
   FillCombo(h, kIdCtrl, {t.ctrl_auto, t.ctrl_pad, t.ctrl_kb});
@@ -1006,6 +1010,7 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     } else if (id == kIdSetOk || id == IDOK) {
       Options& o = st->opt;
       o.window = Cur(h, kIdDisp) == 1;
+      o.exclusive = Cur(h, kIdDisp) == 2;
       o.scale = 1 + std::clamp(Cur(h, kIdScale), 0, 2);
       o.fps = kFpsValues[std::clamp(Cur(h, kIdFps), 0, 1)];
       o.vsync = Cur(h, kIdXVsync) == 1 ? 1 : 0;
@@ -1115,7 +1120,7 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   mk(-1, L"BUTTON", WS_TABSTOP | BS_DEFPUSHBUTTON, 104, yBtn, 130, 32, kIdSetOk);
   mk(-1, L"BUTTON", WS_TABSTOP, 246, yBtn, 130, 32, kIdSetCancel);
   ApplySettingsTexts(h, st);
-  SetCur(h, kIdDisp, opt.window ? 1 : 0);
+  SetCur(h, kIdDisp, opt.window ? 1 : opt.exclusive ? 2 : 0);
   SetCur(h, kIdScale, (opt.scale >= 1 && opt.scale <= 3) ? opt.scale - 1 : 0);
   SetCur(h, kIdFps, opt.fps == 60 ? 1 : 0);
   SetCur(h, kIdXVsync, opt.vsync ? 1 : 0);
@@ -1507,6 +1512,7 @@ unsigned ApplyStartupLanguage() {
       if (line.rfind("difficulty=", 0) == 0) opt.invuln = line[11] == '1' ? 1 : 0;
       if (line.rfind("tick=", 0) == 0) opt.tick = std::clamp(std::atoi(line.c_str() + 5), 0, 3);
       if (line.rfind("window=", 0) == 0) opt.window = line[7] == '1';
+      if (line.rfind("exclusive=", 0) == 0) opt.exclusive = line[10] == '1';
       if (line.rfind("control=", 0) == 0) opt.control = std::clamp(std::atoi(line.c_str() + 8), 0, 2);
       for (int r = 0; r < 3; ++r) {
         std::string k = std::string(kMouse[r].key) + "=";
@@ -1591,7 +1597,8 @@ unsigned ApplyStartupLanguage() {
     std::ofstream out(path, std::ios::trunc);
     out << "language=" << lang << "\nask=" << (remember ? 0 : 1) << "\nfps=" << opt.fps
         << "\nsepia=" << opt.sepia << "\nvsync=" << opt.vsync << "\ntick=0"
-        << "\nwindow=" << (opt.window ? 1 : 0) << "\ncontrol=" << opt.control
+        << "\nwindow=" << (opt.window ? 1 : 0) << "\nexclusive=" << (opt.exclusive ? 1 : 0)
+        << "\ncontrol=" << opt.control
         << "\nscale=" << opt.scale << "\ndifficulty=" << opt.invuln
         << "\nversion=" << AFRO_VERSION << "\n";
     for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
@@ -1632,9 +1639,13 @@ unsigned ApplyStartupLanguage() {
     SetCvar("afro_player_invuln", "true");
   if (opt.invuln)
     std::fprintf(stderr,
-                 "[afro] invuln: requested ON for this session (player HP only; not saved)\n");
+                 "[afro] invuln: Game Journalist difficulty, ON (player HP only)\n");
   if (!Explicit("fullscreen"))
     SetCvar("fullscreen", opt.window ? "false" : "true");
+  // Display: the default fullscreen is a borderless window over the whole screen
+  // (no mode change, instant Alt+Tab); Exclusive fullscreen takes the display.
+  if (!opt.window && opt.exclusive && !Explicit("fullscreen_exclusive"))
+    SetCvar("fullscreen_exclusive", "true");
   // Controls. Auto: the keyboard plays as a pad and its key caps are shown until
   // a controller connects or is used (then its own icons). Controller: no
   // keyboard pad. Keyboard: key cap icons whatever is connected.
