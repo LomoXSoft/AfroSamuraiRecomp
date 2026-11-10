@@ -416,7 +416,18 @@ function Expand-TarXz($arc, $dest, [int]$strip) {
   $psi.CreateNoWindow = $true
   $proc = New-Object System.Diagnostics.Process
   $proc.StartInfo = $psi
-  [void]$proc.Start()
+  # .NET Framework writes the console input encoding's preamble into a redirected
+  # stdin when the process starts. On a UTF-8 console (code page 65001, or Windows'
+  # "UTF-8 worldwide" option) that is EF BB BF ahead of the archive and xz stops
+  # with "File format not recognized". Start it with an encoding without one.
+  $oldIn = $null
+  try {
+    $oldIn = [Console]::InputEncoding
+    if ($oldIn.GetPreamble().Length -gt 0) { [Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false) }
+  } catch { $oldIn = $null }
+  try { [void]$proc.Start() } finally {
+    if ($oldIn) { try { [Console]::InputEncoding = $oldIn } catch {} }
+  }
   $fs = [IO.File]::Create($tarOut)
   $err = ''
   try {
