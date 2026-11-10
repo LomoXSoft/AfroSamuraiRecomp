@@ -33,7 +33,7 @@ Your extracted game, saves and launcher settings stay.
   waiting on the game.
 - Unchanged data is no longer sent to the graphics card again every frame, and
   rendered images are no longer copied back to the CPU.
-- Tested result: steady 60 at native resolution and at 2x on the author's PC
+- Tested result: steady 60 at native resolution and at 2x on the test PC
   (i7-10700F, RX 9060 XT).
 
 ### Launcher
@@ -60,19 +60,22 @@ Your extracted game, saves and launcher settings stay.
 
 ## Tested
 
-- Played on the author's PC at 60: gameplay, the intro cutscene and in-level
+- Played on the test PC at 60: gameplay, the intro cutscene and in-level
   dialogue scenes at normal speed, at 1x and 2x internal resolution.
 - Update from a 0.1.2 install to 0.2.0, then a session at the 30 FPS default.
 - New launcher windows checked in English and Spanish.
 - Clean install into a new folder with a 0.2.0 release candidate, then **Update**
   of that folder with this `afrosetup-v0.2.0.exe`: language on the main window, the
   hidden cursor in fullscreen with keyboard and mouse, and 60 FPS all checked in game.
+- Button prompts (A, B, X, Y, LB, LT, RT and the D-pad prompt) checked in game
+  with Xbox, DualSense, Switch and generic controllers.
 - The whole patch stack applies to a clean ReXGlue `bd833a2`.
 
 ## Still not claimed
 
 - At 60, scenes that show two camera views at once can still drop below 60.
 - RB, Start, Back and the stick-click prompts keep the Xbox icon.
+- Steam icons were not checked in game.
 - Keyboard icons show the default keys, not keys you rebind.
 - No install time is guaranteed on HDD, SSD, or NVMe. **Update** rebuilds the whole
   game even when little changed, so it takes about as long as the build part of a

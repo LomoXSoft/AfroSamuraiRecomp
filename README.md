@@ -17,8 +17,8 @@ The only program attached to a release is `afrosetup-v0.2.0.exe`, the setup inst
   (SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) or a folder you already
   extracted that contains `default.xex`. See [Getting your game files](#getting-your-game-files).
 - About 20 GB of free disk space and an internet connection (the build tools are downloaded).
-- A controller (Xbox, PlayStation, Switch, Steam Deck or any controller Windows/SDL
-  recognises), or keyboard and mouse.
+- A controller (tested: Xbox, PlayStation DualShock 4/DualSense, a Switch controller
+  and a generic controller; others SDL recognises may work), or keyboard and mouse.
 
 ### Install
 1. Download **[`afrosetup-v0.2.0.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.2.0.exe)**
@@ -68,11 +68,14 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
 ## Improvements over the Xbox 360 version
 - **Native Windows x64** program, no emulator. Fullscreen or window.
 - **Up to 4K**: internal resolution 1x (native), 2x or 3x.
-- **Native multi-controller support**: Xbox, PlayStation (DualShock/DualSense, USB
-  and Bluetooth), Switch, Steam Deck and anything SDL recognises.
-- **Button prompts that follow your controller** (0.1.2): PlayStation, Switch,
-  Steam and keyboard icons replace the Xbox ones, and change mid-game when you
-  switch device. Xbox controllers keep the original icons.
+- **Native multi-controller support** through SDL. Tested: Xbox, PlayStation
+  (DualShock 4/DualSense, USB and Bluetooth), a Switch controller and a generic
+  controller. Steam Deck and other controllers are not tested.
+- **Button prompts that follow your controller** (0.1.2): PlayStation, Switch and
+  keyboard icons replace the Xbox ones for A, B, X, Y, LB, LT, RT and the D-pad,
+  and change mid-game when you switch device. Xbox controllers keep the original
+  icons. RB, Start, Back and the stick clicks still show the Xbox icon. A Steam
+  icon set exists but has not been checked in game.
 - **Keyboard and mouse** (0.1.2): mouse camera, left/right click attacks, Q block,
   E kick, R focus, Esc menu, arrows for the D-pad. Mouse sensitivity, dead zone and
   smoothing are sliders in the launcher.
@@ -130,7 +133,9 @@ of the whole game.
     It is not a guarantee for the whole game. It is off by default, lasts for that launch only, and is not saved.
   - Button prompts: A, B, X, Y, LB, LT, RT and the D-pad are replaced. RB, Start,
     Back and the stick clicks have not been found yet and keep the Xbox icon.
-    Keyboard icons show the default keys, not keys you rebind.
+    Checked in game with Xbox, DualSense, Switch and generic controllers; Steam
+    icons not checked in game. Keyboard icons show the default keys, not keys you rebind.
+  - Full list: [`docs/KNOWN_ISSUES_0.2.0.md`](docs/KNOWN_ISSUES_0.2.0.md).
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -313,11 +318,14 @@ the game with `<root>\gamedata` and writes the log to `<root>\afro.log`.
 Hold **Shift** while starting to show the launcher again.
 
 #### Controls
-An Xbox controller or any other controller SDL recognises (XInput, DualShock/DualSense,
-Switch, Steam Deck, etc.) works out of the box. The button prompts follow the device
+Controllers go through SDL. Tested: Xbox, DualShock 4/DualSense (USB and Bluetooth),
+a Switch controller and a generic controller. Other controllers SDL recognises
+(Steam Deck, etc.) may work but are not tested. The button prompts follow the device
 you use last: Xbox icons for Xbox pads, and PlayStation, Switch, Steam or keyboard
 icons for the others (`--afro_button_glyphs=auto|xbox|playstation|nintendo|steam|keyboard`
-forces one).
+forces one). Only A, B, X, Y, LB, LT, RT and the D-pad prompt are replaced; RB,
+Start, Back and the stick-click prompts keep the Xbox icon until their textures are
+identified. Steam icons have not been checked in game.
 
 The launcher's **Control** row picks **Auto** (default: keyboard and mouse are on,
 and a controller takes over when it connects or is used), **Controller**, or

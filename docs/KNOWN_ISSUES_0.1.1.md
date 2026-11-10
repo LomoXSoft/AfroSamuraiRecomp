@@ -1,5 +1,10 @@
 # Known issues for 0.1.1
 
+> **Superseded.** This list is kept for 0.1.1 only. For the current version see
+> [`KNOWN_ISSUES_0.2.0.md`](KNOWN_ISSUES_0.2.0.md) and
+> [`releases/RELEASE_NOTES_v0.2.0.md`](releases/RELEASE_NOTES_v0.2.0.md). In
+> 0.2.0, 60 FPS is a supported option, no longer Experimental (60).
+
 `app/VERSION` is `0.1.1`. These come from the 0.1.1 test runs and earlier
 reports, not from an independent full playthrough. For 0.1.0, see
 `docs/KNOWN_ISSUES_0.1.0.md`.
