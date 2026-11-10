@@ -549,6 +549,7 @@ namespace rex::input {
 uint32_t AfroButtonPresses();
 uint32_t AfroDialogOpenCount();
 uint64_t AfroDialogOpenHash(uint32_t index);
+double AfroVoiceSilenceSeconds();
 }  // namespace rex::input
 namespace {
 
@@ -559,10 +560,11 @@ std::atomic<bool> g_lore_hold{false};
 // state machine (sub_8265D4B8, state at 0x828E62C0) shows a lore interlude in
 // state 6; the level-loaded callback (sub_8265AEF0) sets state 7 and a new fade
 // target at once, so on PC (loads in ~1 s) the lore is cut. The interlude loops
-// its voice lines for loads of any length: hold state 6 (and its fade target)
-// until the first voice line comes round again (one full pass), a button is
-// pressed after the level loaded, or the time cap; then apply what the callback
-// set.
+// its voice lines for loads of any length, or plays them once and goes quiet:
+// hold state 6 (and its fade target) until the first voice line comes round
+// again (one full pass), the voice has been silent 9 s after a line, a button
+// is pressed after the level loaded, or the time cap; then apply what the
+// callback set.
 void InterludeTick() {
   auto* mem = rex::system::kernel_memory();
   if (!mem) return;
@@ -605,6 +607,10 @@ void InterludeTick() {
         const uint64_t first = rex::input::AfroDialogOpenHash(dialog_base);
         if (rex::input::AfroDialogOpenHash(n - 1) == first) why = "full pass";
       }
+      // Linear lore (Okiku's) plays its lines once and then stays quiet; the
+      // longest pause inside a looping one is about 7 s.
+      if (!why && n > dialog_base && rex::input::AfroVoiceSilenceSeconds() >= 9.0)
+        why = "lore ended";
       if (!why && rex::input::AfroButtonPresses() != press_base) why = "button";
       if (!why && now - t6 >= std::chrono::seconds(std::max(REXCVAR_GET(afro_interlude_max_s), 5)))
         why = "time cap";

@@ -255,6 +255,9 @@ Two small helpers for the app's loading interlude (`app/src/frame_pacing.cpp`,
   a reopen within 0.5 s counted once), in order. `NtCreateFile`
   (`src/kernel/xboxkrnl/xboxkrnl_io.cpp`) reports them. The interlude loops its
   lines, so the first one coming round again marks one full pass.
+- `AfroVoiceSilenceSeconds`: seconds since the last voice line ended, its length
+  read from the XMA file under `game_data_root` (XMA2 sample rate, last seek
+  entry). Some interludes (Okiku's) play their lines once and then stay quiet.
 - `AfroButtonPresses`: A, B, X, Y, Start and Back presses on any pad (the keyboard
   pad included), counted in `InputSystem::GetStateForUI`, to skip the interlude.
 

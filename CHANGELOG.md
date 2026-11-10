@@ -28,7 +28,8 @@ Newest first. Versions are in `app/VERSION`.
   screen: the mouse capture is taken again whenever the button icons switch device
   (`zzzzzzz-afro-mouse-recapture` patch, like the startup/focus/resize recapture).
 - Loading screens: the lore interlude shown while a level loads now plays one full
-  pass instead of being cut after about a second (PC loads much faster than the
+  pass (a looping one until its first line comes round again, a linear one such
+  as Okiku's until 9 s after its last line) instead of being cut after about a second (PC loads much faster than the
   360). Once the level is loaded the "Loading" text reads **Press any button to
   continue** (in the game language) and a button skips it. After it the screen
   stays faded until the "Afro!" eyes, instead of showing the lore again for a
