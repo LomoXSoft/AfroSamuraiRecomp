@@ -1601,20 +1601,26 @@ unsigned ApplyStartupLanguage() {
   // First run of a new version: always show the launcher (new options may
   // exist), even if "remember" was ticked before; the tick is kept preset.
   const bool new_version = seen_version != AFRO_VERSION;
-  bool show = ask || new_version || REXCVAR_GET(choose_language);
+  // Started from RecompLauncher (recomplauncher.json): it shows the settings and
+  // writes them to this config itself, so this window stays closed unless asked.
+  const char* rl = std::getenv("RECOMPLAUNCHER");
+  const bool from_recomplauncher = rl && *rl && std::strcmp(rl, "0") != 0;
+  bool show = from_recomplauncher ? REXCVAR_GET(choose_language)
+                                  : (ask || new_version || REXCVAR_GET(choose_language));
 #ifdef _WIN32
   if (GetAsyncKeyState(VK_SHIFT) & 0x8000) show = true;
+  unsigned initial = lang;
+  if (!initial) {  // First run: preselect the Windows UI language.
+    switch (PRIMARYLANGID(GetUserDefaultUILanguage())) {
+      case LANG_SPANISH: initial = 5; break;
+      case LANG_FRENCH: initial = 4; break;
+      case LANG_ITALIAN: initial = 6; break;
+      default: initial = 1;
+    }
+  }
+  if (!show && !lang) lang = initial;  // RecompLauncher before any language was set
   if (show) {
     bool remember = !ask;
-    unsigned initial = lang;
-    if (!initial) {  // First run: preselect the Windows UI language.
-      switch (PRIMARYLANGID(GetUserDefaultUILanguage())) {
-        case LANG_SPANISH: initial = 5; break;
-        case LANG_FRENCH: initial = 4; break;
-        case LANG_ITALIAN: initial = 6; break;
-        default: initial = 1;
-      }
-    }
     lang = ShowPicker(initial, &remember, &opt);
     if (!lang) {  // Launcher closed without Play: quit, keep the old config.
       std::fprintf(stderr, "[afro] launcher closed, not starting the game\n");
@@ -1667,8 +1673,11 @@ unsigned ApplyStartupLanguage() {
   if (opt.invuln)
     std::fprintf(stderr,
                  "[afro] invuln: Game Journalist difficulty, ON (player HP only)\n");
+  // RecompLauncher's Big Picture mode (controller, couch): always fullscreen.
+  const char* rl_mode = std::getenv("RECOMPLAUNCHER_MODE");
+  const bool big_picture = rl_mode && std::strcmp(rl_mode, "bigpicture") == 0;
   if (!Explicit("fullscreen"))
-    SetCvar("fullscreen", opt.window ? "false" : "true");
+    SetCvar("fullscreen", (opt.window && !big_picture) ? "false" : "true");
   // Display: the default fullscreen is a borderless window over the whole screen
   // (no mode change, instant Alt+Tab); Exclusive fullscreen takes the display.
   if (opt.lore && !Explicit("afro_interlude_full"))
