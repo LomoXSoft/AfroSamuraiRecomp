@@ -7,3 +7,6 @@
 *.sh text eol=lf
 *.ico binary
 *.png binary
+# rexglue codegen rewrites this file with LF. A CRLF copy from the setup
+# snapshot would differ on every update and force a full codegen.
+app/afrorecomp_manifest.toml text eol=lf

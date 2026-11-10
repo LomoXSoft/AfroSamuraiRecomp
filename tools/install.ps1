@@ -243,6 +243,8 @@ $script:PhaseKey = ''
 $script:LastStepLine = ''
 $script:LastBucket = ''
 $script:CodegenLog = $false
+$script:PhaseT0 = $null
+$script:NinjaSteps = ''
 function Set-PhasePlan {
   $script:PhasePlan = @()
   foreach ($n in @('git','cmake','ninja','python','llvm','msvc')) {
@@ -495,14 +497,18 @@ function Run($exe, [string[]]$a, $wd = $null) {
       $s = "$_"; $lines.Add($s); Write-InstallLog $s -Bare
       if ($s -match '^AFROPHASE codegen') {
         $script:CodegenLog = $true
+        $script:PhaseT0 = Get-Date
         Emit-Step 'codegen' -1 0 0 'generate'
       } elseif ($s -match '^AFROPHASE compile') {
         $script:CodegenLog = $false
+        if ($script:PhaseT0) { Say ("    codegen took {0:n0} s" -f ((Get-Date) - $script:PhaseT0).TotalSeconds) }
+        $script:PhaseT0 = $null
         Emit-Step 'compile' -1 0 0 'compile'
       } elseif ($s -match 'Receiving objects:\s+\d+%\s+\((\d+)/(\d+)\)') {
         if ($script:PhaseKey) { Emit-Step $script:PhaseKey -1 ([long]$Matches[1]) ([long]$Matches[2]) 'fetch' }
       } elseif ($script:PhaseKey -ne 'codegen' -and $s -match '^\s*\[(\d+)/(\d+)\]') {
         $d = [int]$Matches[1]; $t = [int]$Matches[2]
+        $script:NinjaSteps = "$d/$t"
         $key = if ($script:PhaseKey -eq 'gpu') { 'gpu' } else { 'compile' }
         $act = if ($key -eq 'gpu') { 'graphics' } else { 'compile' }
         Emit-Step $key -1 $d $t $act
@@ -605,6 +611,102 @@ function Remove-IncompleteClone([string]$path, [string]$leaf) {
     throw "Refusing to delete $path. It is not the installer's $leaf folder."
   }
   Remove-Item -LiteralPath $path -Recurse -Force
+}
+
+function Get-TreeFiles([string]$base, [string[]]$skip) {
+  # Relative paths of the files under $base. Anything named .git (a clone's
+  # folder or a worktree's file), a relative path in $skip and a reparse
+  # point are left out.
+  $out = New-Object System.Collections.Generic.List[string]
+  if (-not [IO.Directory]::Exists($base)) { return ,$out }
+  $stack = New-Object System.Collections.Generic.Stack[string]
+  $stack.Push($base)
+  while ($stack.Count -gt 0) {
+    $d = $stack.Pop()
+    foreach ($sub in [IO.Directory]::GetDirectories($d)) {
+      $rel = $sub.Substring($base.Length).TrimStart('\')
+      if ([IO.Path]::GetFileName($sub) -eq '.git' -or $skip -contains $rel) { continue }
+      if ([IO.File]::GetAttributes($sub) -band [IO.FileAttributes]::ReparsePoint) { continue }
+      $stack.Push($sub)
+    }
+    foreach ($f in [IO.Directory]::GetFiles($d)) {
+      $rel = $f.Substring($base.Length).TrimStart('\')
+      if ([IO.Path]::GetFileName($f) -ne '.git' -and $skip -notcontains $rel) { $out.Add($rel) }
+    }
+  }
+  return ,$out
+}
+function Test-SameBytes([string]$a, [string]$b) {
+  $ib = New-Object IO.FileInfo $b
+  if (-not $ib.Exists -or (New-Object IO.FileInfo $a).Length -ne $ib.Length) { return $false }
+  return [Linq.Enumerable]::SequenceEqual([byte[]][IO.File]::ReadAllBytes($a), [byte[]][IO.File]::ReadAllBytes($b))
+}
+function Sync-SourceTree([string]$src, [string]$dest, [string[]]$keep) {
+  # Makes $dest hold the same source files as $src (minus .git and disc
+  # images). Equal files are not written, so their timestamps stay older than
+  # the build outputs. A written file gets the current time: a snapshot with
+  # old timestamps must still look newer than the objects built before it.
+  # Paths in $keep (build folder, codegen output, game-derived files) are
+  # neither written nor removed.
+  $files = @((Get-TreeFiles $src @()) | Where-Object { [IO.Path]::GetExtension($_) -notin '.iso', '.xex', '.pe' })
+  $r = [pscustomobject]@{ Changed = 0; Same = 0; Removed = 0; ChangedFiles = @(); RemovedFiles = @() }
+  $wanted = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+  New-Item -ItemType Directory -Force -Path $dest | Out-Null
+  $n = 0
+  # Each file compared or copied advances this count. There is no time estimate.
+  Emit-Step 'repo' -1 0 $files.Count 'copy'
+  foreach ($rel in $files) {
+    [void]$wanted.Add($rel)
+    $n++
+    $isKept = $false
+    foreach ($k in $keep) { if ($rel -eq $k -or $rel.StartsWith($k + '\', [StringComparison]::OrdinalIgnoreCase)) { $isKept = $true; break } }
+    if ($isKept) { continue }
+    $from = Join-Path $src $rel
+    $target = Join-Path $dest $rel
+    if (Test-SameBytes $from $target) {
+      $r.Same++
+    } else {
+      $parent = Split-Path $target -Parent
+      if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+      Copy-Item -LiteralPath $from -Destination $target -Force
+      [IO.File]::SetLastWriteTimeUtc($target, [DateTime]::UtcNow)
+      $r.Changed++
+      $r.ChangedFiles += $rel
+    }
+    Emit-Step 'repo' -1 $n $files.Count 'copy'
+  }
+  # Files the new source no longer has. Kept paths and a nested .git are not
+  # looked at; a .git at the top of an old clone is removed with the rest.
+  $topGit = Join-Path $dest '.git'
+  if ((Test-Path -LiteralPath $topGit) -and -not ((Get-Item -LiteralPath $topGit -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    Remove-Item -LiteralPath $topGit -Recurse -Force
+    $r.Removed++
+    $r.RemovedFiles += '.git'
+  }
+  foreach ($rel in (Get-TreeFiles $dest $keep)) {
+    if ($wanted.Contains($rel)) { continue }
+    $ext = [IO.Path]::GetExtension($rel)
+    if ($ext -in '.iso', '.xex', '.pe') { continue }
+    Remove-Item -LiteralPath (Join-Path $dest $rel) -Force
+    $r.Removed++
+    $r.RemovedFiles += $rel
+  }
+  return $r
+}
+function Get-BuildToolKey {
+  # What the compiled objects in app\out depend on beyond their sources.
+  # CMake does not notice a different compiler at the same path.
+  $parts = @()
+  foreach ($rel in 'tools\llvm\bin\clang++.exe', 'tools\cmake\bin\cmake.exe', 'tools\ninja\ninja.exe') {
+    $f = Get-Item -LiteralPath (Join-Path $Root $rel) -ErrorAction SilentlyContinue
+    $parts += if ($f) { "$rel=$($f.Length)" } else { "$rel=none" }
+  }
+  foreach ($rel in 'tools\msvc\VC\Tools\MSVC', 'tools\msvc\Windows Kits\10\Lib') {
+    $d = Join-Path $Root $rel
+    $names = if (Test-Path -LiteralPath $d) { (@(Get-ChildItem -LiteralPath $d -Directory | ForEach-Object { $_.Name }) | Sort-Object) -join ',' } else { 'none' }
+    $parts += "$rel=$names"
+  }
+  return ($parts -join ';')
 }
 
 # ---------------------------------------------------------------- setup ------
@@ -964,55 +1066,24 @@ try {
         if ($src.StartsWith($dest + '\', [StringComparison]::OrdinalIgnoreCase)) {
           throw 'Install folder is inside the local source. Choose a different install folder.'
         }
-        # Drop compile stamps so the build runs again. Keep codegen output
-        # and the game-derived tables; those are not in this source tree.
+        # Drop compile stamps so the build runs again. The build itself is
+        # incremental: only what the sync below changed is compiled.
         foreach ($n in 'build-app', 'build-gpu', 'build') {
           Remove-Item -LiteralPath (Join-Path $STAMPS "$n.done") -Force -ErrorAction SilentlyContinue
         }
         Remove-Item -LiteralPath (Join-Path $STAMPS 'build.rev') -Force -ErrorAction SilentlyContinue
         if ($Update) { Test-AfroRunning }
-        $keepRel = @('app\generated', 'app\afro_switch_tables.toml', 'app\afro_icon.ico', 'app\assets\default.pe')
-        $stash = Join-Path ([IO.Path]::GetTempPath()) ('afro-keep-' + [guid]::NewGuid().ToString('n'))
-        $stashed = @()
-        if (Test-Path -LiteralPath $dest) {
-          New-Item -ItemType Directory -Force -Path $stash | Out-Null
-          foreach ($rel in $keepRel) {
-            $from = Join-Path $dest $rel
-            if (-not (Test-Path -LiteralPath $from)) { continue }
-            $to = Join-Path $stash $rel
-            $parent = Split-Path $to -Parent
-            if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-            Move-Item -LiteralPath $from -Destination $to
-            $stashed += $rel
-          }
-          Remove-Item -LiteralPath $dest -Recurse -Force
-        }
-        New-Item -ItemType Directory -Force -Path $dest | Out-Null
-        # File count of the source tree, excluding the git dir and disc images.
-        # Each copy advances that count. There is no time estimate.
-        $files = @(Get-ChildItem -LiteralPath $src -Recurse -File -Force | Where-Object {
-          $rel = $_.FullName.Substring($src.Length).TrimStart('\')
-          $rel -notmatch '(^|\\)\.git(\\|$)' -and $_.Extension -notin '.iso', '.xex', '.pe'
-        })
-        $n = 0
-        Emit-Step 'repo' -1 0 $files.Count 'copy'
-        foreach ($file in $files) {
-          $rel = $file.FullName.Substring($src.Length).TrimStart('\')
-          $target = Join-Path $dest $rel
-          $parent = Split-Path $target -Parent
-          if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-          Copy-Item -LiteralPath $file.FullName -Destination $target -Force
-          $n++
-          Emit-Step 'repo' -1 $n $files.Count 'copy'
-        }
-        foreach ($rel in $stashed) {
-          $from = Join-Path $stash $rel
-          $to = Join-Path $dest $rel
-          $parent = Split-Path $to -Parent
-          if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-          Move-Item -LiteralPath $from -Destination $to
-        }
-        if (Test-Path -LiteralPath $stash) { Remove-Item -LiteralPath $stash -Recurse -Force -ErrorAction SilentlyContinue }
+        # Sync, not replace. Before 0.2.1 the whole folder was deleted and copied
+        # again, which also deleted app\out: every update recompiled the game
+        # from scratch, and every copied file looked newer than its object.
+        # Now a file is written only when its bytes differ, and a written file
+        # gets the current time, so Ninja rebuilds exactly what changed.
+        # Kept as they are: the build folder, codegen output and game-derived
+        # files. None of them are in the source tree.
+        $sync = Sync-SourceTree $src $dest @('app\out', 'app\generated', 'app\assets', 'app\afro_switch_tables.toml', 'app\afro_icon.ico')
+        Say "    source sync: $($sync.Changed) changed, $($sync.Same) unchanged, $($sync.Removed) removed"
+        foreach ($rel in $sync.ChangedFiles) { Write-InstallLog "      changed: $rel" }
+        foreach ($rel in $sync.RemovedFiles) { Write-InstallLog "      removed: $rel" }
       }
     }
     $REV = "local-$localVer"
@@ -1106,8 +1177,31 @@ try {
   }
 
   # ------------------------------------------------------- build -----------
-  Step 'build-app' (T 't_app') { $script:BASE = 0.25; Emit-Step 'codegen' -1 0 0 'generate'; Run "$env:SystemRoot\System32\cmd.exe" @('/c', 'tools\build_win.bat') $REPO }
-  Step 'build-gpu' (T 't_gpu') { $script:BASE = 0.1; $script:PhaseKey = 'gpu'; Emit-Step 'gpu' -1; Run "$env:SystemRoot\System32\cmd.exe" @('/c', 'tools\build_gpu_plugin.bat') $REPO }
+  # app\out is kept from the previous build, so Ninja compiles only what
+  # changed. A different compiler or Windows SDK starts it from scratch.
+  $appOut = Join-Path $REPO 'app\out'
+  $toolKeyFile = Join-Path $STAMPS 'build-tools.key'
+  $toolKey = Get-BuildToolKey
+  $oldToolKey = if (Test-Path -LiteralPath $toolKeyFile) { (Get-Content -LiteralPath $toolKeyFile -Raw).Trim() } else { '' }
+  if (Test-Path -LiteralPath $appOut) {
+    if ($oldToolKey -and $oldToolKey -ne $toolKey -and $REPO -ne $here2) {
+      Say '    toolchain changed: app build folder cleared, full compile'
+      Remove-Item -LiteralPath $appOut -Recurse -Force
+    } else {
+      Say '    app build folder kept: only changed sources are compiled'
+    }
+  }
+  Set-Content -LiteralPath $toolKeyFile -Value $toolKey -Encoding ASCII
+  Step 'build-app' (T 't_app') {
+    $script:BASE = 0.25; $script:NinjaSteps = ''; Emit-Step 'codegen' -1 0 0 'generate'
+    Run "$env:SystemRoot\System32\cmd.exe" @('/c', 'tools\build_win.bat') $REPO
+    Say "    game build steps run: $(if ($script:NinjaSteps) { $script:NinjaSteps } else { 'none, already up to date' })"
+  }
+  Step 'build-gpu' (T 't_gpu') {
+    $script:BASE = 0.1; $script:NinjaSteps = ''; $script:PhaseKey = 'gpu'; Emit-Step 'gpu' -1
+    Run "$env:SystemRoot\System32\cmd.exe" @('/c', 'tools\build_gpu_plugin.bat') $REPO
+    Say "    GPU plugin build steps run: $(if ($script:NinjaSteps) { $script:NinjaSteps } else { 'none, already up to date' })"
+  }
 
   $script:STEP = 'verify output'; $script:CUR = 'verify'; Prog 0 -Force
   Emit-Step 'install' -1 0 0 'check'

@@ -25,6 +25,11 @@ def ok_path(path: str) -> bool:
     return True
 
 
+# rexglue codegen writes these back with LF. A CRLF copy from a Windows checkout
+# made every update differ from the installed file and run the codegen again.
+LF_FILES = {"app/afrorecomp_manifest.toml"}
+
+
 def collect(repo: pathlib.Path, overlay: pathlib.Path) -> list[tuple[str, bytes]]:
     skip_dirs = {".git"}
     skip_suffix = {".iso", ".xex", ".pe", ".exe", ".res", ".o", ".obj"}
@@ -48,7 +53,10 @@ def collect(repo: pathlib.Path, overlay: pathlib.Path) -> list[tuple[str, bytes]
     for rel in sorted(files):
         if not ok_path(rel):
             raise SystemExit(f"unsafe path: {rel}")
-        out.append((rel, files[rel].read_bytes()))
+        data = files[rel].read_bytes()
+        if rel in LF_FILES:
+            data = data.replace(b"\r\n", b"\n")
+        out.append((rel, data))
     return out
 
 

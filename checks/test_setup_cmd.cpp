@@ -1,5 +1,6 @@
 #include "../tools/afrosetup_cmd.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -408,7 +409,7 @@ int main(int argc, char** argv) {
     std::vector<afrosetup::PayloadFile> packed;
     std::string perr;
     Expect(afrosetup::ParsePayload(exe.data(), exe.size(), packed, perr), perr.c_str());
-    bool version_ok = false, ps1_ok = false, bat_ok = false, hooks_ok = false;
+    bool version_ok = false, ps1_ok = false, bat_ok = false, hooks_ok = false, manifest_lf = false;
     for (const auto& f : packed) {
       if (f.path == "app/VERSION") {
         std::string text(f.bytes.begin(), f.bytes.end());
@@ -426,6 +427,8 @@ int main(int argc, char** argv) {
                  text.find("Set-PhasePlan") != std::string::npos;
       }
       if (f.path == "install.bat") bat_ok = true;
+      if (f.path == "app/afrorecomp_manifest.toml")
+        manifest_lf = std::find(f.bytes.begin(), f.bytes.end(), uint8_t('\r')) == f.bytes.end();
       if (f.path == "app/afro_hooks.toml") {
         std::string text(f.bytes.begin(), f.bytes.end());
         hooks_ok = text.find("0x82663180") != std::string::npos &&
@@ -436,6 +439,7 @@ int main(int argc, char** argv) {
     Expect(ps1_ok, "bundled install.ps1 is the 0.2.0 local-tree script");
     Expect(bat_ok, "bundled tree still contains install.bat");
     Expect(hooks_ok, "bundled hooks include the meter death gate");
+    Expect(manifest_lf, "bundled codegen manifest has LF line ends, as rexglue writes it");
   }
 
   auto read_text = [](const std::string& path) {
@@ -585,9 +589,14 @@ int main(int argc, char** argv) {
              L"CMAKE_RC_COMPILER:FILEPATH=E:/AfroSamuraiRecomp/tools/llvm/bin/llvm-rc.exe") &&
              !afrosetup::CmakeRcCacheLineIsExitCode(L"# CMAKE_RC_COMPILER is the resource compiler"),
          "a real resource compiler path and a comment are kept");
-  Expect(script_text.find("app\\generated") != std::string::npos &&
-             script_text.find("afro-keep-") != std::string::npos,
-         "replacing the source tree keeps the finished codegen output");
+  Expect(script_text.find("Sync-SourceTree $src $dest @('app\\out', 'app\\generated'") != std::string::npos &&
+             script_text.find("afro-keep-") == std::string::npos,
+         "an update syncs the source tree and keeps the build folder and codegen output");
+  Expect(script_text.find("SetLastWriteTimeUtc($target, [DateTime]::UtcNow)") != std::string::npos &&
+             script_text.find("Test-SameBytes $from $target") != std::string::npos,
+         "only differing files are written, and they are newer than the old objects");
+  Expect(build_bat.find("--max_jump_table_entries=") == std::string::npos,
+         "build_win.bat runs codegen with the same flags as the Ninja rule");
   Expect(window_cpp.find("ResultButton::kPlay") != std::string::npos && window_cpp.find("ResultButton::kFinish") != std::string::npos &&
              window_cpp.find("ResultButton::kClose") != std::string::npos,
          "Play, Finish and X go through the result policy");

@@ -23,6 +23,7 @@ if not exist generated\default\gen_v3.stamp goto dogegen
 if not exist generated\default\hooks.sha1 goto dogegen
 set /p OLDHOOK=<generated\default\hooks.sha1
 if /I not "%OLDHOOK%"=="%HOOKHASH%" goto dogegen
+echo codegen not forced: afro_hooks.toml unchanged; the build re-checks the other inputs
 goto ogen
 :dogegen
 echo AFROPHASE codegen
@@ -34,7 +35,12 @@ set "CRTBIN=%VCToolsInstallDir%bin\Hostx64\x64"
 python "%~dp0check_pe_imports.py" --stage-from "%CRTBIN%" "%REXBIN%\rexglue.exe"
 if errorlevel 1 exit /b 2
 set "CODELOG=%R%\codegen_rexglue.txt"
-"%REXBIN%\rexglue.exe" codegen afrorecomp_manifest.toml --max_jump_table_entries=8192 > "%CODELOG%" 2>&1
+rem Same command line as the codegen rule in generated\rexglue.cmake. rexglue
+rem fingerprints its flags: the max_jump_table_entries 8192 this used to pass
+rem made that Ninja rule disagree and run the whole codegen a second time with
+rem the default (512). Both emit byte-identical code for this game, and the
+rem default is what the Ninja rule always compiled last.
+"%REXBIN%\rexglue.exe" codegen afrorecomp_manifest.toml > "%CODELOG%" 2>&1
 rem Not RC: CMake reads the environment variable RC as the resource compiler.
 set GEN_EXIT=%ERRORLEVEL%
 if exist "%CODELOG%" type "%CODELOG%"
