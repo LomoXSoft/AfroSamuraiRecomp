@@ -10,9 +10,9 @@ HDD installation can take a long time; SSD/NVMe recommended.
 
 `afrosetup-v0.2.1.exe`
 
-SHA-256 `@SHA256@`
+SHA-256 `c21a4a71dfb9dfbd61d47450f51f9265e50091d16df2e0a9739af5e8f9d124b4`
 
-@BYTES@ bytes.
+1841035 bytes.
 
 Already on 0.1.x or 0.2.0: run it, choose **Update** and pick your install folder.
 Your extracted game, saves and launcher settings stay. **Update** now rebuilds only
@@ -61,7 +61,16 @@ what changed.
 
 ## Tested
 
-- @TESTED@
+- Fresh install into an empty folder with this setup (11 min): MSVC 14.51, the game
+  built and started; a RecompLauncher-style start (no arguments) found the game data
+  and skipped the launcher window.
+- Repair of a fresh 0.2.0 install that had stopped at the game build (MSVC 14.52):
+  the setup swapped in 14.51 and the game built.
+- Played on the author's PC: key bindings and controller remapping (keyboard, Xbox
+  pad), Difficulty (Game Journalist), Exclusive fullscreen, the cursor when switching
+  between keyboard and controller, and the loading screens of Justice (full pass,
+  44 s) and Okiku at the start of the Daimyo level (39 s), with and without a button.
+- The whole patch stack applies to a clean ReXGlue `bd833a2`.
 
 ## Still not claimed
 
