@@ -5,7 +5,10 @@
 #pragma once
 
 #include <array>
+#include <filesystem>
+#include <system_error>
 
+#include <rex/filesystem.h>
 #include <rex/rex_app.h>
 
 #include "language_picker.h"
@@ -64,5 +67,26 @@ class AfrorecompApp : public rex::ReXApp {
   // std::unique_ptr<rex::ui::AchievementNotificationDialog>
   // CreateAchievementNotificationDialog() override;
   // void OnShutdown() override {}
-  // void OnConfigurePaths(rex::PathConfig& paths) override {}
+
+  // A setup install keeps the disc files in <root>\gamedata and the log in
+  // <root>\afro.log, beside <root>\game\afrorecomp.exe. Play.bat passes both;
+  // without them (RecompLauncher, a shortcut to the exe) use the same places.
+  // --game_data_root and --log_file still win.
+  void OnConfigurePaths(rex::PathConfig& paths) override {
+    if (paths.game_data_root.empty()) {
+      const auto data = SetupRoot() / "gamedata";
+      std::error_code ec;
+      if (std::filesystem::is_directory(data / "xbox2", ec)) paths.game_data_root = data;
+    }
+  }
+  void OnConfigureLogging(rex::LogConfig& config) override {
+    std::error_code ec;
+    if (config.log_file.empty() && std::filesystem::is_directory(SetupRoot() / "gamedata", ec))
+      config.log_file = SetupRoot() / "afro.log";
+  }
+
+ private:
+  static std::filesystem::path SetupRoot() {
+    return rex::filesystem::GetExecutableFolder().parent_path();
+  }
 };
