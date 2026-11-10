@@ -2,7 +2,11 @@
 
 Newest first. Versions are in `app/VERSION`.
 
-## 0.2.1 (in progress)
+## 0.2.1 – Controls and loading screens
+- Setup: fresh installs work again. The setup now pins MSVC 14.51 and Windows SDK
+  28000: Microsoft's newest MSVC (14.52) refuses the setup's Clang 20, so new
+  installs stopped at the game build. An install that got 14.52 is repaired on the
+  next run.
 - Setup **Update** rebuilds only what changed (about 10 s instead of minutes when
   little changed).
 - Key bindings: Settings has a **Controls** tab (control mode, mouse sliders, **Key

@@ -9,7 +9,7 @@ Europe, title ID 4E4D07D8) to native Windows x64 using
 **This repository contains no game files.** You need your own original disc
 (or an ISO you dumped from it). The game executable is not released: it
 contains code translated from the game, so everyone builds it from their own copy.
-The only program attached to a release is `afrosetup-v0.2.0.exe`, the setup installer.
+The only program attached to a release is `afrosetup-v0.2.1.exe`, the setup installer.
 
 ## Quick start
 
@@ -23,10 +23,10 @@ The only program attached to a release is `afrosetup-v0.2.0.exe`, the setup inst
   recognises), or keyboard and mouse.
 
 ### Install
-1. Download **[`afrosetup-v0.2.0.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.2.0.exe)**
+1. Download **[`afrosetup-v0.2.1.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.2.1.exe)**
    from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
    That file is the setup program, not the game. It builds the game on your PC from your disc.
-2. Run `afrosetup-v0.2.0.exe`. Choose a language, then **Install**.
+2. Run `afrosetup-v0.2.1.exe`. Choose a language, then **Install**.
 3. Choose a folder, then your Europe ISO or the extracted game folder (`default.xex` must be inside it).
 4. Accept the Microsoft Visual Studio Build Tools license (the box starts unchecked). Shortcuts are optional. You can keep the downloaded tools or delete them when setup finishes. Deleting them does not remove `game`, the extracted game, the logs, your ISO, or your saves.
 5. The window says this takes several minutes. It does not promise a fixed duration.
@@ -37,13 +37,13 @@ Nothing is installed system-wide and no admin rights are needed. To uninstall,
 delete the install folder and the shortcuts. Saves are not in that folder.
 
 ### Update
-Run `afrosetup-v0.2.0.exe` again, choose **Update**, and select the existing installation
+Run `afrosetup-v0.2.1.exe` again, choose **Update**, and select the existing installation
 folder (the one that contains `game\Play.bat`). Close the game first. If
 `gamedata\default.xex` is already there, the ISO is not asked for again. Tools
 still on disk are reused, and only missing tools are downloaded again. The
 extracted game, your saves, and `game\afro_language.cfg` stay. The program files
 are rebuilt and replaced only after that build succeeds, including when the
-folder is already 0.1.x or 0.2.0.
+folder is already 0.1.x or 0.2.x.
 
 ### Your saves
 Paste this into File Explorer:
@@ -56,7 +56,7 @@ to show it again) use **Manage saved games...** to open, back up, restore or
 delete them. Details: [Saves](#saves).
 
 ### If something goes wrong
-- If the window says **Installation did not finish**, read the details (shown by default) and `install.log` in the install folder. Run `afrosetup-v0.2.0.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
+- If the window says **Installation did not finish**, read the details (shown by default) and `install.log` in the install folder. Run `afrosetup-v0.2.1.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
 - [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat) is a separate console fallback. See [Console installer](#console-installer). Without `-Ref` it builds `main`.
 - The game log is `afro.log` in the install folder.
 - Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with what
@@ -110,7 +110,7 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.2.0**). The default is the original 30 FPS at 720p. **60 FPS** is a
+Preview (**0.2.1**). The default is the original 30 FPS at 720p. **60 FPS** is a
 supported option (see [60 FPS](#60-fps)): gameplay, cutscenes and dialogue scenes were
 played at 60 on one PC, also at 2x resolution. That is not an independent playthrough
 of the whole game.
@@ -172,15 +172,15 @@ Please attach that log to the issue.
 
 ### Console installer
 `install.bat` is a fallback for a source checkout. The program players download
-is [`afrosetup-v0.2.0.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.2.0.exe)
+is [`afrosetup-v0.2.1.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.2.1.exe)
 from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
 That setup builds the source stored inside the file. It does not clone public `main`.
 
 When it asks its questions interactively, `install.bat` with no `-Ref` builds the
 `main` branch. With `-NonInteractive` it refuses to build `main`, both with no
 `-Ref` and with `-Ref main`: pass an explicit `-Ref` that is not `main`, or
-`-LocalTree` with a 0.2.0 source tree. To build the tagged 0.2.0 source from the
-console installer, pass `-Ref v0.2.0`.
+`-LocalTree` with a 0.2.1 source tree. To build the tagged 0.2.1 source from the
+console installer, pass `-Ref v0.2.1`.
 
 1. Make an ISO of your own Afro Samurai (Europe) disc, or use an extracted folder
    that contains `default.xex` (see [Getting your game files](#getting-your-game-files)).
@@ -195,7 +195,7 @@ console installer, pass `-Ref v0.2.0`.
    records that language in `game\afro_language.cfg`.
 5. At the end it can delete the toolchain, ReXGlue SDK and source, build files, and
    downloads, and keep `<root>\game`, `<root>\gamedata`, and the logs. Your ISO and
-   your saves are not part of that delete. A later **Update** in `afrosetup-v0.2.0.exe`
+   your saves are not part of that delete. A later **Update** in `afrosetup-v0.2.1.exe`
    downloads again only the tools that are missing and keeps the extracted game.
 
 What the installer does (`tools/install.ps1`, run with the PowerShell execution
@@ -218,7 +218,7 @@ Visual Studio installer changes) and nothing is uploaded. Downloads are about
 and about 2 GB of ReXGlue source; the whole folder ends up around 12-13 GB
 (`<root>\downloads` can be deleted afterwards). A run takes several minutes; there is
 no fixed duration. The console shows its own progress lines. A normal console re-run
-skips steps already stamped in `<root>\.install`. **Update** in `afrosetup-v0.2.0.exe` clears
+skips steps already stamped in `<root>\.install`. **Update** in `afrosetup-v0.2.1.exe` clears
 the compile stamps and rebuilds the program. Neither path promises that an interrupted
 download always resumes. The log is `<root>\install.log`. To uninstall, delete the
 install folder and the shortcuts. Saves stay in `Documents\afrorecomp`
@@ -469,7 +469,7 @@ unless a maintainer specifically asks.
 ### Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
-- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.2.0.exe`, not committed.
+- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.2.1.exe`, not committed.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
 - `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
