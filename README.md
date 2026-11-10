@@ -4,6 +4,8 @@ Unofficial, work-in-progress static recompilation of **Afro Samurai** (Xbox 360,
 Europe, title ID 4E4D07D8) to native Windows x64 using
 [ReXGlue](https://github.com/rexglue/rexglue-sdk).
 
+<a href="https://recomplauncher.com"><picture><source media="(prefers-color-scheme: dark)" srcset="https://recomplauncher.com/assets/press/launcher/badge-light.svg"><img alt="Get it on RecompLauncher" src="https://recomplauncher.com/assets/press/launcher/badge-dark.svg" height="48"></picture></a>
+
 **This repository contains no game files.** You need your own original disc
 (or an ISO you dumped from it). The game executable is not released: it
 contains code translated from the game, so everyone builds it from their own copy.
@@ -412,6 +414,19 @@ Developer options: start with `--advanced` (e.g. `tools\run_win.bat --advanced`)
 to show the "Advanced options..." button on the Experimental tab (resolve readback,
 GPU diagnostics). Any ReXGlue cvar can also be passed on the
 command line, e.g. `--render_target_path_d3d12=rov`.
+
+### RecompLauncher
+The setup puts a `recomplauncher.json` next to `afrorecomp.exe`, so an installed game
+can be played from [RecompLauncher](https://recomplauncher.com): in RecompLauncher,
+Settings → Developers → Developer tools, then **Add a build** and pick the `game`
+folder of your installation. RecompLauncher starts the game and shows its settings
+(language, display, internal resolution, frame rate, VSync, difficulty, loading
+screens, controls), which it writes to `afro_language.cfg`; it also backs up the
+saves. Mouse sensitivity, dead zone and smoothing are sliders there, and a button
+clears the shader cache. Started from RecompLauncher, the game's own launcher window
+stays closed (hold Shift at start to open it); in its Big Picture mode the game
+always starts fullscreen. Installing and updating stay with the setup:
+RecompLauncher cannot build the game from your disc.
 
 ### Troubleshooting
 - **`xex_to_pe.py needs pycryptodome`**: run `python -m pip install pycryptodome`

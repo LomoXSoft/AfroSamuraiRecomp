@@ -1294,6 +1294,12 @@ try {
     }
     Say '    button icons copied to game\glyphs'
   }
+  # RecompLauncher (recomplauncher.com): its manifest next to afrorecomp.exe, so
+  # the game folder can be added there as a build (0.2.1).
+  $rlSrc = Join-Path $REPO 'tools\recomplauncher.json'
+  if (Test-Path -LiteralPath $rlSrc) {
+    Copy-Item -LiteralPath $rlSrc (Join-Path $GAME 'recomplauncher.json') -Force
+  }
   $playBat = Join-Path $GAME 'Play.bat'
   # The old stock bat runs the exe in the foreground, so cmd stays open for the
   # whole session. start returns at once; the window stays only if start fails.

@@ -1,0 +1,350 @@
+{
+  "$schema": "https://recomplauncher.com/schema/recomplauncher.json",
+  "format": 1,
+  "name": "Afro Samurai Recomp",
+  "repo": "LomoXSoft/AfroSamuraiRecomp",
+  "start": {
+    "program": [
+      "afrorecomp.exe"
+    ],
+    "args": [
+      "--game_data_root={install}/../gamedata",
+      "--gpu_plugin=xenos",
+      "--log_file={install}/../afro.log"
+    ]
+  },
+  "config": [
+    {
+      "id": "main",
+      "format": "ini",
+      "file": [
+        {
+          "path": "{install}/afro_language.cfg"
+        }
+      ],
+      "new": {
+        "version": "0.2.1",
+        "ask": "0"
+      }
+    }
+  ],
+  "settings": [
+    {
+      "id": "language",
+      "label": "Language",
+      "help": "Language of the game's text and voices.",
+      "defaults": {
+        "language": "1"
+      },
+      "choices": [
+        {
+          "label": "English",
+          "set": {
+            "language": "1"
+          }
+        },
+        {
+          "label": "Español",
+          "set": {
+            "language": "5"
+          }
+        },
+        {
+          "label": "Français",
+          "set": {
+            "language": "4"
+          }
+        },
+        {
+          "label": "Italiano",
+          "set": {
+            "language": "6"
+          }
+        }
+      ],
+      "group": "Language"
+    },
+    {
+      "id": "display",
+      "label": "Display",
+      "help": "Borderless fullscreen switches instantly with Alt+Tab.",
+      "defaults": {
+        "window": "0",
+        "exclusive": "0"
+      },
+      "choices": [
+        {
+          "label": "Borderless fullscreen",
+          "set": {
+            "window": "0",
+            "exclusive": "0"
+          }
+        },
+        {
+          "label": "Window",
+          "set": {
+            "window": "1",
+            "exclusive": "0"
+          }
+        },
+        {
+          "label": "Exclusive fullscreen",
+          "set": {
+            "window": "0",
+            "exclusive": "1"
+          }
+        }
+      ],
+      "group": "Graphics"
+    },
+    {
+      "id": "scale",
+      "label": "Internal resolution",
+      "help": "1x is the original 720p.",
+      "defaults": {
+        "scale": "1"
+      },
+      "choices": [
+        {
+          "label": "1x (720p)",
+          "set": {
+            "scale": "1"
+          }
+        },
+        {
+          "label": "2x (1440p)",
+          "set": {
+            "scale": "2"
+          }
+        },
+        {
+          "label": "3x (2160p)",
+          "set": {
+            "scale": "3"
+          }
+        }
+      ],
+      "group": "Graphics"
+    },
+    {
+      "id": "fps",
+      "label": "Frame rate",
+      "help": "60 plays the whole game, cutscenes included, at 60 FPS.",
+      "defaults": {
+        "fps": "0",
+        "vsync": "0"
+      },
+      "choices": [
+        {
+          "label": "30 (original)",
+          "set": {
+            "fps": "0",
+            "vsync": "0"
+          }
+        },
+        {
+          "label": "60",
+          "set": {
+            "fps": "60",
+            "vsync": "1"
+          }
+        }
+      ],
+      "group": "Graphics"
+    },
+    {
+      "id": "vsync",
+      "label": "VSync",
+      "help": "Off is recommended at 60 FPS.",
+      "defaults": {
+        "vsync": "0"
+      },
+      "choices": [
+        {
+          "label": "On",
+          "set": {
+            "vsync": "0"
+          }
+        },
+        {
+          "label": "Off",
+          "set": {
+            "vsync": "1"
+          }
+        }
+      ],
+      "group": "Graphics"
+    },
+    {
+      "id": "difficulty",
+      "label": "Difficulty",
+      "help": "Game Journalist: you can't die.",
+      "defaults": {
+        "difficulty": "0"
+      },
+      "choices": [
+        {
+          "label": "Normal",
+          "set": {
+            "difficulty": "0"
+          }
+        },
+        {
+          "label": "Game Journalist",
+          "set": {
+            "difficulty": "1"
+          }
+        }
+      ],
+      "group": "Gameplay"
+    },
+    {
+      "id": "lore",
+      "label": "Loading screens",
+      "help": "Full lore plays the loading story once; any button continues.",
+      "defaults": {
+        "lore": "0"
+      },
+      "choices": [
+        {
+          "label": "Full lore",
+          "set": {
+            "lore": "0"
+          }
+        },
+        {
+          "label": "Fast",
+          "set": {
+            "lore": "1"
+          }
+        }
+      ],
+      "group": "Gameplay"
+    },
+    {
+      "id": "control",
+      "label": "Controls",
+      "help": "Auto: keyboard and mouse, a controller takes over when used.",
+      "defaults": {
+        "control": "0"
+      },
+      "choices": [
+        {
+          "label": "Auto",
+          "set": {
+            "control": "0"
+          }
+        },
+        {
+          "label": "Controller",
+          "set": {
+            "control": "1"
+          }
+        },
+        {
+          "label": "Keyboard",
+          "set": {
+            "control": "2"
+          }
+        }
+      ],
+      "group": "Controls"
+    },
+    {
+      "id": "mouse_sensitivity",
+      "label": "Mouse sensitivity",
+      "group": "Controls",
+      "help": "How far the camera turns with the mouse. 100 is 1.00x.",
+      "slider": {
+        "key": "mouse_sensitivity",
+        "min": 10,
+        "max": 500,
+        "step": 5,
+        "format": "%d"
+      },
+      "defaults": {
+        "mouse_sensitivity": "200"
+      }
+    },
+    {
+      "id": "mouse_deadzone",
+      "label": "Mouse dead zone",
+      "group": "Controls",
+      "help": "Small mouse moves below this are ignored. 100 is 1.00.",
+      "slider": {
+        "key": "mouse_deadzone",
+        "min": 0,
+        "max": 80,
+        "step": 1,
+        "format": "%d"
+      },
+      "defaults": {
+        "mouse_deadzone": "55"
+      }
+    },
+    {
+      "id": "mouse_smoothing",
+      "label": "Mouse smoothing",
+      "group": "Controls",
+      "help": "Milliseconds of mouse movement averaged for the camera.",
+      "slider": {
+        "key": "mouse_smoothing_ms",
+        "min": 1,
+        "max": 50,
+        "step": 1,
+        "format": "%d"
+      },
+      "defaults": {
+        "mouse_smoothing_ms": "5"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "id": "Language"
+    },
+    {
+      "id": "Graphics"
+    },
+    {
+      "id": "Gameplay"
+    },
+    {
+      "id": "Controls"
+    }
+  ],
+  "saves": [
+    "{documents}/afrorecomp/*/4E4D07D8",
+    "{documents}/afrorecomp/achievements"
+  ],
+  "folders": {
+    "saves": [
+      {
+        "path": "{documents}/afrorecomp"
+      }
+    ],
+    "logs": [
+      {
+        "path": "{install}/.."
+      }
+    ]
+  },
+  "actions": [
+    {
+      "id": "open_saves",
+      "label": "Open saves folder",
+      "open": "saves"
+    },
+    {
+      "id": "open_logs",
+      "label": "Open log folder",
+      "open": "logs"
+    },
+    {
+      "id": "cache",
+      "label": "Shader cache",
+      "help": "Shaders the game built, so later scenes don't stutter. Clearing only helps if graphics look wrong after an update.",
+      "clear": "saves/cache"
+    }
+  ]
+}
