@@ -135,7 +135,7 @@ std::string MouseCvarValue(int r, int v) {
   return buf;
 }
 
-struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* 0 off, 1 on — session test only, not persisted */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ };
+struct Options { int fps = 0; /* 0=Original(30), 60=Experimental(60) */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ bool window = false; int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ };
 
 struct KeyAction { const char* cvar; const char* def; };
 constexpr int kKeyN = 24;
@@ -203,7 +203,7 @@ const UiText kText[] = {
      L"Controls:", L"Auto (keyboard + controller)", L"Controller", L"Keyboard",
      L"Mouse sensitivity:", L"Mouse dead zone:", L"Mouse smoothing:",
      L"Difficulty:", L"Normal (default)", L"Game Journalist",
-     L"Game Journalist: you can't die. Only for this launch, not saved.",
+     L"Game Journalist: you can't die.",
      L"These options are not fully tested. They may cause visual problems.",
      L"Sepia filter:", L"Blood effect:", L"Depth of field:", L"Bloom:", L"Focus effect:",
      L"On (default)", L"Off",
@@ -218,7 +218,7 @@ const UiText kText[] = {
      L"Control:", L"Autom\u00e1tico (teclado + mando)", L"Mando", L"Teclado",
      L"Sensibilidad del rat\u00f3n:", L"Zona muerta del rat\u00f3n:", L"Suavizado del rat\u00f3n:",
      L"Dificultad:", L"Normal (por defecto)", L"Periodista de videojuegos",
-     L"Periodista de videojuegos: no puedes morir. Solo para esta partida, no se guarda.",
+     L"Periodista de videojuegos: no puedes morir.",
      L"Estas opciones no est\u00e1n probadas del todo. Pueden causar fallos visuales.",
      L"Filtro sepia:", L"Efecto de sangre:", L"Profundidad de campo:", L"Resplandor (bloom):",
      L"Efecto de concentraci\u00f3n:",
@@ -235,7 +235,7 @@ const UiText kText[] = {
      L"Contr\u00f4les :", L"Auto (clavier + manette)", L"Manette", L"Clavier",
      L"Sensibilit\u00e9 souris :", L"Zone morte souris :", L"Lissage souris :",
      L"Difficult\u00e9 :", L"Normal (par d\u00e9faut)", L"Journaliste jeu vid\u00e9o",
-     L"Journaliste jeu vid\u00e9o : tu ne peux pas mourir. Pour ce lancement seulement, non enregistr\u00e9.",
+     L"Journaliste jeu vid\u00e9o : tu ne peux pas mourir.",
      L"Ces options ne sont pas enti\u00e8rement test\u00e9es. Elles peuvent causer des d\u00e9fauts visuels.",
      L"Filtre s\u00e9pia :", L"Effet de sang :", L"Profondeur de champ :", L"Bloom :",
      L"Effet de concentration :",
@@ -251,7 +251,7 @@ const UiText kText[] = {
      L"Controlli:", L"Automatico (tastiera + controller)", L"Controller", L"Tastiera",
      L"Sensibilit\u00e0 mouse:", L"Zona morta mouse:", L"Smussatura mouse:",
      L"Difficolt\u00e0:", L"Normale (predefinito)", L"Giornalista di videogiochi",
-     L"Giornalista di videogiochi: non puoi morire. Solo per questo avvio, non salvato.",
+     L"Giornalista di videogiochi: non puoi morire.",
      L"Queste opzioni non sono del tutto testate. Possono causare difetti visivi.",
      L"Filtro seppia:", L"Effetto sangue:", L"Profondit\u00e0 di campo:", L"Bloom:",
      L"Effetto concentrazione:",
@@ -1319,6 +1319,7 @@ unsigned ApplyStartupLanguage() {
       if (line.rfind("fps=", 0) == 0) opt.fps = std::atoi(line.c_str() + 4);
       if (line.rfind("sepia=", 0) == 0) opt.sepia = line[6] == '1' ? 1 : 0;
       if (line.rfind("vsync=", 0) == 0) opt.vsync = line[6] == '1' ? 1 : 0;
+      if (line.rfind("difficulty=", 0) == 0) opt.invuln = line[11] == '1' ? 1 : 0;
       if (line.rfind("tick=", 0) == 0) opt.tick = std::clamp(std::atoi(line.c_str() + 5), 0, 3);
       if (line.rfind("window=", 0) == 0) opt.window = line[7] == '1';
       if (line.rfind("control=", 0) == 0) opt.control = std::clamp(std::atoi(line.c_str() + 8), 0, 2);
@@ -1396,7 +1397,8 @@ unsigned ApplyStartupLanguage() {
     out << "language=" << lang << "\nask=" << (remember ? 0 : 1) << "\nfps=" << opt.fps
         << "\nsepia=" << opt.sepia << "\nvsync=" << opt.vsync << "\ntick=0"
         << "\nwindow=" << (opt.window ? 1 : 0) << "\ncontrol=" << opt.control
-        << "\nscale=" << opt.scale << "\nversion=" << AFRO_VERSION << "\n";
+        << "\nscale=" << opt.scale << "\ndifficulty=" << opt.invuln
+        << "\nversion=" << AFRO_VERSION << "\n";
     for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
     for (int i = 0; i < kKeyN; ++i) out << KeyCfgName(i) << "=" << opt.keys[i] << "\n";
     // Diagnostic options keep their stored value unless --advanced showed them.
@@ -1428,8 +1430,8 @@ unsigned ApplyStartupLanguage() {
   // caught by the page write watches; this only drops the extra re-upload.
   if (!Explicit("clear_memory_page_state"))
     SetCvar("clear_memory_page_state", "false");
-  // Invulnerability (Difficulty: Game Journalist): session-only. Never read/written in
-  // the config; Normal each launch unless chosen in Settings (or the cvar is passed).
+  // Difficulty: Game Journalist turns on the player invulnerability. Saved as
+  // difficulty= like the other settings (0.2.1; before that it was session-only).
   if (opt.invuln && !Explicit("afro_player_invuln"))
     SetCvar("afro_player_invuln", "true");
   if (opt.invuln)

@@ -113,7 +113,8 @@ def main() -> None:
     if "110" in hdr or "110" in body:
         fail("HP policy or hook body contains a literal 110")
 
-    # Launcher: session flag is applied, never stored.
+    # Launcher: the Difficulty (Game Journalist = invulnerable) is applied and, since
+    # 0.2.1, saved as difficulty= like the other settings.
     if 'SetCvar("afro_player_invuln", "true")' not in picker:
         fail("launcher does not pass afro_player_invuln")
     save_at = picker.find("std::ofstream out(path")
@@ -121,8 +122,10 @@ def main() -> None:
     if save_at < 0 or save_end < 0:
         fail("launcher save block not found")
     save = picker[save_at:save_end]
-    if "invuln" in save:
-        fail("launcher save block mentions invuln")
+    if '"\\ndifficulty=" << opt.invuln' not in save:
+        fail("launcher does not save the difficulty")
+    if 'line.rfind("difficulty=", 0) == 0) opt.invuln' not in picker:
+        fail("launcher does not load the difficulty")
     if "RTV" not in picker or "ROV" not in picker:
         fail("RTV/ROV launcher strings missing")
 

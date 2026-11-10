@@ -127,8 +127,8 @@ of the whole game.
   - If two tutorial prompts appear at once, the first one can stay stuck on screen
     (original game behaviour; restarting the level clears it).
   - **Invulnerability** (Settings → Gameplay → Difficulty → **Game Journalist**)
-    works in the tested build.
-    It is not a guarantee for the whole game. It is off by default, lasts for that launch only, and is not saved.
+    works in the tested build. It is not a guarantee for the whole game. It is off
+    by default and saved like the other settings.
   - Button prompts: A, B, X, Y, LB, LT, RT and the D-pad are replaced. RB, Start,
     Back and the stick clicks have not been found yet and keep the Xbox icon.
     Keyboard icons follow the keys you rebind (the first key of each binding).
@@ -378,8 +378,7 @@ language (English, Español, Français, Italiano) and three buttons: **Play**,
 - **Graphics**: fullscreen or window, internal resolution (1x native by default /
   2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
 - **Gameplay**: **Difficulty**: **Normal** (default, the game as it is) or **Game
-  Journalist**, which makes the player invulnerable. It goes back to Normal at each
-  launch and is not written to `afro_language.cfg`.
+  Journalist**, which makes the player invulnerable. Saved like the other settings.
 - **Controls**: Auto (keyboard and mouse, a controller takes over when used),
   Controller or Keyboard; mouse sensitivity, dead zone and smoothing; and
   **Key bindings...**.
