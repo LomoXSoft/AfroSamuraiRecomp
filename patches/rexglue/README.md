@@ -217,9 +217,11 @@ releases and takes that capture again. The driver now does the same itself:
 - once, about 120 input polls (some 2 seconds) after the first capture, while the
   game finishes starting up;
 - when the window gains focus;
-- when the window is resized (entering or leaving fullscreen).
+- when the window is resized (entering or leaving fullscreen);
+- when the button icons switch device (`afro_pad_family` changes: keyboard to a
+  pad or back).
 
-Each time it logs `afro mnk: mouse capture taken again (startup|focus|resize)`.
+Each time it logs `afro mnk: mouse capture taken again (startup|focus|resize|device switch)`.
 The next input poll withdraws the capture if the game no longer wants the mouse.
 
 ## zzzzzzzz-afro-keyboard-glyph-binds.patch (GPU plugin, `rexgpu-xenos.dll`)

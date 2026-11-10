@@ -1,5 +1,5 @@
 diff --git a/include/rex/input/mnk/mnk_input_driver.h b/include/rex/input/mnk/mnk_input_driver.h
-index 2d36faa..26d9712 100644
+index 2d36faa..dbe672f 100644
 --- a/include/rex/input/mnk/mnk_input_driver.h
 +++ b/include/rex/input/mnk/mnk_input_driver.h
 @@ -56,6 +56,7 @@ class MnkInputDriver final : public InputDriver,
@@ -19,21 +19,23 @@ index 2d36faa..26d9712 100644
    void RecenterCursorFromUIThread(int32_t x, int32_t y);
    // Safe to call from any thread.
    void DetachFromWindow();
-@@ -96,6 +99,9 @@ class MnkInputDriver final : public InputDriver,
+@@ -96,6 +99,11 @@ class MnkInputDriver final : public InputDriver,
    int32_t prev_mouse_x_ = 0;
    int32_t prev_mouse_y_ = 0;
    bool mouse_captured_ = false;
 +  // afro: polls left before the first capture is taken again (-1 = done).
 +  std::atomic<int> first_recapture_polls_{-1};
 +  bool first_capture_done_ = false;
++  // afro: button icon family seen at the last poll (-1 = none yet).
++  std::atomic<int32_t> afro_last_family_{-1};
    // Whether the window has the pointer locked and is reporting relative motion.
    bool relative_mouse_mode_ = false;
    // Cursor visibility to restore on capture release - the window owner may run
 diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver.cpp
-index 409be1f..88bc9fd 100644
+index 409be1f..00ad705 100644
 --- a/src/input/mnk/mnk_input_driver.cpp
 +++ b/src/input/mnk/mnk_input_driver.cpp
-@@ -517,6 +517,17 @@ X_RESULT MnkInputDriver::GetDeviceState(DeviceId id, X_INPUT_STATE* out_state) {
+@@ -517,6 +517,28 @@ X_RESULT MnkInputDriver::GetDeviceState(DeviceId id, X_INPUT_STATE* out_state) {
    // and lock the cursor, breaking the ImGui overlays.
    QueueMouseCaptureUpdate(IsEnabled() && REXCVAR_GET(mnk_mouse) && IsMouseLookActive() &&
                            has_focus_ && is_active());
@@ -48,10 +50,21 @@ index 409be1f..88bc9fd 100644
 +          [this] { RecaptureMouseFromUIThread("startup"); });
 +    }
 +  }
++  // afro: switching between the keyboard and a pad (the icon family changes) can
++  // leave the cursor on screen, mostly in fullscreen. Take the capture again then.
++  const int32_t afro_family = REXCVAR_GET(afro_pad_family);
++  const int32_t afro_prev = afro_last_family_.exchange(afro_family, std::memory_order_relaxed);
++  if (afro_prev != -1 && afro_prev != afro_family) {
++    std::lock_guard lock(state_mutex_);
++    if (attached_window_) {
++      attached_window_->app_context().CallInUIThreadDeferred(
++          [this] { RecaptureMouseFromUIThread("device switch"); });
++    }
++  }
  
    if (!is_active() || !has_focus_) {
      if (out_state) {
-@@ -737,6 +748,10 @@ void MnkInputDriver::ApplyMouseCaptureFromUIThread() {
+@@ -737,6 +759,10 @@ void MnkInputDriver::ApplyMouseCaptureFromUIThread() {
      return;
    }
    mouse_captured_ = true;
@@ -62,7 +75,7 @@ index 409be1f..88bc9fd 100644
    precapture_cursor_visibility_ = window->GetCursorVisibility();
    window->SetCursorVisibility(rex::ui::Window::CursorVisibility::kHidden);
    window->CaptureMouse();
-@@ -761,6 +776,16 @@ void MnkInputDriver::ReleaseMouseCaptureFromUIThread(rex::ui::Window* window) {
+@@ -761,6 +787,16 @@ void MnkInputDriver::ReleaseMouseCaptureFromUIThread(rex::ui::Window* window) {
    window->ReleaseMouse();
  }
  
@@ -79,7 +92,7 @@ index 409be1f..88bc9fd 100644
  void MnkInputDriver::RecenterCursorFromUIThread(int32_t x, int32_t y) {
    rex::ui::Window* window = attached_window_;
    if (!window) {
-@@ -928,6 +953,13 @@ void MnkInputDriver::OnLostFocus(rex::ui::UISetupEvent&) {
+@@ -928,6 +964,13 @@ void MnkInputDriver::OnLostFocus(rex::ui::UISetupEvent&) {
  
  void MnkInputDriver::OnGotFocus(rex::ui::UISetupEvent&) {
    has_focus_ = true;

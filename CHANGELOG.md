@@ -24,6 +24,9 @@ Newest first. Versions are in `app/VERSION`.
   already was: a window over the whole screen, instant Alt+Tab), **Window** and
   **Exclusive fullscreen** (the runtime's `fullscreen_exclusive`, saved as
   `exclusive=1`).
+- Switching between keyboard and controller no longer leaves the mouse cursor on
+  screen: the mouse capture is taken again whenever the button icons switch device
+  (`zzzzzzz-afro-mouse-recapture` patch, like the startup/focus/resize recapture).
 - Keyboard action names follow the manual (Light/Heavy attack, Guard, Overfocus,
   Dash, Center camera, Pause, Skill menu).
 
