@@ -20,7 +20,7 @@ Options (all optional; anything missing is asked interactively):
   -Ref <branch|tag>      repository revision to build (default: main)
   -RepoUrl <url|path>    repository to clone (default: the GitHub repo)
   -LocalTree <dir>       copy this prepared source tree instead of cloning.
-                         The graphical setup uses this for private 0.2.3.
+                         The graphical setup uses this for private 0.3.0.
                          It does not fetch public main.
   -NonInteractive        fail instead of prompting. Requires the other answers.
   -CleanupAfterInstall   at the end, delete everything not needed to play (no question)
@@ -51,8 +51,8 @@ $script:DLSHARE = 0.9   # share of a download+extract step spent downloading
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $ISO_SHA1 = '29394DB1854DFC59C767D768C8D35E0A08ACB73D'
-# Graphical setup for the private 0.2.3 tree passes -LocalTree and checks this.
-$LOCAL_TREE_VERSION = '0.2.3'
+# Graphical setup for the private 0.3.0 tree passes -LocalTree and checks this.
+$LOCAL_TREE_VERSION = '0.3.0'
 $NEED_GB = 20
 # Pinned downloads (official sources) with SHA-256.
 $DL = @{
@@ -1130,10 +1130,10 @@ try {
     }
   } else {
     if ($NonInteractive -and -not $PSBoundParameters.ContainsKey('Ref')) {
-      throw 'Refusing to build the default branch main. Pass -LocalTree with the 0.2.3 source, or an explicit -Ref that is not public main.'
+      throw 'Refusing to build the default branch main. Pass -LocalTree with the 0.3.0 source, or an explicit -Ref that is not public main.'
     }
     if ($NonInteractive -and $Ref -eq 'main') {
-      throw 'Refusing -Ref main. Public main is not this 0.2.3 source.'
+      throw 'Refusing -Ref main. Public main is not this 0.3.0 source.'
     }
     Step 'repo' (T 't_repo' $Ref) {
       Add-OwnedGit $REPO
