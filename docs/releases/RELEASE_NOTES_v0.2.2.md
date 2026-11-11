@@ -10,9 +10,9 @@ HDD installation can take a long time; SSD/NVMe recommended.
 
 `afrosetup-v0.2.2.exe`
 
-SHA-256 `TBD`
+SHA-256 `252ab7c900daa8999c5dcc25af9e0496db4c83c41052d0933b9167ca7831ae46`
 
-TBD bytes.
+1889190 bytes.
 
 Already on 0.1.x or 0.2.x: run it, choose **Update** and pick your install folder.
 Your extracted game, saves and launcher settings stay. **Update** rebuilds only
@@ -38,7 +38,12 @@ what changed.
 
 ## Tested
 
-- TBD
+- Fresh install into an empty folder with this setup (13 min): the game built
+  with the menu's runtime functions and started from a RecompLauncher-style start.
+- Played on the author's PC: the menu with a controller and the keyboard, display
+  and frame rate changed from it, the game's stats readable beside it, and the
+  button icons following the device in use.
+- The whole patch stack applies to a clean ReXGlue `bd833a2`.
 
 ## Still not claimed
 
