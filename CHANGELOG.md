@@ -2,6 +2,14 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## Unreleased
+- USA disc support. The build reads the SHA-1 of `default.xex` and picks Europe or
+  USA (`tools/region_config.py`, writes `app/region/`). `app/regions/usa.toml` maps
+  each Europe address the project uses to the USA build (an older build, December
+  2008, with the same code apart from about 80 functions); hooks, function list and
+  `frame_pacing.cpp` (`AfroGameAddr`) use it. The installer accepts the USA files;
+  on the USA disc Spanish and Italian run the game in English.
+
 ## 0.2.2 – Options while playing
 - Options while playing: **F1** (or hold L3 + R3) opens the main settings over the
   paused game, styled like the game's own menus (red ink strokes, the selected

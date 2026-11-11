@@ -1,7 +1,7 @@
 # AfroSamuraiRecomp – Afro Samurai (Xbox 360) static recompilation
 
 Unofficial, work-in-progress static recompilation of **Afro Samurai** (Xbox 360,
-Europe, title ID 4E4D07D8) to native Windows x64 using
+Europe and USA, title ID 4E4D07D8) to native Windows x64 using
 [ReXGlue](https://github.com/rexglue/rexglue-sdk).
 
 <a href="https://recomplauncher.com/game/afrosamurairecomp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://recomplauncher.com/assets/press/launcher/badge-light.svg"><img alt="Get it on RecompLauncher" src="https://recomplauncher.com/assets/press/launcher/badge-dark.svg" height="48"></picture></a>
@@ -15,9 +15,10 @@ The only program attached to a release is `afrosetup-v0.2.2.exe`, the setup inst
 
 ### Prerequisites
 - Windows 10 or 11 (64-bit) and a graphics card with Direct3D 12 (current drivers).
-- **Your own** Afro Samurai disc, **Europe** version only: an ISO
-  (SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) or a folder you already
-  extracted that contains `default.xex`. See [Getting your game files](#getting-your-game-files).
+- **Your own** Afro Samurai disc, **Europe** or **USA**: an ISO
+  (Europe SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) or a folder you already
+  extracted that contains `default.xex`. The USA disc is new and less tested, and has
+  English and French text only. See [Getting your game files](#getting-your-game-files).
 - About 20 GB of free disk space and an internet connection (the build tools are downloaded).
 - A controller (tested: Xbox, PlayStation DualShock 4/DualSense, a Switch controller
   and a generic controller; others SDL recognises may work), or keyboard and mouse.
@@ -27,7 +28,7 @@ The only program attached to a release is `afrosetup-v0.2.2.exe`, the setup inst
    from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
    That file is the setup program, not the game. It builds the game on your PC from your disc.
 2. Run `afrosetup-v0.2.2.exe`. Choose a language, then **Install**.
-3. Choose a folder, then your Europe ISO or the extracted game folder (`default.xex` must be inside it).
+3. Choose a folder, then your ISO or the extracted game folder (`default.xex` must be inside it).
 4. Accept the Microsoft Visual Studio Build Tools license (the box starts unchecked). Shortcuts are optional. You can keep the downloaded tools or delete them when setup finishes. Deleting them does not remove `game`, the extracted game, the logs, your ISO, or your saves.
 5. The window says this takes several minutes. It does not promise a fixed duration.
 HDD installation can take a long time; SSD/NVMe recommended.
@@ -139,8 +140,9 @@ of the whole game.
     icons not checked in game. Keyboard icons follow the keys you rebind (the
     first key of each binding).
   - Full list: [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
-- Only the Europe disc (Redump 17884, ISO SHA-1
-  `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
+- Supported: the Europe disc (Redump 17884, ISO SHA-1
+  `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) and the USA disc (new, less tested).
+  Other versions will not work.
 - Windows x64 only for now (D3D12).
 - Expect bugs; saves and settings may change between versions.
 
@@ -186,7 +188,7 @@ When it asks its questions interactively, `install.bat` with no `-Ref` builds th
 `-LocalTree` with a 0.2.2 source tree. To build the tagged 0.2.2 source from the
 console installer, pass `-Ref v0.2.2`.
 
-1. Make an ISO of your own Afro Samurai (Europe) disc, or use an extracted folder
+1. Make an ISO of your own Afro Samurai disc (Europe or USA), or use an extracted folder
    that contains `default.xex` (see [Getting your game files](#getting-your-game-files)).
 2. Use `install.bat` from a checkout, or download
    [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat)
@@ -235,7 +237,7 @@ instead of an ISO.
 
 ### Requirements
 - Windows 10/11 x64, a GPU with Direct3D 12 and current drivers.
-- Original Afro Samurai disc (Europe) and a way to make an ISO of it.
+- Original Afro Samurai disc (Europe or USA) and a way to make an ISO of it.
 - About 20 GB free disk space (the finished install uses about 12-13 GB).
 - A controller (see [Controls](#controls)).
 - For a manual build only (the installer downloads all of this):
@@ -250,8 +252,8 @@ instead of an ISO.
   source at the same commit.
 
 ### Getting your game files
-Only the Europe disc is supported (Redump 17884, ISO SHA-1
-`29394DB1854DFC59C767D768C8D35E0A08ACB73D`). Make the ISO from your own disc,
+The Europe disc (Redump 17884, ISO SHA-1
+`29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. USA disc (new, boots; not yet played through): the build recognises its `default.xex` (SHA-1 `873fff7191be2b687eb55f8564f9b9f5c5842b40`) and uses the USA addresses in `app/regions/usa.toml`. No USA ISO SHA-1 is recorded yet, so a USA ISO shows the "not verified" note; the game files are checked after extraction. Make the ISO from your own disc,
 for example with a DVD drive that can read Xbox 360 discs and a disc dumping
 tool, or from a backup of your own disc that you made with your console.
 Check the SHA-1 with `certutil -hashfile "Afro Samurai.iso" SHA1`.
@@ -458,7 +460,7 @@ RecompLauncher cannot build the game from your disc.
   or was modified. Reset it with `git -C <root>\rexglue-sdk checkout -f bd833a2`,
   `git -C <root>\rexglue-sdk clean -fd src include` and delete `.git\afro-patches`, then run the script again.
 - **`CODEGEN FAILED`**: see `<root>\codegen_win.log`. Usually `gamedata\default.xex`
-  is not from the Europe disc or the extraction was incomplete.
+  is not from the Europe or USA disc or the extraction was incomplete.
 - **Black screen, black frames or broken image**: make sure `build_gpu_plugin.bat`
   ran after the last `build_win.bat` and printed `GPU PLUGIN + RUNTIME OK`, and update the GPU driver.
   As a fallback, try the ROV path: `tools\run_win.bat --render_target_path_d3d12=rov` (slower).

@@ -29,8 +29,13 @@ lists are in the Git history and the release notes in `docs/releases/`.
 - Keyboard icons show the first key of each binding.
 
 ## Install
-- Only the Europe disc is supported (Redump 17884, ISO SHA-1
-  `29394DB1854DFC59C767D768C8D35E0A08ACB73D`).
+- Supported discs: Europe (Redump 17884, ISO SHA-1
+  `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) and USA.
+- USA disc: new. It builds and boots at 30 FPS; the 60 FPS, difficulty, loading
+  screen and button-icon features were mapped to it but are not yet checked in
+  play. It has English and French text only: with Spanish or Italian chosen, the
+  launcher keeps that language and the game runs in English. No USA ISO SHA-1 is
+  recorded yet (a USA ISO shows the "not verified" note).
 - Windows x64 only (D3D12).
 - No install time is guaranteed on HDD, SSD or NVMe; SSD/NVMe recommended. A
   fresh install took about 13 minutes on the author's PC.
