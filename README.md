@@ -90,7 +90,7 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
 
 ## Goals
 - Borderless window and key rebinding: done in 0.2.1.
-- Launcher options in game, while playing.
+- Launcher options in game, while playing: in progress for 0.2.2 (**F1**).
 - Loading screens: their lore cutscenes play in full again (0.2.1).
 - One-hit kill cheat.
 - USA disc (`.iso`) support.
@@ -391,6 +391,17 @@ It opens a window with:
 Restore and delete are refused while the game is running. Backups are plain folders:
 you can also restore one by hand (close the game, copy the contents of a `saves-...`
 folder back into `Documents\afrorecomp\`).
+
+### Options while playing
+Press **F1**, or hold both stick clicks (L3 + R3) for half a second, to open the
+options over the paused game. It has the launcher's main settings: display, frame
+rate, VSync, internal resolution, difficulty, loading screens, language, control
+mode, the three mouse sliders and the Experimental effects. Each change is saved
+to `afro_language.cfg` at once; most also apply at once, and the ones marked
+**(after restart)** (internal resolution, language, control mode) apply the next
+time the game starts. Move with the D-pad or the arrow keys, change with left and
+right, and close with B, Start, Back, Esc or F1 again (the game ignores that press).
+Key bindings stay in the launcher.
 
 ### Launcher and options
 The launcher (shown on first run, after each update, or with Shift) has the

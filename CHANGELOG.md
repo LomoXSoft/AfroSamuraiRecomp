@@ -2,6 +2,17 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.2.2 (in progress)
+- Options while playing: **F1** (or hold L3 + R3) opens the main settings over the
+  paused game, styled like the game's own menus (red ink strokes, the selected
+  row in a red stroke with arrows, the device's button prompts). Changes are
+  saved to `afro_language.cfg` and most apply at once; internal resolution,
+  language and control mode after a restart. New `app/src/afro_menu.cpp`; the
+  runtime adds `afro_pad_buttons` and `afro_ui_input_block` (C exports in the
+  `zzzzzzzzzz-afro-interlude` patch) for the menu's input.
+- README goals: the "Afro!" voice item is dropped; the speakers play the decoded
+  sound sample for sample and the cut could not be reproduced.
+
 ## 0.2.1 – Controls and loading screens
 - Setup: fresh installs work again. The setup now pins MSVC 14.51 and Windows SDK
   28000: Microsoft's newest MSVC (14.52) refuses the setup's Clang 20, so new

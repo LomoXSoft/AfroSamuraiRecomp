@@ -260,6 +260,13 @@ Two small helpers for the app's loading interlude (`app/src/frame_pacing.cpp`,
   entry). Some interludes (Okiku's) play their lines once and then stay quiet.
 - `AfroButtonPresses`: A, B, X, Y, Start and Back presses on any pad (the keyboard
   pad included), counted in `InputSystem::GetStateForUI`, to skip the interlude.
+- For the app, which looks them up with `GetProcAddress` (the setup links it
+  against the prebuilt SDK, whose import library lacks patch-added functions):
+  plain C exports `afro_button_presses`, `afro_dialog_open_count`,
+  `afro_dialog_open_hash`, `afro_voice_silence_seconds`, and for the in-game
+  options menu `afro_pad_buttons(user)` (the buttons held, read even while the
+  guest's input is blocked) and `afro_ui_input_block(on)` (the guest reads a
+  neutral pad while on; what is still held when it goes off stays masked).
 
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
