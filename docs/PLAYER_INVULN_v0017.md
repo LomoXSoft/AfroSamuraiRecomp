@@ -1,6 +1,18 @@
+# Player invulnerability
+
+**Current state (0.2.1 and later):** this is the **Game Journalist** difficulty
+(launcher Settings → Gameplay, or the in-game menu). It works in the tested
+levels, is off by default and is saved as `difficulty=` like the other settings.
+It is not a guarantee for the whole game. The code is the char-HP store hook in
+`app/src/frame_pacing.cpp` with the policy in `app/src/player_hp_invuln.h`.
+
+Everything below is the development history, kept for the addresses and the
+reasoning. Statements such as "not claimed" or "session-only" were true for the
+version they name, not now.
+
 # Player invulnerability — experimental in 0.1.0
 
-Release 0.1.0 does **not** claim this works. With the char-HP hooks on, a
+Release 0.1.0 did **not** claim this works. With the char-HP hooks on, a
 Windows session still ended in death (`clamps=717`, `restores=0`). The Cheats
 checkbox is labeled experimental and warns that it does not prevent death.
 Default remains off, and the choice is not saved.

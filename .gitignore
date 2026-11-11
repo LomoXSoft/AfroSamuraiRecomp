@@ -16,3 +16,5 @@ shaderdump/
 *.log
 *.cfg
 out/
+__pycache__/
+tools/afrosetup-v*.exe

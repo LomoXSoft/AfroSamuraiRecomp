@@ -138,7 +138,7 @@ of the whole game.
     Checked in game with Xbox, DualSense, Switch and generic controllers; Steam
     icons not checked in game. Keyboard icons follow the keys you rebind (the
     first key of each binding).
-  - Full list: [`docs/KNOWN_ISSUES_0.2.0.md`](docs/KNOWN_ISSUES_0.2.0.md).
+  - Full list: [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
 - Only the Europe disc (Redump 17884, ISO SHA-1
   `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. Other versions will not work.
 - Windows x64 only for now (D3D12).
@@ -489,7 +489,12 @@ unless a maintainer specifically asks.
   boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
 - `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.2.2.exe`, not committed.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
-  `gen_switch_tables.py`, `extract_icon.py`, analysis helpers).
+  `gen_switch_tables.py`, `extract_icon.py`); `tools/analysis/` has the
+  reverse-engineering helpers used while mapping the game, `tools/artwork/` the
+  setup art and button icons.
+- `checks/` – tests for the setup, launcher and patches: run each `.py` with
+  Python, each `.ps1` with PowerShell, and compile each `.cpp` with any C++17
+  compiler. They need no game files.
 - `patches/rexglue/` – ReXGlue GPU plugin and runtime patches (BSD-3, see its README).
 
 ### Plans

@@ -45,8 +45,14 @@ for required in (
 ):
     if required not in ps1:
         fail(f"install.ps1 missing {required}")
-if "TerminateProcess" in cpp:
-    fail("setup UI can kill a process")
+# The setup may stop only the build it started (Cancel): its job object, or the
+# install.ps1 process and its descendants. Never the game or anything else.
+if cpp.count("TerminateProcess(") != 1 or "void TerminatePid(DWORD pid)" not in cpp:
+    fail("setup UI terminates processes outside TerminatePid")
+if cpp.count("TerminatePid(") != 2 or "for (auto it = tree.rbegin(); it != tree.rend(); ++it) TerminatePid(*it);" not in cpp:
+    fail("TerminatePid is used for more than the started build's process tree")
+if "DescendantPids(root, edges)" not in cpp or "GetProcessId(g_proc)" not in cpp:
+    fail("Cancel no longer limits itself to the started build's process tree")
 if "kSource" in cpp:
     fail("source choice page returned")
 print("update contract: ok")

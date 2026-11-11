@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""The quad-depth helper must be a PipelineCache member, and the upgrade is idempotent."""
+"""The quad-depth helper must be a PipelineCache member, and the upgrade is idempotent.
+
+The upgrade part needs a ReXGlue tree with the patches applied: set
+AFRO_PATCHED_SDK to it (an install's rexglue-sdk folder works). Without one it
+is skipped and only the text checks run.
+"""
 from __future__ import annotations
 
+import os
 import pathlib
 import shutil
 import subprocess
@@ -13,7 +19,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import repair_quad_depth_access as repair  # noqa: E402
 
 PATCH = (ROOT / "patches" / "rexglue" / "zzz-afro-quad-depth-offset.patch").read_text(encoding="utf-8")
-GOOD = pathlib.Path("/tmp/rexapply")
+GOOD = pathlib.Path(os.environ.get("AFRO_PATCHED_SDK", "/tmp/rexapply"))
 BROKEN_FN = repair.BROKEN
 FIXED_FN = repair.FIXED
 
@@ -43,7 +49,8 @@ def main() -> None:
         if label in picker:
             fail("quad depth label still visible: " + label)
     if not (GOOD / "src/graphics/d3d12/pipeline_cache.cpp").is_file():
-        fail("upstream apply result is missing; rerun the patch check")
+        print("quad depth repair: text checks passed; skip upgrade (set AFRO_PATCHED_SDK to a patched ReXGlue tree)")
+        return
 
     with tempfile.TemporaryDirectory() as tmp:
         tree = pathlib.Path(tmp)
@@ -166,6 +173,7 @@ int use() {
   return REXCVAR_GET(afro_quad_depth_offset) == "full" || REXCVAR_GET(force_convert_quad_lists_to_triangle_lists);
 }
 }
+int main() { return rex::graphics::d3d12::use(); }
 """
         good_tu = macros + r"""
 REXCVAR_DECLARE(std::string, afro_quad_depth_offset);
