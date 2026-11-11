@@ -524,17 +524,19 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
     return (c & 0x00FFFFFF) | (ImU32(((c >> 24) & 0xFF) * a * fade) << 24);
   };
 
-  // Dim the paused game; the red ink of the game's menus on the left.
-  dl->AddRectFilled({0, 0}, {W, H}, A(IM_COL32(8, 6, 6, 228)));
-  Brush(dl, {-60 * s, H * 0.98f}, {W * 0.42f, -40 * s}, 260 * s, A(kRedDark, 0.75f), 7);
-  Brush(dl, {W * 0.02f, H * 1.05f}, {W * 0.36f, H * 0.18f}, 120 * s, A(kRed, 0.55f), 11);
+  // Dim the paused game only lightly on the left: L3 + R3 also shows the game's
+  // own stats there (top left), which stay readable. The red ink of the game's
+  // menus sweeps up from the bottom-left corner, below them.
+  dl->AddRectFilled({0, 0}, {W, H}, A(IM_COL32(8, 6, 6, 110)));
+  Brush(dl, {-90 * s, H * 1.06f}, {W * 0.33f, H * 0.66f}, 230 * s, A(kRedDark, 0.75f), 7);
+  Brush(dl, {-20 * s, H * 1.10f}, {W * 0.27f, H * 0.74f}, 110 * s, A(kRed, 0.55f), 11);
   Brush(dl, {W * 0.70f, H * 1.04f}, {W * 1.06f, H * 0.55f}, 150 * s, A(kRedDark, 0.45f), 23);
   // Black panel behind the list, with a soft left edge.
-  const float px0 = W * 0.30f, px1 = std::min(W - 40 * s, px0 + 1100 * s);
-  dl->AddRectFilledMultiColor({px0 - 120 * s, 0}, {px0, H}, A(IM_COL32(0, 0, 0, 0)),
-                              A(IM_COL32(0, 0, 0, 170)), A(IM_COL32(0, 0, 0, 170)),
+  const float px0 = W * 0.35f, px1 = std::min(W - 40 * s, px0 + 1100 * s);
+  dl->AddRectFilledMultiColor({px0 - 60 * s, 0}, {px0, H}, A(IM_COL32(0, 0, 0, 0)),
+                              A(IM_COL32(0, 0, 0, 215)), A(IM_COL32(0, 0, 0, 215)),
                               A(IM_COL32(0, 0, 0, 0)));
-  dl->AddRectFilled({px0, 0}, {W, H}, A(IM_COL32(0, 0, 0, 190)));
+  dl->AddRectFilled({px0, 0}, {W, H}, A(IM_COL32(0, 0, 0, 215)));
 
   // Title with a brush underline.
   const float tx = px0 + 40 * s, ty = H * 0.07f;
