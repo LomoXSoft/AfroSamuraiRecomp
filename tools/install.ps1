@@ -1,7 +1,7 @@
 <#
 AfroSamuraiRecomp one-click installer (Windows 10/11 x64).
 
-Asks for an install folder and your Afro Samurai (Europe) ISO, then downloads a
+Asks for an install folder and your Afro Samurai (Europe or USA) ISO, then downloads a
 portable toolchain from official sources into <root>\tools (no admin rights, no
 PATH/registry changes, no Visual Studio installer), gets the ReXGlue SDK, clones
 this repository, extracts your disc and builds afrorecomp.exe.
@@ -13,7 +13,7 @@ Usage (normally just double-click install.bat):
   powershell -ExecutionPolicy Bypass -File install.ps1 [options]
 Options (all optional; anything missing is asked interactively):
   -InstallDir <dir>      install folder (alias -Root); skips the folder picker
-  -Iso <file>            your Afro Samurai (Europe) ISO
+  -Iso <file>            your Afro Samurai (Europe or USA) ISO
   -AcceptMsvcLicense     accept the Microsoft Visual Studio Build Tools license
                          without the interactive prompt
   -Shortcut yes|no       create desktop + Start menu shortcuts
@@ -101,7 +101,7 @@ $TR = @{
   'install_there' = @('Install there?', 'Instalar ahi?', 'Installer ici ?', 'Installare qui?')
   'log_file' = @('log file: {0}', 'registro: {0}', 'journal : {0}', 'registro: {0}')
   'all_q' = @('All questions are asked now; after that the installation runs to the end on its own.', 'Todas las preguntas se hacen ahora; despues la instalacion sigue sola hasta el final.', 'Toutes les questions sont posees maintenant ; ensuite l''installation va seule jusqu''au bout.', 'Tutte le domande vengono fatte ora; poi l''installazione prosegue da sola fino alla fine.')
-  'sel_iso' = @('Select your Afro Samurai (Europe) ISO...', 'Selecciona tu ISO de Afro Samurai (Europa)...', 'Selectionne ton ISO d''Afro Samurai (Europe)...', 'Seleziona la tua ISO di Afro Samurai (Europa)...')
+  'sel_iso' = @('Select your Afro Samurai ISO (Europe or USA)...', 'Selecciona tu ISO de Afro Samurai (Europa o EE. UU.)...', 'Selectionne ton ISO d''Afro Samurai (Europe ou USA)...', 'Seleziona la tua ISO di Afro Samurai (Europa o USA)...')
   'iso_path' = @('Path to your ISO', 'Ruta de tu ISO', 'Chemin de ton ISO', 'Percorso della tua ISO')
   'iso_nf' = @('ISO not found: {0}', 'No se encuentra la ISO: {0}', 'ISO introuvable : {0}', 'ISO non trovata: {0}')
   'no_xex' = @('{0} does not contain default.xex', '{0} no contiene default.xex', '{0} ne contient pas default.xex', '{0} non contiene default.xex')
@@ -115,7 +115,9 @@ $TR = @{
   'iso_check' = @('Checking the ISO (SHA-1, takes a minute)...', 'Comprobando la ISO (SHA-1, tarda un minuto)...', 'Verification de l''ISO (SHA-1, une minute)...', 'Controllo della ISO (SHA-1, ci vuole un minuto)...')
   'iso_ok' = @('ISO matches Afro Samurai (Europe), Redump 17884.', 'La ISO coincide con Afro Samurai (Europa), Redump 17884.', 'L''ISO correspond a Afro Samurai (Europe), Redump 17884.', 'La ISO corrisponde ad Afro Samurai (Europa), Redump 17884.')
   'iso_bad' = @('WARNING: ISO SHA-1 is {0}, expected {1}.', 'AVISO: el SHA-1 de la ISO es {0}, se esperaba {1}.', 'ATTENTION : le SHA-1 de l''ISO est {0}, attendu {1}.', 'ATTENZIONE: lo SHA-1 della ISO e {0}, atteso {1}.')
-  'iso_only' = @('Only the Europe disc is supported; another version or a bad dump will NOT work.', 'Solo se admite el disco europeo; otra version o un volcado malo NO funcionara.', 'Seul le disque europeen est pris en charge ; une autre version ou un mauvais dump ne marchera PAS.', 'E supportato solo il disco europeo; un''altra versione o un dump difettoso NON funzionera.')
+  'iso_only' = @('The Europe and USA discs are supported. Only the Europe ISO has a known SHA-1; for any ISO the game executable is checked after extraction, and another version or a bad dump will NOT work.', 'Se admiten los discos de Europa y EE. UU. Solo la ISO europea tiene un SHA-1 conocido; en cualquier ISO se comprueba el ejecutable del juego tras extraerla, y otra version o un volcado malo NO funcionara.', 'Les disques Europe et USA sont pris en charge. Seule l''ISO Europe a un SHA-1 connu ; pour toute ISO, l''executable du jeu est verifie apres l''extraction, et une autre version ou un mauvais dump ne marchera PAS.', 'Sono supportati i dischi europeo e USA. Solo la ISO europea ha uno SHA-1 noto; per qualsiasi ISO l''eseguibile del gioco viene controllato dopo l''estrazione, e un''altra versione o un dump difettoso NON funzionera.')
+  'xex_ok' = @('Game files: Afro Samurai ({0}).', 'Archivos del juego: Afro Samurai ({0}).', 'Fichiers du jeu : Afro Samurai ({0}).', 'File del gioco: Afro Samurai ({0}).')
+  'xex_bad' = @('default.xex (SHA-1 {0}) is not from the Europe or USA disc, or the extraction is incomplete.', 'default.xex (SHA-1 {0}) no es del disco de Europa ni de EE. UU., o la extraccion esta incompleta.', 'default.xex (SHA-1 {0}) ne vient pas du disque Europe ou USA, ou l''extraction est incomplete.', 'default.xex (SHA-1 {0}) non proviene dal disco europeo o USA, oppure l''estrazione e incompleta.')
   'iso_continue' = @('SHA-1 does not match. Got {0}, expected {1}. Not verified. Continuing anyway.', 'El SHA-1 no coincide. Es {0}, se esperaba {1}. No verificada. Se continua igualmente.', 'Le SHA-1 ne correspond pas. Obtenu {0}, attendu {1}. Non verifiee. Poursuite malgre tout.', 'Lo SHA-1 non coincide. Ottenuto {0}, atteso {1}. Non verificata. Si continua comunque.')
   'cont' = @('Continue anyway?', 'Continuar de todos modos?', 'Continuer quand meme ?', 'Continuare comunque?')
   'iso_nomatch' = @('ISO does not match the supported version.', 'La ISO no coincide con la version soportada.', 'L''ISO ne correspond pas a la version prise en charge.', 'La ISO non corrisponde alla versione supportata.')
@@ -912,7 +914,7 @@ try {
     try {
       Add-Type -AssemblyName System.Windows.Forms
       $dlg = New-Object System.Windows.Forms.OpenFileDialog
-      $dlg.Title = 'Select your Afro Samurai (Europe) ISO'; $dlg.Filter = 'Disc images (*.iso)|*.iso|All files (*.*)|*.*'
+      $dlg.Title = 'Select your Afro Samurai ISO (Europe or USA)'; $dlg.Filter = 'Disc images (*.iso)|*.iso|All files (*.*)|*.*'
       if ($dlg.ShowDialog() -eq 'OK') { $Iso = $dlg.FileName }
     } catch { }
     if (-not $Iso) { $Iso = Ask (T 'iso_path') '' }
@@ -1206,6 +1208,11 @@ try {
     }
     if (-not (Test-Path -LiteralPath (Join-Path $g 'default.xex'))) { throw (T 'missing1' 'gamedata\default.xex') }
   }
+  # Europe or USA: the build picks the matching hooks (tools/region_config.py).
+  $xexSha = (Get-FileHash -LiteralPath (Join-Path $Root 'gamedata\default.xex') -Algorithm SHA1).Hash.ToLowerInvariant()
+  $xexRegion = @{ '5e831c64173b4a24805bc9c0c0eb860b3d7f53c6' = 'Europe'; '873fff7191be2b687eb55f8564f9b9f5c5842b40' = 'USA' }[$xexSha]
+  if (-not $xexRegion) { throw (T 'xex_bad' $xexSha) }
+  Say (T 'xex_ok' $xexRegion)
 
   # ------------------------------------------------------- build -----------
   # app\out is kept from the previous build, so Ninja compiles only what

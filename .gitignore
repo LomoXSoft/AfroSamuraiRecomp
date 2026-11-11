@@ -12,6 +12,7 @@ tools/afrosetup_header.inc
 assets/
 app/generated/default/
 app/afro_switch_tables.toml
+app/region/
 shaderdump/
 *.log
 *.cfg

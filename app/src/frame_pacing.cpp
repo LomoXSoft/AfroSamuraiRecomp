@@ -4,6 +4,7 @@
 #include "frame_pacing.h"
 #include "player_hp_invuln.h"
 #include "afro_menu.h"
+#include "afro_region.h"  // AfroGameAddr: Europe address -> this disc
 
 #include <algorithm>
 #include <atomic>
@@ -87,22 +88,22 @@ REXCVAR_DEFINE_BOOL(afro_player_invuln, false, "Afro",
 namespace {
 struct FxFlag { const char* name; uint32_t addr; bool (*on)(); };
 const FxFlag kFx[] = {
-    {"dof", 0x828B0E8E, [] { return (bool)REXCVAR_GET(afro_fx_dof); }},
-    {"bloom", 0x828B0EBC, [] { return (bool)REXCVAR_GET(afro_fx_bloom); }},
-    {"sepia", 0x828B0EAB, [] { return (bool)REXCVAR_GET(afro_fx_sepia); }},
-    {"blood", 0x828B0D1B, [] { return (bool)REXCVAR_GET(afro_fx_blood); }},
-    {"focus", 0x828B0E94, [] { return (bool)REXCVAR_GET(afro_fx_focus); }},
+    {"dof", AfroGameAddr(0x828B0E8E), [] { return (bool)REXCVAR_GET(afro_fx_dof); }},
+    {"bloom", AfroGameAddr(0x828B0EBC), [] { return (bool)REXCVAR_GET(afro_fx_bloom); }},
+    {"sepia", AfroGameAddr(0x828B0EAB), [] { return (bool)REXCVAR_GET(afro_fx_sepia); }},
+    {"blood", AfroGameAddr(0x828B0D1B), [] { return (bool)REXCVAR_GET(afro_fx_blood); }},
+    {"focus", AfroGameAddr(0x828B0E94), [] { return (bool)REXCVAR_GET(afro_fx_focus); }},
 };
-constexpr uint32_t kBloodActive = 0x828B0E8F, kBloodMask = 0x828B0EA0,
-                   kBloodParams = 0x828B0D20 + 172;
+constexpr uint32_t kBloodActive = AfroGameAddr(0x828B0E8F), kBloodMask = AfroGameAddr(0x828B0EA0),
+                   kBloodParams = AfroGameAddr(0x828B0D20) + 172;
 
 // Guest timing globals written by sub_826A0AE8:
 //   0x828B1C04 = primary sim dt (fixed-step feed for movement) — safe to force to 1/60
 //   0x828B1BF0 = measured frame dt — leave alone
 //   0x828B1C08 = sometimes a copy of measured dt, sometimes 1.0 time-scale — NEVER force
-constexpr uint32_t kDtAddr = 0x828B1C04;
-constexpr uint32_t kDtMeasuredAddr = 0x828B1BF0;
-constexpr uint32_t kDtScaleAddr = 0x828B1C08;
+constexpr uint32_t kDtAddr = AfroGameAddr(0x828B1C04);
+constexpr uint32_t kDtMeasuredAddr = AfroGameAddr(0x828B1BF0);
+constexpr uint32_t kDtScaleAddr = AfroGameAddr(0x828B1C08);
 
 // Player singleton + the combat HP writer (see docs/PLAYER_INVULN_v0017.md):
 //   *(uint32*)0x828E629C = player character
@@ -111,18 +112,18 @@ constexpr uint32_t kDtScaleAddr = 0x828B1C08;
 //   player+0x7D4 = HP meter object; meter+0x4 is secondary (not the restore target)
 //   meter+0x3C = retail "block set-when-new<=0" flag (not sufficient on its own)
 // sub_82674030 / VA 0x826740D8 is a codegen label collision, not this writer.
-constexpr uint32_t kPlayerPtr = 0x828E629C;
+constexpr uint32_t kPlayerPtr = AfroGameAddr(0x828E629C);
 constexpr uint32_t kPlayerHpMeterOff = 0x7D4;
 constexpr uint32_t kPlayerHpFloatOff = 0x280;
 constexpr uint32_t kPlayerHpMaxOff = 0x284;
 constexpr uint32_t kMeterCurOff = 0x4;
 constexpr uint32_t kMeterBlockLethalOff = 0x3C;
-constexpr uint32_t kHpStoreA = 0x826662D8;
-constexpr uint32_t kHpStoreB = 0x82666308;
+constexpr uint32_t kHpStoreA = AfroGameAddr(0x826662D8);
+constexpr uint32_t kHpStoreB = AfroGameAddr(0x82666308);
 // bl sub_82663180: the generated LR is 0x82666318, so the bl is the previous word.
-constexpr uint32_t kMeterDeathCall = 0x82666314;
+constexpr uint32_t kMeterDeathCall = AfroGameAddr(0x82666314);
 // Function entry. r3 is still the meter argument, before lfs/fcmpu/ble.
-constexpr uint32_t kMeterDeathEntry = 0x82663180;
+constexpr uint32_t kMeterDeathEntry = AfroGameAddr(0x82663180);
 constexpr uint32_t kMeterHp0 = 0;       // float compared with 0
 constexpr uint32_t kMeterFlag60 = 60;   // byte cleared on the lethal path
 constexpr uint32_t kMeterFlag63 = 63;   // byte set on the lethal path
@@ -163,7 +164,7 @@ int ClampedPresentInterval() {
 // In-engine cutscene flags, found by comparing global-memory snapshots with
 // screenshots: byte 0x828E6172 is 1 during full in-engine cinematics, byte
 // 0x828E6173 is 1 during in-level dialogue scenes, both 0 in gameplay.
-constexpr uint32_t kCineFlagAddr = 0x828E6172;
+constexpr uint32_t kCineFlagAddr = AfroGameAddr(0x828E6172);
 bool InCutscene() {
   auto* mem = rex::system::kernel_memory();
   if (!mem || !rex::system::kernel_state()) return false;
@@ -489,7 +490,7 @@ void ForceDevicePresentInterval(uint32_t device) {
 // [u32 'AFGD'][u32 frame][u64 Unix time in ms][kDumpLen bytes, guest byte order]
 // to afro_globals.bin in the working directory. Used offline to find the flag
 // that marks in-engine cutscenes (compare with screenshots taken meanwhile).
-constexpr uint32_t kDumpBase = 0x828A0000;
+constexpr uint32_t kDumpBase = AfroGameAddr(0x828A0000);
 constexpr uint32_t kDumpLen = 0x60000;
 void GlobalsDumpTick(uint64_t frame) {
   if (!REXCVAR_GET(afro_globals_dump) || frame % 30) return;
@@ -522,16 +523,20 @@ void LoadDiagTick(uint64_t frame) {
   if (!mem) return;
   struct W { uint32_t addr; int size; const char* name; };
   static const W kW[] = {
-      {0x828E62C0, 4, "state"},   {0x828B3068, 4, "obj3068"}, {0x828E62BC, 4, "obj62BC"},
-      {0x828E62A5, 1, "b62A5"},   {0x828E62A7, 1, "b62A7"},   {0x828B2D39, 1, "b2D39"},
-      {0x82897B20, 1, "b7B20"},   {0x828B2E5C, 4, "w2E5C"},   {0x828E62DA, 1, "b62DA"},
-      {0x828B2E50, 4, "cb2E50"},
+      {AfroGameAddr(0x828E62C0), 4, "state"},   {AfroGameAddr(0x828B3068), 4, "obj3068"}, {AfroGameAddr(0x828E62BC), 4, "obj62BC"},
+      {AfroGameAddr(0x828E62A5), 1, "b62A5"},   {AfroGameAddr(0x828E62A7), 1, "b62A7"},   {AfroGameAddr(0x828B2D39), 1, "b2D39"},
+      {AfroGameAddr(0x82897B20), 1, "b7B20"},   {AfroGameAddr(0x828B2E5C), 4, "w2E5C"},   {AfroGameAddr(0x828E62DA), 1, "b62DA"},
+      {AfroGameAddr(0x828B2E50), 4, "cb2E50"},
   };
   static uint32_t last[sizeof(kW) / sizeof(kW[0])];
   static bool init = false;
   bool changed = !init;
   uint32_t now[sizeof(kW) / sizeof(kW[0])];
   for (size_t i = 0; i < sizeof(kW) / sizeof(kW[0]); ++i) {
+    if (!kW[i].addr) {  // not on this disc (app/regions)
+      now[i] = 0;
+      continue;
+    }
     now[i] = kW[i].size == 4
                  ? rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kW[i].addr))
                  : *mem->TranslateVirtual<uint8_t*>(kW[i].addr);
@@ -545,7 +550,7 @@ void LoadDiagTick(uint64_t frame) {
     last[i] = now[i];
   }
   const uint32_t count =
-      rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(0x828B3070));
+      rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(AfroGameAddr(0x828B3070)));
   REXLOG_INFO("afro load: frame {}{} count={}", frame, s, int32_t(count));
 }
 
@@ -606,7 +611,7 @@ void InterludeTick() {
   auto put = [&](uint32_t a, uint32_t v) {
     rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(a), v);
   };
-  constexpr uint32_t kState = 0x828E62C0, kFadeTarget = 0x82898D7C;
+  constexpr uint32_t kState = AfroGameAddr(0x828E62C0), kFadeTarget = AfroGameAddr(0x82898D7C);
   static bool in6 = false, pending = false, done = false;
   static uint32_t last_target = 0, pending_target = 0, dialog_base = 0, press_base = 0;
   static clk::time_point t6{}, loaded{};
@@ -663,7 +668,7 @@ void InterludeTick() {
   // the "Afro!" screen gets ready (8, 9), then fades out again (10). Keep it
   // faded through 8 and 9 so the lore does not flash back before the eyes.
   if (in6 && (state == 8 || state == 9) && REXCVAR_GET(afro_interlude_full)) {
-    put(kFadeTarget, u32(0x82045F6C));  // the full-fade value states 7 and 10 use
+    put(kFadeTarget, u32(AfroGameAddr(0x82045F6C)));  // the full-fade value states 7 and 10 use
   }
   if (!pending && state != 6 && state != 7 && state != 8 && state != 9) in6 = false;
   g_lore_hold.store(pending, std::memory_order_relaxed);

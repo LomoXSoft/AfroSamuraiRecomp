@@ -9,21 +9,23 @@ call "%~dp0env_win.bat" || exit /b 1
 cd /d "%~dp0..\app"
 if not exist assets mkdir assets
 copy /y "%R%\gamedata\default.xex" assets\default.xex >nul || (echo gamedata\default.xex not found & exit /b 1)
+rem Europe or USA: writes appegion (hooks and addresses for this disc).
+python ..	oolsegion_config.py . || exit /b 1
 rem Game-derived inputs (private, gitignored): PE basefile, switch tables, icon.
 if not exist afro_switch_tables.toml (
   python ..\tools\xex_to_pe.py assets\default.xex assets\default.pe "%R%\rexglue-sdk" || exit /b 1
   python ..\tools\gen_switch_tables.py assets\default.pe afro_switch_tables.toml || exit /b 1
   python ..\tools\extract_icon.py assets\default.pe afro_icon.ico
 )
-rem Codegen when stamp missing. Also regenerate when afro_hooks.toml content changes
+rem Codegen when stamp missing. Also regenerate when regionfro_hooks.toml content changes
 rem (present-interval / tick mid-asm hooks): compare a sidecar hash.
 set HOOKHASH=
-for /f %%H in ('certutil -hashfile afro_hooks.toml SHA1 ^| findstr /v ":"') do set HOOKHASH=%%H
+for /f %%H in ('certutil -hashfile regionfro_hooks.toml SHA1 ^| findstr /v ":"') do set HOOKHASH=%%H
 if not exist generated\default\gen_v3.stamp goto dogegen
 if not exist generated\default\hooks.sha1 goto dogegen
 set /p OLDHOOK=<generated\default\hooks.sha1
 if /I not "%OLDHOOK%"=="%HOOKHASH%" goto dogegen
-echo codegen not forced: afro_hooks.toml unchanged; the build re-checks the other inputs
+echo codegen not forced: regionfro_hooks.toml unchanged; the build re-checks the other inputs
 goto ogen
 :dogegen
 echo AFROPHASE codegen

@@ -36,3 +36,8 @@ endif()
 
 rexglue_setup_target(afrorecomp GPU_PLUGINS xenos)
 target_compile_definitions(afrorecomp PRIVATE AFRO_VERSION="${AFRO_VERSION}")
+# region/afro_region.h: written by tools/region_config.py (tools/build_win.bat).
+if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/region/afro_region.h)
+    message(FATAL_ERROR "app/region/afro_region.h is missing: run python tools/region_config.py app")
+endif()
+target_include_directories(afrorecomp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/region)

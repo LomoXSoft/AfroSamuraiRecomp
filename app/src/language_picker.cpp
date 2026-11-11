@@ -3,6 +3,7 @@
 // The dialog is shown when there is no config, when ask=1, when Shift is held
 // at launch, or with --choose_language. An explicit --user_language wins.
 #include "language_picker.h"
+#include "afro_region.h"  // AFRO_REGION_USA, AFRO_REGION_NAME
 
 #include <rex/cvar.h>
 
@@ -1724,9 +1725,12 @@ unsigned ApplyStartupLanguage() {
                rt_explicit ? "; cmdline/config already set" : "");
   if (!Explicit("resolution_scale") && opt.scale > 1)
     SetCvar("resolution_scale", std::to_string(opt.scale));
-  rex::cvar::SetFlagByName("user_language", std::to_string(lang));
-  std::fprintf(stderr, "[afro] user_language=%u (config: %s)\n", lang,
-               path.string().c_str());
+  // The USA disc has English and French text only: Spanish and Italian keep the
+  // launcher in that language and run the game (and its menus) in English.
+  const unsigned game_lang = (AFRO_REGION_USA && lang != 1 && lang != 4) ? 1 : lang;
+  rex::cvar::SetFlagByName("user_language", std::to_string(game_lang));
+  std::fprintf(stderr, "[afro] %s disc, user_language=%u (launcher %u, config: %s)\n",
+               AFRO_REGION_NAME, game_lang, lang, path.string().c_str());
   return lang;
 }
 

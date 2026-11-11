@@ -8,4 +8,4 @@ game_root = "assets"
 [entrypoint]
 file_path = "assets/default.xex"
 out_directory_path = "generated/default"
-includes = ["afro_functions.toml", "afro_switch_tables.toml", "afro_hooks.toml"]
+includes = ["region/afro_functions.toml", "afro_switch_tables.toml", "region/afro_hooks.toml"]
