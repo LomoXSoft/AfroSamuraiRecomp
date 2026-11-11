@@ -5,7 +5,9 @@ Newest first. Versions are in `app/VERSION`.
 ## 0.2.2 (in progress)
 - Options while playing: **F1** (or hold L3 + R3) opens the main settings over the
   paused game, styled like the game's own menus (red ink strokes, the selected
-  row in a red stroke with arrows, the device's button prompts). Changes are
+  row in a red stroke with arrows). Its hints use the same button icons as the
+  game's prompts (`glyphs\<device>\*.png`: Xbox, PlayStation, Switch, Steam, or
+  the bound key caps on the keyboard). Changes are
   saved to `afro_language.cfg` and most apply at once; internal resolution,
   language and control mode after a restart. New `app/src/afro_menu.cpp`; the
   runtime adds `afro_pad_buttons` and `afro_ui_input_block` (C exports in the

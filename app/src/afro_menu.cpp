@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <imgui.h>
@@ -28,10 +29,15 @@
 #include <rex/logging.h>
 #include <rex/ui/imgui_dialog.h>
 #include <rex/ui/imgui_drawer.h>
+#include <rex/ui/immediate_drawer.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <objbase.h>
+#include <wincodec.h>
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "windowscodecs.lib")
 #endif
 
 namespace afro {
@@ -386,6 +392,116 @@ void ButtonNames(const char** ok, const char** back) {
   }
 }
 
+// ------------------------------------------------------------- button icons
+// The hints use the same icons as the game's own prompts: glyphs\<family>\*.png
+// next to the exe (zzzz-afro-button-glyphs.patch), named by Xbox position.
+rex::ui::ImmediateDrawer* g_imm = nullptr;
+std::unordered_map<std::string, std::unique_ptr<rex::ui::ImmediateTexture>> g_glyphs;
+
+// Same choice as the GPU plugin's ResolvedFamily: afro_button_glyphs, else the
+// device last used. 1 Xbox, 2 PlayStation, 3 Nintendo, 4 Steam, 5 keyboard.
+int GlyphFamily() {
+  const std::string s = rex::cvar::GetFlagByName("afro_button_glyphs");
+  if (s == "xbox") return 1;
+  if (s == "playstation" || s == "ps") return 2;
+  if (s == "nintendo" || s == "switch") return 3;
+  if (s == "steam") return 4;
+  if (s == "keyboard") return 5;
+  const int pad = std::atoi(rex::cvar::GetFlagByName("afro_pad_family").c_str());
+  return (pad >= 1 && pad <= 5) ? pad : 1;
+}
+
+#ifdef _WIN32
+// PNG to RGBA with WIC; empty on failure.
+std::vector<uint8_t> DecodePng(const std::filesystem::path& path, uint32_t& w, uint32_t& h) {
+  std::vector<uint8_t> out;
+  const HRESULT co = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  IWICImagingFactory* factory = nullptr;
+  IWICBitmapDecoder* decoder = nullptr;
+  IWICBitmapFrameDecode* frame = nullptr;
+  IWICFormatConverter* conv = nullptr;
+  if (SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                 IID_PPV_ARGS(&factory))) &&
+      SUCCEEDED(factory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ,
+                                                   WICDecodeMetadataCacheOnDemand, &decoder)) &&
+      SUCCEEDED(decoder->GetFrame(0, &frame)) &&
+      SUCCEEDED(factory->CreateFormatConverter(&conv)) &&
+      SUCCEEDED(conv->Initialize(frame, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone,
+                                 nullptr, 0.0, WICBitmapPaletteTypeCustom)) &&
+      SUCCEEDED(conv->GetSize(&w, &h)) && w > 0 && h > 0 && w <= 1024 && h <= 1024) {
+    out.resize(size_t(w) * h * 4);
+    if (FAILED(conv->CopyPixels(nullptr, w * 4, UINT(out.size()), out.data()))) out.clear();
+  }
+  if (conv) conv->Release();
+  if (frame) frame->Release();
+  if (decoder) decoder->Release();
+  if (factory) factory->Release();
+  if (SUCCEEDED(co)) CoUninitialize();
+  return out;
+}
+
+std::filesystem::path GlyphDir() {
+  static std::filesystem::path dir = [] {
+    wchar_t buf[MAX_PATH];
+    const DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
+    return std::filesystem::path(std::wstring(buf, n)).parent_path() / "glyphs";
+  }();
+  return dir;
+}
+#endif
+
+// UI thread. "playstation/A" -> its texture, or nullptr when there is no icon.
+rex::ui::ImmediateTexture* Glyph(const std::string& name) {
+  auto it = g_glyphs.find(name);
+  if (it != g_glyphs.end()) return it->second.get();
+  std::unique_ptr<rex::ui::ImmediateTexture> tex;
+#ifdef _WIN32
+  if (g_imm) {
+    uint32_t w = 0, h = 0;
+    std::vector<uint8_t> rgba = DecodePng(GlyphDir() / (name + ".png"), w, h);
+    if (!rgba.empty()) {
+      tex = g_imm->CreateTexture(w, h, rex::ui::ImmediateTextureFilter::kLinear, false,
+                                 rgba.data());
+    }
+  }
+#endif
+  rex::ui::ImmediateTexture* raw = tex.get();
+  g_glyphs.emplace(name, std::move(tex));
+  return raw;
+}
+
+// The icon for a pad button (Xbox position: A, B, DPAD_LEFT...). On the
+// keyboard, the key bound to it (`bind`, e.g. keybind_a) when one is set, like
+// the game's keyboard prompts; `key` is the key cap to use for the D-pad.
+rex::ui::ImmediateTexture* ButtonGlyph(const char* button, const char* bind, const char* key) {
+  static const char* kDirs[] = {"xbox", "xbox", "playstation", "nintendo", "steam", "keyboard"};
+  const int fam = GlyphFamily();
+  const std::string dir = std::string(kDirs[fam]) + "/";
+  if (fam == 5) {
+    std::string k = key ? key : "";
+    if (bind) {
+      k = rex::cvar::GetFlagByName(bind);
+      k = k.substr(0, k.find(','));
+      const size_t plus = k.rfind('+');
+      if (plus != std::string::npos && plus + 1 < k.size()) k = k.substr(plus + 1);
+    }
+    if (!k.empty()) {
+      if (auto* t = Glyph(dir + "key_" + k)) return t;
+    }
+  }
+  return Glyph(dir + button);
+}
+
+// Draws the icon `tex` with height `size` at p, or the text key cap when there
+// is no icon. Returns the width used.
+float Prompt(ImDrawList* dl, ImFont* f, float size, ImVec2 p, rex::ui::ImmediateTexture* tex,
+             const char* text) {
+  if (!tex) return KeyCap(dl, f, size * 0.62f, {p.x, p.y + size * 0.1f}, text);
+  const float w = size * float(tex->width) / float(std::max<uint32_t>(1, tex->height));
+  dl->AddImage(reinterpret_cast<ImTextureID>(tex), p, {p.x + w, p.y + size});
+  return w;
+}
+
 // -------------------------------------------------------------------- dialog
 class MenuDialog : public rex::ui::ImGuiDialog {
  public:
@@ -620,16 +736,25 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
   const char *ok, *back;
   ButtonNames(&ok, &back);
   const float hs = 24 * s;
+  const float gs = 38 * s;  // icon height, centred on the hint text
   float hx = px0 + 40 * s;
   const float hy = H - 78 * s;
-  dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kWhite), "\xE2\x97\x84 \xE2\x96\xBA");  // ◄ ►
-  hx += fS->CalcTextSizeA(hs, 1e9f, 0, "\xE2\x97\x84 \xE2\x96\xBA").x + 10 * s;
+  const ImVec2 gp{0, hy + 2 * s + hs * 0.5f - gs * 0.5f};
+  rex::ui::ImmediateTexture* left = ButtonGlyph("DPAD_LEFT", nullptr, "Left");
+  rex::ui::ImmediateTexture* right = ButtonGlyph("DPAD_RIGHT", nullptr, "Right");
+  if (left && right) {
+    hx += Prompt(dl, fS, gs, {hx, gp.y}, left, "") + 2 * s;
+    hx += Prompt(dl, fS, gs, {hx, gp.y}, right, "") + 10 * s;
+  } else {
+    dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kWhite), "\xE2\x97\x84 \xE2\x96\xBA");  // ◄ ►
+    hx += fS->CalcTextSizeA(hs, 1e9f, 0, "\xE2\x97\x84 \xE2\x96\xBA").x + 10 * s;
+  }
   dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintChange));
   hx += fS->CalcTextSizeA(hs, 1e9f, 0, Tr(kHintChange)).x + 34 * s;
-  hx += KeyCap(dl, fS, hs * 0.8f, {hx, hy}, ok) + 10 * s;
+  hx += Prompt(dl, fS, gs, {hx, gp.y}, ButtonGlyph("A", "keybind_a", nullptr), ok) + 10 * s;
   dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintSelect));
   hx += fS->CalcTextSizeA(hs, 1e9f, 0, Tr(kHintSelect)).x + 34 * s;
-  hx += KeyCap(dl, fS, hs * 0.8f, {hx, hy}, back) + 10 * s;
+  hx += Prompt(dl, fS, gs, {hx, gp.y}, ButtonGlyph("B", "keybind_b", nullptr), back) + 10 * s;
   dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintBack));
   dl->AddText(fS, 20 * s, {px0 + 40 * s, H - 40 * s}, A(kDim), Tr(kHintKeys));
   ImGui::End();
@@ -668,8 +793,10 @@ void MenuAddFonts(ImFontAtlas* atlas) {
 #endif
 }
 
-void MenuInit(rex::ui::ImGuiDrawer* drawer, std::function<void(std::function<void()>)> post_ui) {
+void MenuInit(rex::ui::ImGuiDrawer* drawer, rex::ui::ImmediateDrawer* immediate,
+              std::function<void(std::function<void()>)> post_ui) {
   g_drawer = drawer;
+  g_imm = immediate;
   g_post_ui = std::move(post_ui);
 }
 
@@ -720,6 +847,10 @@ void MenuGuestFrame() {
 
 void MenuShutdown() {
   g_open = false;
+  // Before the app destroys the immediate drawer the icons belong to.
+  g_dialog.reset();
+  g_glyphs.clear();
+  g_imm = nullptr;
 }
 
 }  // namespace afro

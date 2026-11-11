@@ -7,14 +7,17 @@
 struct ImFontAtlas;
 namespace rex::ui {
 class ImGuiDrawer;
+class ImmediateDrawer;
 }
 
 namespace afro {
 
 // Fonts for the menu; call from OnConfigureFonts (after the drawer's own font).
 void MenuAddFonts(ImFontAtlas* atlas);
-// From OnCreateDialogs. post_ui runs a function on the UI thread.
-void MenuInit(rex::ui::ImGuiDrawer* drawer, std::function<void(std::function<void()>)> post_ui);
+// From OnCreateDialogs. immediate loads the button icons; post_ui runs a
+// function on the UI thread.
+void MenuInit(rex::ui::ImGuiDrawer* drawer, rex::ui::ImmediateDrawer* immediate,
+              std::function<void(std::function<void()>)> post_ui);
 // UI thread: open or close the menu.
 void MenuToggle();
 // Guest thread, once per frame (the present hook): opens the menu on the

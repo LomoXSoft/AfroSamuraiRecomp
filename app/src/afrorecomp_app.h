@@ -49,7 +49,7 @@ class AfrorecompApp : public rex::ReXApp {
   void OnConfigureFonts(ImFontAtlas* atlas) override { afro::MenuAddFonts(atlas); }
   void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {
     // In-game options menu: F1, or hold both stick clicks (afro_menu.cpp).
-    afro::MenuInit(drawer, [this](std::function<void()> f) {
+    afro::MenuInit(drawer, immediate_drawer(), [this](std::function<void()> f) {
       app_context().CallInUIThreadDeferred(std::move(f));
     });
     rex::ui::RegisterBind("bind_afro_menu", "F1", "Options menu", [] { afro::MenuToggle(); });
