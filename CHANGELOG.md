@@ -2,7 +2,7 @@
 
 Newest first. Versions are in `app/VERSION`.
 
-## 0.2.2 (in progress)
+## 0.2.2 – Options while playing
 - Options while playing: **F1** (or hold L3 + R3) opens the main settings over the
   paused game, styled like the game's own menus (red ink strokes, the selected
   row in a red stroke with arrows). Its hints use the same button icons as the
