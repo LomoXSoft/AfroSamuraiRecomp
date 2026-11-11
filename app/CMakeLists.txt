@@ -15,6 +15,7 @@ set(AFRORECOMP_SOURCES
     src/main.cpp
     src/language_picker.cpp
     src/frame_pacing.cpp
+    src/afro_menu.cpp
 )
 
 # Single version source: app/VERSION (bump per release).

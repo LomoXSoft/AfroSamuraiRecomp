@@ -11,6 +11,11 @@
 #include <rex/filesystem.h>
 #include <rex/rex_app.h>
 
+#include <functional>
+
+#include <rex/ui/keybinds.h>
+
+#include "afro_menu.h"
 #include "language_picker.h"
 #include "frame_pacing.h"
 
@@ -41,8 +46,13 @@ class AfrorecompApp : public rex::ReXApp {
   // void OnLoadXexImage(std::string& xex_image) override {}
   // void OnPostLoadXexImage() override {}
   // void OnPostSetup() override {}
+  void OnConfigureFonts(ImFontAtlas* atlas) override { afro::MenuAddFonts(atlas); }
   void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {
-    (void)drawer;
+    // In-game options menu: F1, or hold both stick clicks (afro_menu.cpp).
+    afro::MenuInit(drawer, [this](std::function<void()> f) {
+      app_context().CallInUIThreadDeferred(std::move(f));
+    });
+    rex::ui::RegisterBind("bind_afro_menu", "F1", "Options menu", [] { afro::MenuToggle(); });
     if (window()) window()->SetTitle("afrorecomp_v" AFRO_VERSION);
     SetGuestFrameStats(afro::GuestFrameStats);  // F3 overlay
 #ifdef _WIN32
@@ -66,7 +76,7 @@ class AfrorecompApp : public rex::ReXApp {
   // std::unique_ptr<rex::ui::ImGuiDialog> CreateAchievementsOverlay() override;
   // std::unique_ptr<rex::ui::AchievementNotificationDialog>
   // CreateAchievementNotificationDialog() override;
-  // void OnShutdown() override {}
+  void OnShutdown() override { afro::MenuShutdown(); }
 
   // A setup install keeps the disc files in <root>\gamedata and the log in
   // <root>\afro.log, beside <root>\game\afrorecomp.exe. Play.bat passes both;

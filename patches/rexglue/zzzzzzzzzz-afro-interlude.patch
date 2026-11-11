@@ -28,7 +28,7 @@ index 84d1473..40ac2cf 100644
 +
  }  // namespace rex::input
 diff --git a/src/input/input_system.cpp b/src/input/input_system.cpp
-index f143348..350d69f 100644
+index f143348..573fd05 100644
 --- a/src/input/input_system.cpp
 +++ b/src/input/input_system.cpp
 @@ -10,8 +10,14 @@
@@ -46,7 +46,7 @@ index f143348..350d69f 100644
  
  #include <rex/dbg.h>
  #include <rex/input/device_assignment.h>
-@@ -51,8 +57,108 @@ constexpr uint32_t kSyntheticOrdinal = UINT32_MAX;
+@@ -51,11 +57,143 @@ constexpr uint32_t kSyntheticOrdinal = UINT32_MAX;
  // XN_SYS_INPUTDEVICESCHANGED
  constexpr uint32_t kXNotificationSystemInputDevicesChanged = 0x00000012;
  
@@ -90,6 +90,7 @@ index f143348..350d69f 100644
 +
  }  // namespace
  
+-InputSystem::InputSystem(rex::ui::Window* window) : window_(window) {}
 +uint32_t AfroButtonPresses() {
 +  return afro_presses.load(std::memory_order_relaxed);
 +}
@@ -122,7 +123,8 @@ index f143348..350d69f 100644
 +  if (afro_voice_end.time_since_epoch().count() == 0) return 1e9;
 +  return std::chrono::duration<double>(std::chrono::steady_clock::now() - afro_voice_end).count();
 +}
-+
+ 
+-InputSystem::~InputSystem() = default;
 +}  // namespace rex::input
 +
 +// afro: plain C exports of the helpers above. The app looks them up in
@@ -152,10 +154,45 @@ index f143348..350d69f 100644
 +  return index < afro_dialog_hashes.size() ? afro_dialog_hashes[index] : 0;
 +}
 +
- InputSystem::InputSystem(rex::ui::Window* window) : window_(window) {}
++// afro: the input system, for the plain C helpers below (in-game menu).
++static std::atomic<InputSystem*> afro_input_system{nullptr};
++
++InputSystem::InputSystem(rex::ui::Window* window) : window_(window) {
++  afro_input_system.store(this);
++}
++
++InputSystem::~InputSystem() {
++  InputSystem* self = this;
++  afro_input_system.compare_exchange_strong(self, nullptr);
++}
++
++}  // namespace rex::input
++
++extern "C" {
++// Buttons held on guest user `user` (the keyboard pad included), read even while
++// the guest's input is blocked. 0 when there is no input system or device.
++AFRO_EXPORT uint32_t afro_pad_buttons(uint32_t user) {
++  auto* in = rex::input::afro_input_system.load();
++  if (!in) return 0;
++  rex::input::X_INPUT_STATE st = {};
++  if (in->GetStateForUI(user, &st) != 0) return 0;  // X_ERROR_SUCCESS
++  return static_cast<uint16_t>(st.gamepad.buttons);
++}
++// on != 0: the guest reads a neutral pad until called with 0; buttons still held
++// then stay masked until released (so the press that closes a menu is not seen).
++AFRO_EXPORT void afro_ui_input_block(int on) {
++  auto* in = rex::input::afro_input_system.load();
++  if (!in) return;
++  if (on) in->AddUIInputBlocker();
++  else in->RemoveUIInputBlocker();
++}
++}
++
++namespace rex::input {
  
- InputSystem::~InputSystem() = default;
-@@ -334,6 +440,12 @@ X_RESULT InputSystem::GetStateForUI(uint32_t user_index, X_INPUT_STATE* out_stat
+ X_STATUS InputSystem::Setup() {
+   return X_STATUS_SUCCESS;
+@@ -334,6 +472,12 @@ X_RESULT InputSystem::GetStateForUI(uint32_t user_index, X_INPUT_STATE* out_stat
    }
    UpdateConnectedUser(user_index, true);
    AdjustDeadzoneLevels(user_index, &merged.gamepad);

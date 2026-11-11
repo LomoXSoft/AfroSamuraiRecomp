@@ -3,6 +3,7 @@
 // Present-interval / Experimental dt hooks also live here (see afro_hooks.toml).
 #include "frame_pacing.h"
 #include "player_hp_invuln.h"
+#include "afro_menu.h"
 
 #include <algorithm>
 #include <atomic>
@@ -979,6 +980,9 @@ void AfroLoadingTextHook(PPCRegister& r9) {
 }
 
 void AfroSwapHook(PPCRegister& r31) {
+  // In-game options menu: opens on its controller combination, and the game
+  // waits here while it is open (afro_menu.cpp).
+  afro::MenuGuestFrame();
   TickModeOnce();
   FxTick();
   PlayerInvulnTick();
