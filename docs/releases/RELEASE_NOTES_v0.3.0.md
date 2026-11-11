@@ -10,13 +10,14 @@ HDD installation can take a long time; SSD/NVMe recommended.
 
 `afrosetup-v0.3.0.exe`
 
-SHA-256 `2183eb407e58c9f4b521ca62fe80eb2d83638df84655cbffcd0e66701377ea13`
+SHA-256 `32675e112275759cc899d80c5cd34425b872a4e0c4aaf28465d44f9325833da9`
 
-1890743 bytes.
+1893036 bytes.
 
 Already on 0.1.x or 0.2.x: run it, choose **Update** and pick your install folder.
 Your extracted game, saves and launcher settings stay. **Update** rebuilds only
-what changed; this update runs the game's code generation once more.
+what changed; this first update to 0.3.0 runs the game's code generation once
+more (about a minute).
 
 ## New
 
@@ -33,18 +34,29 @@ what changed; this update runs the game's code generation once more.
 - No SHA-1 is recorded yet for a USA ISO, so a USA ISO shows the "not verified"
   note. Its game files are still checked after extraction.
 
+### Fixes
+- **Update** no longer removes the build's generated region files, so a later
+  update does not run code generation again when nothing changed.
+
 ## Tested
 
-- Fresh installs into empty folders with this source: one from the USA files, one
-  from the Europe ISO. Both built and started.
-- USA, played with the keyboard on the author's PC: title and menus, a Europe save
-  loaded, the loading screen with "Press any button to continue", the in-game
-  options menu, 60 FPS, Game Journalist in a fight, and the game's A/B prompts
-  replaced by the keyboard icons.
+- Fresh install from the USA files (French): title, menus, level select, subtitles
+  and loading text in French; a Europe save loaded; a new game started and saved;
+  the opening cutscene and the first fight; the loading screen held the lore and
+  continued on a button; the in-game options menu; 60 FPS in gameplay and in
+  cutscenes; Game Journalist kept the player alive in a fight; the game's A, B, X,
+  Y and RT prompts were recognised (same images as the Europe disc) and replaced
+  by the keyboard icons.
+- Fresh install from the Europe ISO (Redump 17884 verified, Spanish): built, the
+  region step picked Europe with hooks identical to 0.2.2, and the game played at
+  60 FPS.
+- Update of a 0.2.2 install to 0.3.0: built and started; a second update skipped
+  code generation and compiled one file.
+- All checks in `checks/` pass.
 
 ## Still not claimed
 
-- The USA disc was checked in short sessions, not played through. Controllers and
-  the X, Y and trigger prompts were not checked on it.
+- The USA disc was checked in short sessions with the keyboard, not played
+  through. Controllers and the LT prompt were not checked on it.
 - At 60, scenes that show two camera views at once can still drop below 60.
 - No install time is guaranteed on HDD, SSD, or NVMe.

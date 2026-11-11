@@ -9,6 +9,9 @@ Newest first. Versions are in `app/VERSION`.
   2008, with the same code apart from about 80 functions); hooks, function list and
   `frame_pacing.cpp` (`AfroGameAddr`) use it. The installer accepts the USA files;
   on the USA disc Spanish and Italian run the game in English.
+- Update keeps `app/region/`: removing it gave the region files new timestamps and
+  ran codegen again on every update. `checks/test_source_sync.ps1` reads the keep
+  list from `install.ps1`.
 
 ## 0.2.2 – Options while playing
 - Options while playing: **F1** (or hold L3 + R3) opens the main settings over the

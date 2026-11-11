@@ -253,7 +253,7 @@ instead of an ISO.
 
 ### Getting your game files
 The Europe disc (Redump 17884, ISO SHA-1
-`29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. USA disc (new; checked in one short session, not played through): the build recognises its `default.xex` (SHA-1 `873fff7191be2b687eb55f8564f9b9f5c5842b40`) and uses the USA addresses in `app/regions/usa.toml`. No USA ISO SHA-1 is recorded yet, so a USA ISO shows the "not verified" note; the game files are checked after extraction. Make the ISO from your own disc,
+`29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. USA disc (new in 0.3.0; checked in short sessions, not played through): the build recognises its `default.xex` (SHA-1 `873fff7191be2b687eb55f8564f9b9f5c5842b40`) and uses the USA addresses in `app/regions/usa.toml`. No USA ISO SHA-1 is recorded yet, so a USA ISO shows the "not verified" note; the game files are checked after extraction. Make the ISO from your own disc,
 for example with a DVD drive that can read Xbox 360 discs and a disc dumping
 tool, or from a backup of your own disc that you made with your console.
 Check the SHA-1 with `certutil -hashfile "Afro Samurai.iso" SHA1`.
