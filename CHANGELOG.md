@@ -2,7 +2,7 @@
 
 Newest first. Versions are in `app/VERSION`.
 
-## Unreleased
+## 0.2.3 – USA disc
 - USA disc support. The build reads the SHA-1 of `default.xex` and picks Europe or
   USA (`tools/region_config.py`, writes `app/region/`). `app/regions/usa.toml` maps
   each Europe address the project uses to the USA build (an older build, December

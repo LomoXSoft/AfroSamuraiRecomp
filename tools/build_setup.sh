@@ -6,7 +6,7 @@
 set -eu
 cd "$(dirname "$0")"
 ROOT=$(CDPATH= cd .. && pwd)
-REPO=${REPO:-/tmp/afro-0.2.2}
+REPO=${REPO:-/tmp/afro-0.2.3}
 if [ ! -f "$REPO/install.bat" ]; then
   echo "REPO must be a full AfroSamuraiRecomp tree (install.bat missing: $REPO)" >&2
   exit 1
