@@ -92,8 +92,6 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
 - Borderless window and key rebinding: done in 0.2.1.
 - Launcher options in game, while playing.
 - Loading screens: their lore cutscenes play in full again (0.2.1).
-- The "Afro!" voice of the loading screen's eyes starts slightly cut (mid "A"); it
-  did so before 0.2.1 too.
 - One-hit kill cheat.
 - USA disc (`.iso`) support.
 - Linux, macOS and Android versions.
