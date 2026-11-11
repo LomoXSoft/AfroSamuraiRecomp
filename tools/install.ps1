@@ -1113,7 +1113,9 @@ try {
         # gets the current time, so Ninja rebuilds exactly what changed.
         # Kept as they are: the build folder, codegen output and game-derived
         # files. None of them are in the source tree.
-        $sync = Sync-SourceTree $src $dest @('app\out', 'app\generated', 'app\assets', 'app\afro_switch_tables.toml', 'app\afro_icon.ico')
+        # app\region: Europe/USA codegen inputs written by tools\region_config.py.
+        # Removing them would give them new timestamps and rerun codegen on every update.
+        $sync = Sync-SourceTree $src $dest @('app\out', 'app\generated', 'app\assets', 'app\afro_switch_tables.toml', 'app\afro_icon.ico', 'app\region')
         Say "    source sync: $($sync.Changed) changed, $($sync.Same) unchanged, $($sync.Removed) removed"
         foreach ($rel in $sync.ChangedFiles) { Write-InstallLog "      changed: $rel" }
         foreach ($rel in $sync.RemovedFiles) { Write-InstallLog "      removed: $rel" }
