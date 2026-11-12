@@ -38,7 +38,8 @@ lists are in the Git history and the release notes in `docs/releases/`.
 - The USA disc has English and French text only: with Spanish or Italian chosen,
   the launcher keeps that language and the game runs in English.
 - No USA ISO SHA-1 is recorded yet: a USA ISO shows the "not verified" note, and
-  its game files are checked after extraction.
+  its game files are checked after extraction. A USA ISO has not been tested;
+  only extracted USA files have.
 - Windows x64 only (D3D12).
 - No install time is guaranteed on HDD, SSD or NVMe; SSD/NVMe recommended. A
-  fresh install took about 13 minutes on the author's PC.
+  fresh install took 13 to 16 minutes on the author's PC.
