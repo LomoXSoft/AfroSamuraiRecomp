@@ -204,6 +204,10 @@ std::vector<Item> MakeItems() {
                      "Schermate di caricamento"};
   static T4 lLang = {"Language", "Idioma", "Langue", "Lingua"};
   static T4 lCtl = {"Control", "Control", "Contr\xC3\xB4le", "Controllo"};
+  static T4 lCamX = {"Camera X axis", "Eje X de la c\xC3\xA1mara", "Axe X de la cam\xC3\xA9ra",
+                     "Asse X della telecamera"};
+  static T4 lCamY = {"Camera Y axis", "Eje Y de la c\xC3\xA1mara", "Axe Y de la cam\xC3\xA9ra",
+                     "Asse Y della telecamera"};
   static T4 lSens = {"Mouse sensitivity", "Sensibilidad del rat\xC3\xB3n", "Sensibilit\xC3\xA9 souris",
                      "Sensibilit\xC3\xA0 mouse"};
   static T4 lDz = {"Mouse dead zone", "Zona muerta del rat\xC3\xB3n", "Zone morte souris",
@@ -282,6 +286,16 @@ std::vector<Item> MakeItems() {
           {{"Controller", "Mando", "Manette", "Controller"}, {{"control", "1"}}},
           {{"Keyboard", "Teclado", "Clavier", "Tastiera"}, {{"control", "2"}}}},
          {{"control", "0"}}, nullptr, true);
+  // Camera invert: the game's own Options -> Camera setting (frame_pacing.cpp
+  // keeps it in step with the game and its save).
+  auto axis = [&](T4& l, const char* key, const char* cvar) {
+    choice(l,
+           {{{"Default", "Normal", "Normal", "Normale"}, {{key, "0"}}},
+            {{"Invert", "Invertido", "Invers\xC3\xA9", "Invertito"}, {{key, "1"}}}},
+           {{key, "0"}}, [cvar](int i) { SetCvar(cvar, i == 1 ? "1" : "0"); });
+  };
+  axis(lCamX, "invert_x", "afro_invert_x");
+  axis(lCamY, "invert_y", "afro_invert_y");
   slider(lSens, "mouse_sensitivity", 10, 500, 5, 200, 100, "", "mnk_sensitivity");
   slider(lDz, "mouse_deadzone", 0, 80, 1, 55, 100, "", "afro_mouse_deadzone");
   slider(lSmooth, "mouse_smoothing_ms", 1, 50, 1, 5, 1, " ms", "afro_mouse_window_ms");
@@ -852,5 +866,7 @@ void MenuShutdown() {
   g_glyphs.clear();
   g_imm = nullptr;
 }
+
+void CfgStore(const char* key, const std::string& value) { CfgSet({{key, value}}); }
 
 }  // namespace afro

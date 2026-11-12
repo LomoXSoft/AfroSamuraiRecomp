@@ -26,7 +26,7 @@
         }
       ],
       "new": {
-        "version": "0.3.0",
+        "version": "0.3.1",
         "ask": "0"
       }
     }
@@ -248,6 +248,52 @@
           "label": "Keyboard",
           "set": {
             "control": "2"
+          }
+        }
+      ],
+      "group": "Controls"
+    },
+    {
+      "id": "invert_x",
+      "label": "Camera X axis",
+      "help": "Same as the game's Options > Camera. Unset: as in your save.",
+      "defaults": {
+        "invert_x": "0"
+      },
+      "choices": [
+        {
+          "label": "Default",
+          "set": {
+            "invert_x": "0"
+          }
+        },
+        {
+          "label": "Invert",
+          "set": {
+            "invert_x": "1"
+          }
+        }
+      ],
+      "group": "Controls"
+    },
+    {
+      "id": "invert_y",
+      "label": "Camera Y axis",
+      "help": "Same as the game's Options > Camera. Unset: as in your save.",
+      "defaults": {
+        "invert_y": "0"
+      },
+      "choices": [
+        {
+          "label": "Default",
+          "set": {
+            "invert_y": "0"
+          }
+        },
+        {
+          "label": "Invert",
+          "set": {
+            "invert_y": "1"
           }
         }
       ],

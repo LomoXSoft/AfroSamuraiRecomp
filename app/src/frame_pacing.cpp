@@ -85,6 +85,13 @@ REXCVAR_DEFINE_BOOL(afro_fx_log, false, "Afro", "Log fullscreen effect state cha
 REXCVAR_DEFINE_BOOL(afro_player_invuln, false, "Afro",
                     "Test: player char HP does not decrease (session; not a full god-mode)");
 
+// Camera invert (launcher, F1 menu): -1 follows the game's own Options -> Camera
+// setting (from its save), 0 default, 1 invert. See InvertTick.
+REXCVAR_DEFINE_INT32(afro_invert_x, -1, "Afro",
+                     "Camera X axis: -1 as the game's save, 0 default, 1 invert");
+REXCVAR_DEFINE_INT32(afro_invert_y, -1, "Afro",
+                     "Camera Y axis: -1 as the game's save, 0 default, 1 invert");
+
 namespace {
 struct FxFlag { const char* name; uint32_t addr; bool (*on)(); };
 const FxFlag kFx[] = {
@@ -700,7 +707,144 @@ void PatchPrimaryDtStore(PPCRegister& base, PPCRegister& f, int32_t offset) {
   rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(base.u32 + offset), u);
   ForceExperimentalPrimaryDt();
 }
+
+// Camera invert. The game's camera code (0x827BA0xx) reads two bytes every
+// frame: X at 0x8285CCBF (1 default, 0 invert) and Y at 0x828E55EB (0 default,
+// 1 invert). Its Options -> Camera menu shows, and its save stores, the
+// profile's byte 13 (bit 1 X invert, bit 0 Y invert; profile pointer at
+// 0x829F9470 = 0x829F92D0 + 416, as in the menu's setter sub_82682538), which
+// sub_8269B2E8 copies into the two bytes when the save is read (hook below).
+// The setting (afro_invert_x/_y, afro_language.cfg invert_x/invert_y) is put
+// over both, so the game's next save keeps it; a change made in the game's own
+// Camera menu is taken back into the setting. Unset (-1): the save's value is
+// taken as the setting.
+// USA disc (older build): its menu and save have Y only (byte 13 non-zero =
+// invert), but its camera code reads the X byte too, so X works from here and
+// is never written to the profile.
+struct InvertAxis {
+  const char* cvar;
+  const char* key;
+  uint32_t addr;
+  uint8_t invert_value;  // byte value meaning "invert"
+  uint8_t profile_mask;  // bits of profile byte 13 for this axis; 0: not in the profile
+  uint8_t profile_set;   // value written under the mask for "invert"
+};
+const InvertAxis kInvert[2] = {
+    {"afro_invert_x", "invert_x", AfroGameAddr(0x8285CCBF), 0, AFRO_REGION_USA ? 0 : 2, 2},
+    // USA: the whole byte is Y (a Europe save with X invert, 2, is Y invert there).
+    {"afro_invert_y", "invert_y", AfroGameAddr(0x828E55EB), 1, AFRO_REGION_USA ? 0xFF : 1, 1},
+};
+constexpr uint32_t kProfilePtr = AfroGameAddr(0x829F9470);
+constexpr uint32_t kProfileCameraByte = 13;
+int g_invert_seen[2] = {-1, -1};     // value last seen in (or written to) the game
+int g_invert_applied[2] = {-1, -1};  // setting last applied
+
+int InvertWant(int i) {
+  const int v = i == 0 ? REXCVAR_GET(afro_invert_x) : REXCVAR_GET(afro_invert_y);
+  return v < 0 ? -1 : (v ? 1 : 0);
+}
+int InvertRead(int i) {
+  auto* mem = rex::system::kernel_memory();
+  const uint8_t b = *mem->TranslateVirtual<uint8_t*>(kInvert[i].addr);
+  return b == kInvert[i].invert_value ? 1 : 0;
+}
+void InvertWrite(int i, int inv) {
+  auto* mem = rex::system::kernel_memory();
+  const uint8_t inv_b = kInvert[i].invert_value;
+  *mem->TranslateVirtual<uint8_t*>(kInvert[i].addr) = inv ? inv_b : uint8_t(inv_b ^ 1);
+  const uint32_t profile = rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kProfilePtr));
+  const InvertAxis& a = kInvert[i];
+  if (a.profile_mask && profile >= 0x1000) {
+    uint8_t* p = mem->TranslateVirtual<uint8_t*>(profile + kProfileCameraByte);
+    *p = uint8_t((*p & ~a.profile_mask) | (inv ? a.profile_set : 0));
+  }
+}
+// The profile's copy of the axis (what the game's menu shows), -1 without a
+// profile or when the profile has no copy of it.
+int InvertProfile(int i) {
+  auto* mem = rex::system::kernel_memory();
+  const uint32_t profile = rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kProfilePtr));
+  if (!kInvert[i].profile_mask || profile < 0x1000) return -1;
+  return (*mem->TranslateVirtual<uint8_t*>(profile + kProfileCameraByte) & kInvert[i].profile_mask) ? 1 : 0;
+}
+// The profile copy disagrees with the setting (an axis with no copy never does).
+bool InvertProfileDiffers(int i, int want) {
+  const int p = InvertProfile(i);
+  return p >= 0 && p != want;
+}
+// The game changed the axis: make it the setting (and the cfg value the
+// launcher and the F1 menu show).
+void InvertAdopt(int i, int inv, const char* why) {
+  const std::string v = inv ? "1" : "0";
+  rex::cvar::SetFlagByName(kInvert[i].cvar, v);
+  afro::CfgStore(kInvert[i].key, v);
+  g_invert_applied[i] = inv;
+  REXLOG_INFO("afro camera: {} {} ({})", kInvert[i].key, inv ? "invert" : "default", why);
+}
+
+// Per frame (present hook): apply a new setting (launcher at start, F1 menu),
+// or take in a change made in the game's Camera menu. That menu sets the flag
+// and the profile bit together; the game's start-up defaults (sub_8269B9A8,
+// before the save is read) set only the flag, and are overwritten again.
+void InvertTick() {
+  if (!rex::system::kernel_memory()) return;
+  for (int i = 0; i < 2; ++i) {
+    const int want = InvertWant(i);
+    const int cur = InvertRead(i);
+    if (want >= 0 && want != g_invert_applied[i]) {
+      g_invert_applied[i] = want;
+      if (cur != want) {
+        InvertWrite(i, want);
+        REXLOG_INFO("afro camera: {} set to {}", kInvert[i].key, want ? "invert" : "default");
+      }
+      g_invert_seen[i] = want;
+      continue;
+    }
+    if (cur == g_invert_seen[i]) continue;
+    if (g_invert_seen[i] >= 0 && InvertProfile(i) == cur) {
+      InvertAdopt(i, cur, "game menu");
+      g_invert_seen[i] = cur;
+    } else if (want >= 0) {
+      InvertWrite(i, want);
+      g_invert_seen[i] = want;
+    } else {
+      g_invert_seen[i] = cur;
+    }
+  }
+}
 }  // namespace
+
+// sub_8269B2E8 has just copied the save's camera bytes (profile byte 13) into
+// the game: put the setting back over them, or take them as the setting.
+void AfroInvertProfileHook(PPCRegister& r29) {
+  (void)r29;
+  if (!rex::system::kernel_memory()) return;
+  for (int i = 0; i < 2; ++i) {
+    const int want = InvertWant(i);
+    const int cur = InvertRead(i);
+    if (want < 0) {
+      InvertAdopt(i, cur, "from the save");
+    } else if (cur != want || InvertProfileDiffers(i, want)) {
+      InvertWrite(i, want);
+      REXLOG_INFO("afro camera: {} {} over the save", kInvert[i].key,
+                  want ? "invert" : "default");
+    }
+    g_invert_seen[i] = want < 0 ? cur : want;
+  }
+}
+
+// sub_8269B9A8 has just reset the profile to its defaults (at start-up, before
+// the save is read): put the setting back, take nothing from the defaults.
+void AfroInvertDefaultsHook(PPCRegister& r10) {
+  (void)r10;
+  if (!rex::system::kernel_memory()) return;
+  for (int i = 0; i < 2; ++i) {
+    const int want = InvertWant(i);
+    const int cur = InvertRead(i);
+    if (want >= 0 && (cur != want || InvertProfileDiffers(i, want))) InvertWrite(i, want);
+    g_invert_seen[i] = want < 0 ? cur : want;
+  }
+}
 
 void AfroPresentIntervalHook(PPCRegister& r11) {
   r11.u64 = static_cast<uint64_t>(EffectiveInterval());
@@ -988,6 +1132,7 @@ void AfroSwapHook(PPCRegister& r31) {
   // In-game options menu: opens on its controller combination, and the game
   // waits here while it is open (afro_menu.cpp).
   afro::MenuGuestFrame();
+  InvertTick();
   TickModeOnce();
   FxTick();
   PlayerInvulnTick();

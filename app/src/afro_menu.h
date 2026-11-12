@@ -3,6 +3,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 
 struct ImFontAtlas;
 namespace rex::ui {
@@ -25,5 +26,7 @@ void MenuToggle();
 void MenuGuestFrame();
 // App shutdown: release a paused game.
 void MenuShutdown();
+// Writes one key of afro_language.cfg (the launcher's settings file).
+void CfgStore(const char* key, const std::string& value);
 
 }  // namespace afro

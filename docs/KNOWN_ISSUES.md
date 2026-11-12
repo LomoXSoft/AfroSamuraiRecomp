@@ -27,6 +27,9 @@ the Git history and the release notes in `docs/releases/`.
 - Checked in game with Xbox, DualSense, Switch and generic controllers. Steam
   icons were not checked in game. Steam Deck is not tested.
 - Keyboard icons show the first key of each binding.
+- Camera invert: on the USA disc the game's own Camera menu has the Y axis only.
+  X invert works there from the launcher or the F1 menu, but the USA save does
+  not store it; it is kept in `afro_language.cfg`.
 
 ## Install
 - Supported discs: Europe (Redump 17884, ISO SHA-1

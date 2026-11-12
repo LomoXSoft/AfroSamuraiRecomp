@@ -2,6 +2,19 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.3.1 – Camera invert
+- Camera invert for the X and Y axes in the launcher (Settings -> Controls),
+  the in-game options (F1) and RecompLauncher. It is the game's own
+  Options -> Camera setting: the camera reads two bytes every frame (X at
+  0x8285CCBF, Y at 0x828E55EB) and the save keeps them in profile byte 13.
+  `frame_pacing.cpp` puts the setting over the save when the game reads it
+  (hook in `sub_8269B2E8`) and after the start-up profile reset
+  (`sub_8269B9A8`), so the game's next save keeps it, and takes a change made
+  in the game's Camera menu back into `afro_language.cfg` (`invert_x`,
+  `invert_y`). Without a value there, the save's setting is kept and written
+  to the cfg. The USA disc's menu and save have no X option, but its camera
+  reads the X byte too: X invert works there from the recomp's settings.
+
 ## 0.3.0 – USA compatibility
 - USA disc support. The build reads the SHA-1 of `default.xex` and picks Europe or
   USA (`tools/region_config.py`, writes `app/region/`). `app/regions/usa.toml` maps

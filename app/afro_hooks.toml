@@ -204,3 +204,19 @@ address = 0x826B8674
 name = "AfroLoadingTextHook"
 registers = ["r9"]
 after_instruction = true
+
+# Camera invert (afro_invert_x/_y): the game has just copied the save's camera
+# bytes (profile byte 13) into X 0x8285CCBF and Y 0x828E55EB (stb at 0x8269B844).
+[[midasm_hook]]
+address = 0x8269B844
+name = "AfroInvertProfileHook"
+registers = ["r29"]
+after_instruction = true
+
+# Camera invert: sub_8269B9A8 has just reset the profile to its defaults and
+# the Y byte (stb at 0x8269BA6C, at start-up before the save is read).
+[[midasm_hook]]
+address = 0x8269BA6C
+name = "AfroInvertDefaultsHook"
+registers = ["r10"]
+after_instruction = true

@@ -47,6 +47,8 @@
 0x82676350 = 0x82676218
 0x82686540 = 0x826863E0
 0x8268661C = 0x826864BC
+0x8269B844 = 0x8269B560  # camera bytes from the save (USA: Y only, stb at the end)
+0x8269BA6C = 0x8269B78C
 0x826A0D0C = 0x826A0A2C
 0x826A0DC8 = 0x826A0AE8
 0x826A0E2C = 0x826A0B4C
@@ -68,6 +70,7 @@
 [data]
 0x820EB774 = 0x820EB6F4  # constant 1/30
 0x82045F6C = 0x82045F58  # constant 1.0 (full fade)
+0x8285CCBF = 0x8285CCBF  # camera X invert flag (no X in the USA menu or save)
 0x82897B20 = 0x82897B00
 0x82898D7C = 0x82898D5C  # fade target (struct at 0x82898D78 moved by -0x20)
 0x828A0000 = 0x828A0000  # diagnostic dump range
@@ -89,6 +92,7 @@
 0x828B2E5C = 0x828B2E5C
 0x828B3068 = 0x828B3068
 0x828B3070 = 0x828B3070
+0x828E55EB = 0x828E55EB  # camera Y invert flag
 0x828E5697 = 0x828E5697
 0x828E6172 = 0x828E6172  # cinematic flag
 0x828E6173 = 0x828E6173
@@ -99,3 +103,4 @@
 0x828E62C0 = 0x828E62C0
 0x828E62DA = 0           # diagnostic watch only; not found
 0x828E63A3 = 0x828E63A2
+0x829F9470 = 0x829F9470  # profile pointer

@@ -136,7 +136,7 @@ std::string MouseCvarValue(int r, int v) {
   return buf;
 }
 
-struct Options { int fps = 0; /* 0=Original(30), 60 */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ int lore = 0; /* Loading screens: 0 full lore (default), 1 fast */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ };
+struct Options { int fps = 0; /* 0=Original(30), 60 */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ int lore = 0; /* Loading screens: 0 full lore (default), 1 fast */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ int invert[2] = {-1, -1}; /* camera X, Y: -1 as the game's save (not written), 0 default, 1 invert */ };
 
 struct KeyAction { const char* cvar; const char* def; };
 constexpr int kKeyN = 24;
@@ -367,6 +367,19 @@ const LoreText kLoreText[] = {
      L"Xbox 360. Qualsiasi tasto la salta quando il livello \u00e8 caricato."},
 };
 constexpr int kIdLoreLbl = 175, kIdLore = 176, kIdLoreNote = 177;
+
+// Controls -> camera invert (the game's own Options -> Camera setting).
+struct CamText { const wchar_t *x, *y, *def, *inv; };
+const CamText kCamText[] = {
+    {L"Camera X axis:", L"Camera Y axis:", L"Default", L"Invert"},
+    {L"Eje X de la c\u00e1mara:", L"Eje Y de la c\u00e1mara:", L"Normal", L"Invertido"},
+    {L"Axe X de la cam\u00e9ra :", L"Axe Y de la cam\u00e9ra :", L"Normal", L"Invers\u00e9"},
+    {L"Asse X della telecamera:", L"Asse Y della telecamera:", L"Normale", L"Invertito"},
+};
+constexpr int kIdCamLbl = 178;  // 178..179 X, Y labels
+constexpr int kIdCam = 180;     // 180..181 X, Y combos
+const char* const kCamKey[2] = {"invert_x", "invert_y"};
+const char* const kCamCvar[2] = {"afro_invert_x", "afro_invert_y"};
 
 const wchar_t* const kExclText[] = {L"Exclusive fullscreen", L"Pantalla completa exclusiva",
                                     L"Plein écran exclusif", L"Schermo intero esclusivo"};
@@ -946,6 +959,9 @@ void ApplySettingsTexts(HWND h, const SettingsState& st) {
   SetDlgItemTextW(h, kIdLoreLbl, kLoreText[st.sel].lbl);
   FillCombo(h, kIdLore, {kLoreText[st.sel].full, kLoreText[st.sel].fast});
   SetDlgItemTextW(h, kIdLoreNote, kLoreText[st.sel].note);
+  SetDlgItemTextW(h, kIdCamLbl, kCamText[st.sel].x);
+  SetDlgItemTextW(h, kIdCamLbl + 1, kCamText[st.sel].y);
+  for (int a = 0; a < 2; ++a) FillCombo(h, kIdCam + a, {kCamText[st.sel].def, kCamText[st.sel].inv});
   SetDlgItemTextW(h, kIdXWarn, t.xwarn);
   const wchar_t* fx_lbl[5] = {t.sepia, t.blood, t.dof, t.bloom, t.focus};
   for (int i = 0; i < 5; ++i) {
@@ -1042,6 +1058,9 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
                                 kMouse[r].lo, kMouse[r].hi);
       o.invuln = Cur(h, kIdCheatInv) == 1 ? 1 : 0;  // Game Journalist
       o.lore = Cur(h, kIdLore) == 1 ? 1 : 0;
+      // Camera invert: stays unset (as the game's save) until chosen here.
+      for (int a = 0; a < 2; ++a)
+        if (o.invert[a] >= 0 || Cur(h, kIdCam + a) == 1) o.invert[a] = Cur(h, kIdCam + a) == 1 ? 1 : 0;
       ExpToOptions(h, o);
       st->remember = IsDlgButtonChecked(h, kIdCheck) == BST_CHECKED;
       finish(true);
@@ -1133,7 +1152,9 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
     HWND val = mk(2, L"STATIC", SS_CENTERIMAGE | SS_RIGHT, 404, yy, 52, 26, kIdXMouseVal + r);
     SetWindowTextW(val, MouseText(r, v).c_str());
   }
-  mk(2, L"BUTTON", WS_TABSTOP, lx, 224, 432, 30, kIdKeysBtn);
+  row(2, 224, kIdCamLbl, kIdCam);
+  row(2, 262, kIdCamLbl + 1, kIdCam + 1);
+  mk(2, L"BUTTON", WS_TABSTOP, lx, 306, 432, 30, kIdKeysBtn);
   // Experimental.
   mk(3, L"STATIC", SS_SUNKEN, lx, 64, 432, 40, kIdXWarn);
   for (int i = 0; i < 5; ++i) row(3, 114 + i * 38, kIdFxLbl + i, kIdFx + i);
@@ -1153,6 +1174,7 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   SetCur(h, kIdCtrl, std::clamp(opt.control, 0, 2));
   SetCur(h, kIdCheatInv, opt.invuln ? 1 : 0);
   SetCur(h, kIdLore, opt.lore ? 1 : 0);
+  for (int a = 0; a < 2; ++a) SetCur(h, kIdCam + a, opt.invert[a] == 1 ? 1 : 0);
   OptionsToExp(h, opt);
   CheckDlgButton(h, kIdCheck, remember ? BST_CHECKED : BST_UNCHECKED);
   ShowTab(h, &st, 0);
@@ -1541,6 +1563,11 @@ unsigned ApplyStartupLanguage() {
       if (line.rfind("window=", 0) == 0) opt.window = line[7] == '1';
       if (line.rfind("exclusive=", 0) == 0) opt.exclusive = line[10] == '1';
       if (line.rfind("lore=", 0) == 0) opt.lore = line[5] == '1' ? 1 : 0;
+      for (int a = 0; a < 2; ++a) {
+        const std::string k = std::string(kCamKey[a]) + "=";
+        if (line.rfind(k, 0) == 0 && line.size() > k.size() && (line[k.size()] == '0' || line[k.size()] == '1'))
+          opt.invert[a] = line[k.size()] - '0';
+      }
       if (line.rfind("control=", 0) == 0) opt.control = std::clamp(std::atoi(line.c_str() + 8), 0, 2);
       for (int r = 0; r < 3; ++r) {
         std::string k = std::string(kMouse[r].key) + "=";
@@ -1638,6 +1665,8 @@ unsigned ApplyStartupLanguage() {
     for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
     for (int i = 0; i < kKeyN; ++i) out << KeyCfgName(i) << "=" << opt.keys[i] << "\n";
     for (int f = 0; f < 3; ++f) out << "padmap_" << kPadFamilies[f] << "=" << opt.padmap[f] << "\n";
+    for (int a = 0; a < 2; ++a)
+      if (opt.invert[a] >= 0) out << kCamKey[a] << "=" << opt.invert[a] << "\n";
     // Diagnostic options keep their stored value unless --advanced showed them.
     for (int i = 0; i < kAdvN; ++i)
       out << kAdv[i].key << "="
@@ -1671,6 +1700,10 @@ unsigned ApplyStartupLanguage() {
   // difficulty= like the other settings (0.2.1; before that it was session-only).
   if (opt.invuln && !Explicit("afro_player_invuln"))
     SetCvar("afro_player_invuln", "true");
+  // Camera invert: unset follows the game's save (frame_pacing.cpp).
+  for (int a = 0; a < 2; ++a)
+    if (opt.invert[a] >= 0 && !Explicit(kCamCvar[a]))
+      SetCvar(kCamCvar[a], opt.invert[a] ? "1" : "0");
   if (opt.invuln)
     std::fprintf(stderr,
                  "[afro] invuln: Game Journalist difficulty, ON (player HP only)\n");
