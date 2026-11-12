@@ -52,11 +52,12 @@ more (about a minute).
   60 FPS.
 - Update of a 0.2.2 install to 0.3.0: built and started; a second update skipped
   code generation and compiled one file.
+- USA with a controller, played on the author's PC after the release: menus,
+  gameplay and the in-game options menu with the controller's button icons.
 - All checks in `checks/` pass.
 
 ## Still not claimed
 
-- The USA disc was checked in short sessions with the keyboard, not played
-  through. Controllers and the LT prompt were not checked on it.
+- The USA disc was not played through.
 - At 60, scenes that show two camera views at once can still drop below 60.
 - No install time is guaranteed on HDD, SSD, or NVMe.

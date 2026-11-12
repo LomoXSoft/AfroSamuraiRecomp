@@ -644,7 +644,7 @@ int main(int argc, char** argv) {
   Expect(!afrosetup::IsoOverrideMarksVerified(), "continuing does not mark the ISO verified");
   afrosetup::IsoUnverifiedNote noted;
   noted.ok = true;
-  noted.path = L"C:\\Users\\luis_\\Downloads\\afro360recomp\\Afro Samurai (Europe) (En,Fr,Es,It).iso";
+  noted.path = L"C:\\Games\\Afro Samurai (Europe) (En,Fr,Es,It).iso";
   noted.actual = L"56D1C955B07C8DCF3439362946592FC9677FA9CB";
   noted.expected = L"29394DB1854DFC59C767D768C8D35E0A08ACB73D";
   noted.length = 7835492352ULL;

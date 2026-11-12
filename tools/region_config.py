@@ -19,7 +19,6 @@ import hashlib
 import pathlib
 import re
 import sys
-import tomllib
 
 XEX_SHA1 = {
     "5e831c64173b4a24805bc9c0c0eb860b3d7f53c6": "eu",
@@ -29,16 +28,26 @@ NAMES = {"eu": "Europe", "usa": "USA"}
 ADDR = re.compile(r"0x8[23][0-9A-Fa-f]{6}")
 # Calls in the C++ sources that must have an entry in the map.
 CALL = re.compile(r"AfroGameAddr\(\s*(0x[0-9A-Fa-f]{8})\s*\)")
+MAP_LINE = re.compile(r"(0x[0-9A-Fa-f]{8})\s*=\s*(0x[0-9A-Fa-f]{1,8}|0)")
 
 
 def load_map(app: pathlib.Path, region: str) -> dict[int, int] | None:
+    """Read `0xEUROPE = 0xTHISDISC` lines. Plain parsing, not tomllib, so Python 3.8 works."""
     if region == "eu":
         return None
-    data = tomllib.loads((app / "regions" / f"{region}.toml").read_text(encoding="utf-8"))
+    path = app / "regions" / f"{region}.toml"
     out: dict[int, int] = {}
-    for table in ("code", "data"):
-        for k, v in data.get(table, {}).items():
-            out[int(k, 16)] = int(v)
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        code = line.split("#", 1)[0].strip()
+        if not code or (code.startswith("[") and code.endswith("]")):
+            continue
+        m = MAP_LINE.fullmatch(code)
+        if not m:
+            raise SystemExit(f"region_config: {path.name}:{n}: expected 0xEUROPE = 0xADDRESS, got {code!r}")
+        eu, here = int(m.group(1), 16), int(m.group(2), 16)
+        if eu in out:
+            raise SystemExit(f"region_config: {path.name}:{n}: 0x{eu:08X} is listed twice")
+        out[eu] = here
     return out
 
 

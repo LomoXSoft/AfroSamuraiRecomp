@@ -9,6 +9,17 @@ body:
         Thanks for helping. **Do not attach** ISO, `gamedata`, `default.xex`/`default.pe`, saves, or other game data unless a maintainer asks.
         Review `afro.log` for paths you want to redact before uploading.
   - type: dropdown
+    id: disc
+    attributes:
+      label: Game disc
+      description: The install log says which one (`Game files: Afro Samurai (…)`).
+      options:
+        - Europe
+        - USA
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
     id: mode
     attributes:
       label: Frame rate mode

@@ -17,8 +17,8 @@ The only program attached to a release is `afrosetup-v0.3.0.exe`, the setup inst
 - Windows 10 or 11 (64-bit) and a graphics card with Direct3D 12 (current drivers).
 - **Your own** Afro Samurai disc, **Europe** or **USA**: an ISO
   (Europe SHA-1 `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) or a folder you already
-  extracted that contains `default.xex`. The USA disc is new and less tested, and has
-  English and French text only. See [Getting your game files](#getting-your-game-files).
+  extracted that contains `default.xex`. The USA disc is new in 0.3.0 and has English
+  and French text only. See [Getting your game files](#getting-your-game-files).
 - About 20 GB of free disk space and an internet connection (the build tools are downloaded).
 - A controller (tested: Xbox, PlayStation DualShock 4/DualSense, a Switch controller
   and a generic controller; others SDL recognises may work), or keyboard and mouse.
@@ -94,8 +94,9 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
 - Launcher options in game, while playing: done in 0.2.2 (**F1**, or hold L3 + R3).
 - Loading screens: their lore cutscenes play in full again (0.2.1).
 - One-hit kill cheat.
-- USA disc (`.iso`) support.
-- Linux, macOS and Android versions.
+- USA disc support: done in 0.3.0.
+- Steam Deck, Steam Machine and Linux through Proton (next, 0.3.x). Native Linux
+  and macOS builds are not planned.
 
 ---
 
@@ -116,7 +117,8 @@ Preview (**0.3.0**). The default is the original 30 FPS at 720p. **60 FPS** is a
 supported option (see [60 FPS](#60-fps)): gameplay, cutscenes and dialogue scenes were
 played at 60 on one PC, also at 2x resolution. That is not an independent playthrough
 of the whole game.
-- Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection.
+- Boots, plays videos, menus and gameplay; EN/ES/FR/IT language selection (the USA
+  disc has EN/FR text only).
 - Default GPU path is **RTV (default)** (host render targets): correct image at a stable
   30 FPS with **30 (default)** (launcher default). The black frames of earlier versions
   are fixed by the `afro-edram-no-wrap` GPU plugin patch.
@@ -141,7 +143,7 @@ of the whole game.
     first key of each binding).
   - Full list: [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
 - Supported: the Europe disc (Redump 17884, ISO SHA-1
-  `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) and the USA disc (new, less tested).
+  `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) and the USA disc (new in 0.3.0).
   Other versions will not work.
 - Windows x64 only for now (D3D12).
 - Expect bugs; saves and settings may change between versions.
@@ -207,7 +209,8 @@ console installer, pass `-Ref v0.3.0`.
 What the installer does (`tools/install.ps1`, run with the PowerShell execution
 policy bypassed for that process only):
 - Checks free disk space (about 20 GB) and lists your GPU (Direct3D 12 needed).
-- Verifies the ISO SHA-1 (`29394DB1854DFC59C767D768C8D35E0A08ACB73D`) and warns if it does not match.
+- Verifies the ISO SHA-1 (Europe: `29394DB1854DFC59C767D768C8D35E0A08ACB73D`) and warns if it does not match,
+  then checks that the extracted `default.xex` is from the Europe or USA disc.
 - Downloads a **portable** toolchain into `<root>\tools`, only from official
   sources, each pinned and SHA-256-verified: MinGit, CMake, Ninja, LLVM/Clang
   20.1.8, Python 3.12 (embeddable) + pycryptodome, and the MSVC compiler + Windows SDK
@@ -253,7 +256,11 @@ instead of an ISO.
 
 ### Getting your game files
 The Europe disc (Redump 17884, ISO SHA-1
-`29394DB1854DFC59C767D768C8D35E0A08ACB73D`) is supported. USA disc (new in 0.3.0; checked in short sessions, not played through): the build recognises its `default.xex` (SHA-1 `873fff7191be2b687eb55f8564f9b9f5c5842b40`) and uses the USA addresses in `app/regions/usa.toml`. No USA ISO SHA-1 is recorded yet, so a USA ISO shows the "not verified" note; the game files are checked after extraction. Make the ISO from your own disc,
+`29394DB1854DFC59C767D768C8D35E0A08ACB73D`) and the USA disc are supported. The USA disc
+is new in 0.3.0 and not played through: the build recognises its `default.xex`
+(SHA-1 `873fff7191be2b687eb55f8564f9b9f5c5842b40`) and uses the USA addresses in
+`app/regions/usa.toml`. No USA ISO SHA-1 is recorded yet, so a USA ISO shows the
+"not verified" note; its game files are checked after extraction. Make the ISO from your own disc,
 for example with a DVD drive that can read Xbox 360 discs and a disc dumping
 tool, or from a backup of your own disc that you made with your console.
 Check the SHA-1 with `certutil -hashfile "Afro Samurai.iso" SHA1`.
@@ -302,7 +309,8 @@ Folder layout (`<root>` = e.g. `C:\afro`; avoid spaces and non-ASCII characters 
 
    Both end with `BUILD OK` and `GPU PLUGIN + RUNTIME OK`.
 
-`build_win.bat` copies your `default.xex`, extracts (privately, gitignored) the
+`build_win.bat` copies your `default.xex`, picks Europe or USA from it
+(`tools/region_config.py` writes `app/region/`), extracts (privately, gitignored) the
 PE image, jump-table overrides and icon from it, runs the ReXGlue code
 generator (a few minutes, ~130 MB of generated C++, log in `<root>\codegen_win.log`)
 and compiles. The output is
@@ -488,7 +496,8 @@ unless a maintainer specifically asks.
 
 ### Repository layout
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
-  boundaries), `afro_hooks.toml` (mid-asm hook), launcher and hooks in `src/`.
+  boundaries), `afro_hooks.toml` (mid-asm hooks), launcher and hooks in `src/`.
+  These use Europe addresses; `regions/usa.toml` maps each one to the USA disc.
 - `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.3.0.exe`, not committed.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`); `tools/analysis/` has the
