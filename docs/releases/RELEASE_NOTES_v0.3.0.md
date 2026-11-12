@@ -49,8 +49,9 @@ again (about a minute on the test PC); later updates skip it when nothing change
 - USA, a pre-release build with the same game code (English, with the keyboard):
   a Europe save loaded at its last checkpoint, and Game Journalist kept the player
   alive in a fight at 60 FPS.
-- USA with a controller, played by the author after the release: menus, gameplay
-  and the in-game options menu with the controller's button icons.
+- USA, fresh install of this release from a USA ISO, played with a controller:
+  menus, gameplay and the in-game options menu with the controller's button
+  icons.
 - Europe, fresh install of this release from the ISO (Redump 17884 verified,
   Spanish; the install was resumed once after the test PC ran two installs at the
   same time): built with the same hooks as before, and the game played at 60 FPS.
@@ -62,6 +63,5 @@ again (about a minute on the test PC); later updates skip it when nothing change
 ## Still not claimed
 
 - The USA disc was not played through.
-- A USA ISO was not tested; only the extracted USA files were.
 - At 60, scenes that show two camera views at once can still drop below 60.
 - No install time is guaranteed on HDD, SSD, or NVMe.

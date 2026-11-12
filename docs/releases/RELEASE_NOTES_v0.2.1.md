@@ -66,7 +66,7 @@ what changed.
   and skipped the launcher window.
 - Repair of a fresh 0.2.0 install that had stopped at the game build (MSVC 14.52):
   the setup swapped in 14.51 and the game built.
-- Played on the author's PC: key bindings and controller remapping (keyboard, Xbox
+- Played on one PC: key bindings and controller remapping (keyboard, Xbox
   pad), Difficulty (Game Journalist), Exclusive fullscreen, the cursor when switching
   between keyboard and controller, and the loading screens of Justice (full pass,
   44 s) and Okiku at the start of the Daimyo level (39 s), with and without a button.

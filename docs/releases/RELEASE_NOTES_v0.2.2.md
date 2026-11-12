@@ -40,7 +40,7 @@ what changed.
 
 - Fresh install into an empty folder with this setup (13 min): the game built
   with the menu's runtime functions and started from a RecompLauncher-style start.
-- Played on the author's PC: the menu with a controller and the keyboard, display
+- Played on one PC: the menu with a controller and the keyboard, display
   and frame rate changed from it, the game's stats readable beside it, and the
   button icons following the device in use.
 - The whole patch stack applies to a clean ReXGlue `bd833a2`.
