@@ -1,4 +1,4 @@
-// Graphical installer for AfroSamuraiRecomp 0.3.2 development.
+// Graphical installer for AfroSamuraiRecomp 0.3.3 development.
 // Embedded source only. Closing the window never terminates a running build.
 // The header and icon are the supplied Lomorsin pixel art.
 static const char kArtCredit[] = "Lomorsin Afro header 1200x240";

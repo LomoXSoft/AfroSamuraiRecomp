@@ -4,6 +4,7 @@
 // at launch, or with --choose_language. An explicit --user_language wins.
 #include "language_picker.h"
 #include "afro_region.h"  // AFRO_REGION_USA, AFRO_REGION_NAME
+#include "upscale.h"
 
 #include <rex/cvar.h>
 
@@ -136,7 +137,7 @@ std::string MouseCvarValue(int r, int v) {
   return buf;
 }
 
-struct Options { int fps = 0; /* 0=Original(30), 60 */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ int lore = 0; /* Loading screens: 0 full lore (default), 1 fast */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ int invert[2] = {-1, -1}; /* camera X, Y: -1 as the game's save (not written), 0 default, 1 invert */ };
+struct Options { int fps = 0; /* 0=Original(30), 60 */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ int lore = 0; /* Loading screens: 0 full lore (default), 1 fast */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ int invert[2] = {-1, -1}; /* camera X, Y: -1 as the game's save (not written), 0 default, 1 invert */ int upscale_mode = 0; /* 0 bilinear (default), 1 AMD FSR 1, 2 AMD CAS (upscale.h) */ int fsr_sharp = upscale::kSharpDefault; /* FSR sharpness, % */ int cas_sharp = upscale::kCasDefault; /* CAS sharpness, % */ int fxaa = 0; /* 0 off (default), 1 FXAA, 2 FXAA extreme */ };
 
 struct KeyAction { const char* cvar; const char* def; };
 constexpr int kKeyN = 24;
@@ -380,6 +381,41 @@ constexpr int kIdCamLbl = 178;  // 178..179 X, Y labels
 constexpr int kIdCam = 180;     // 180..181 X, Y combos
 const char* const kCamKey[2] = {"invert_x", "invert_y"};
 const char* const kCamCvar[2] = {"afro_invert_x", "afro_invert_y"};
+
+// Graphics -> upscaling (the presenter's effect), FSR and CAS sharpness, and FXAA
+// (upscale.h).
+struct UpscaleText {
+  const wchar_t *lbl, *bilinear, *fsr, *cas, *sharp, *cas_sharp, *fxaa, *fxaa_off, *fxaa_on,
+      *fxaa_extreme, *note;
+};
+const UpscaleText kUpscaleText[] = {
+    {L"Upscaling:", L"Bilinear (original, default)", L"AMD FSR 1", L"AMD CAS", L"FSR sharpness:",
+     L"CAS sharpness:", L"Anti-aliasing:", L"Off (default)", L"FXAA", L"FXAA (extreme quality)",
+     L"FSR 1 gives sharper edges when the screen is larger than the game's picture (720p at "
+     L"1x internal resolution). CAS sharpens the picture. FXAA smooths jagged edges."},
+    {L"Escalado:", L"Bilineal (original, por defecto)", L"AMD FSR 1", L"AMD CAS",
+     L"Nitidez de FSR:", L"Nitidez de CAS:", L"Antialiasing:", L"Desactivado (por defecto)",
+     L"FXAA", L"FXAA (calidad extrema)",
+     L"FSR 1 da bordes m\u00e1s n\u00edtidos cuando la pantalla es mayor que la imagen del "
+     L"juego (720p con resoluci\u00f3n interna 1x). CAS aumenta la nitidez. FXAA suaviza "
+     L"los bordes dentados."},
+    {L"Mise \u00e0 l'\u00e9chelle :", L"Bilin\u00e9aire (original, par d\u00e9faut)", L"AMD FSR 1",
+     L"AMD CAS", L"Nettet\u00e9 FSR :", L"Nettet\u00e9 CAS :", L"Anticr\u00e9nelage :",
+     L"D\u00e9sactiv\u00e9 (par d\u00e9faut)", L"FXAA", L"FXAA (qualit\u00e9 extr\u00eame)",
+     L"FSR 1 donne des bords plus nets quand l'\u00e9cran est plus grand que l'image du jeu "
+     L"(720p en r\u00e9solution interne 1x). CAS rend l'image plus nette. FXAA adoucit les "
+     L"bords cr\u00e9nel\u00e9s."},
+    {L"Ridimensionamento:", L"Bilineare (originale, predefinito)", L"AMD FSR 1", L"AMD CAS",
+     L"Nitidezza FSR:", L"Nitidezza CAS:", L"Antialiasing:", L"Disattivato (predefinito)",
+     L"FXAA", L"FXAA (qualit\u00e0 estrema)",
+     L"FSR 1 rende i bordi pi\u00f9 nitidi quando lo schermo \u00e8 pi\u00f9 grande "
+     L"dell'immagine del gioco (720p con risoluzione interna 1x). CAS rende l'immagine pi\u00f9 "
+     L"nitida. FXAA smussa i bordi seghettati."},
+};
+constexpr int kIdUpLbl = 182, kIdUp = 183, kIdFsrLbl = 184, kIdFsr = 185, kIdFsrVal = 186,
+              kIdUpNote = 187, kIdCasLbl = 188, kIdCas = 189, kIdCasVal = 190, kIdFxaaLbl = 191,
+              kIdFxaa = 192;
+std::wstring PctText(int v) { return std::to_wstring(v) + L"%"; }
 
 const wchar_t* const kExclText[] = {L"Exclusive fullscreen", L"Pantalla completa exclusiva",
                                     L"Plein écran exclusif", L"Schermo intero esclusivo"};
@@ -962,6 +998,14 @@ void ApplySettingsTexts(HWND h, const SettingsState& st) {
   SetDlgItemTextW(h, kIdCamLbl, kCamText[st.sel].x);
   SetDlgItemTextW(h, kIdCamLbl + 1, kCamText[st.sel].y);
   for (int a = 0; a < 2; ++a) FillCombo(h, kIdCam + a, {kCamText[st.sel].def, kCamText[st.sel].inv});
+  const UpscaleText& up = kUpscaleText[st.sel];
+  SetDlgItemTextW(h, kIdUpLbl, up.lbl);
+  FillCombo(h, kIdUp, {up.bilinear, up.fsr, up.cas});
+  SetDlgItemTextW(h, kIdFsrLbl, up.sharp);
+  SetDlgItemTextW(h, kIdCasLbl, up.cas_sharp);
+  SetDlgItemTextW(h, kIdFxaaLbl, up.fxaa);
+  FillCombo(h, kIdFxaa, {up.fxaa_off, up.fxaa_on, up.fxaa_extreme});
+  SetDlgItemTextW(h, kIdUpNote, up.note);
   SetDlgItemTextW(h, kIdXWarn, t.xwarn);
   const wchar_t* fx_lbl[5] = {t.sepia, t.blood, t.dof, t.bloom, t.focus};
   for (int i = 0; i < 5; ++i) {
@@ -1023,13 +1067,14 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     finish(false);
     return 0;
   }
-  // Mouse sliders: keep the value next to each one current while dragging.
+  // Sliders (mouse, FSR sharpness): keep the value next to each one current while dragging.
   if (m == WM_HSCROLL && l) {
-    const int r = GetDlgCtrlID(reinterpret_cast<HWND>(l)) - kIdXMouse;
-    if (r >= 0 && r < 3) {
-      const int v = static_cast<int>(SendMessageW(reinterpret_cast<HWND>(l), TBM_GETPOS, 0, 0));
-      SetDlgItemTextW(h, kIdXMouseVal + r, MouseText(r, v).c_str());
-    }
+    const int id = GetDlgCtrlID(reinterpret_cast<HWND>(l));
+    const int v = static_cast<int>(SendMessageW(reinterpret_cast<HWND>(l), TBM_GETPOS, 0, 0));
+    const int r = id - kIdXMouse;
+    if (r >= 0 && r < 3) SetDlgItemTextW(h, kIdXMouseVal + r, MouseText(r, v).c_str());
+    if (id == kIdFsr) SetDlgItemTextW(h, kIdFsrVal, PctText(v).c_str());
+    if (id == kIdCas) SetDlgItemTextW(h, kIdCasVal, PctText(v).c_str());
     return 0;
   }
   if (m == WM_COMMAND) {
@@ -1052,6 +1097,12 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       o.scale = 1 + std::clamp(Cur(h, kIdScale), 0, 2);
       o.fps = kFpsValues[std::clamp(Cur(h, kIdFps), 0, 1)];
       o.vsync = Cur(h, kIdXVsync) == 1 ? 1 : 0;
+      o.upscale_mode = std::clamp(Cur(h, kIdUp), 0, upscale::kModes - 1);
+      o.fsr_sharp = std::clamp(static_cast<int>(SendDlgItemMessageW(h, kIdFsr, TBM_GETPOS, 0, 0)),
+                               upscale::kSharpLo, upscale::kSharpHi);
+      o.cas_sharp = std::clamp(static_cast<int>(SendDlgItemMessageW(h, kIdCas, TBM_GETPOS, 0, 0)),
+                               upscale::kCasLo, upscale::kCasHi);
+      o.fxaa = std::clamp(Cur(h, kIdFxaa), 0, upscale::kFxaaModes - 1);
       o.control = std::clamp(Cur(h, kIdCtrl), 0, 2);
       for (int r = 0; r < 3; ++r)
         o.mouse[r] = std::clamp(static_cast<int>(SendDlgItemMessageW(h, kIdXMouse + r, TBM_GETPOS, 0, 0)),
@@ -1088,7 +1139,7 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const bool adv = REXCVAR_GET(advanced);
   const DWORD style = WS_CAPTION | WS_SYSMENU;
-  const int yLine2 = 386, yCheck = 396, yHint = 420, yBtn = 450, yEnd = yBtn + 32 + 14;
+  const int yLine2 = 440, yCheck = 450, yHint = 474, yBtn = 504, yEnd = yBtn + 32 + 14;
   RECT rc{0, 0, S(480), S(yEnd)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   RECT orc{};
@@ -1129,6 +1180,27 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
     SendMessageW(scale, CB_ADDSTRING, 0, (LPARAM)i);
   row(0, 142, kIdFpsLbl, kIdFps);
   row(0, 180, kIdXVsyncLbl, kIdXVsync);
+  // Upscaling (the presenter's effect), FSR and CAS sharpness (percent sliders),
+  // anti-aliasing (FXAA), with a short note.
+  row(0, 218, kIdUpLbl, kIdUp);
+  auto pct_slider = [&](int yy, int lbl_id, int tb_id, int val_id, int lo, int hi, int step, int v) {
+    v = std::clamp(v, lo, hi);
+    mk(0, L"STATIC", SS_CENTERIMAGE, lx, yy, lw, 26, lbl_id);
+    HWND tb = mk(0, TRACKBAR_CLASSW, WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, 206, yy, 196, 26, tb_id);
+    SendMessageW(tb, TBM_SETRANGEMIN, FALSE, lo);
+    SendMessageW(tb, TBM_SETRANGEMAX, FALSE, hi);
+    SendMessageW(tb, TBM_SETLINESIZE, 0, step);
+    SendMessageW(tb, TBM_SETPAGESIZE, 0, step * 4);
+    SendMessageW(tb, TBM_SETPOS, TRUE, v);
+    HWND val = mk(0, L"STATIC", SS_CENTERIMAGE | SS_RIGHT, 404, yy, 52, 26, val_id);
+    SetWindowTextW(val, PctText(v).c_str());
+  };
+  pct_slider(256, kIdFsrLbl, kIdFsr, kIdFsrVal, upscale::kSharpLo, upscale::kSharpHi,
+             upscale::kSharpStep, opt.fsr_sharp);
+  pct_slider(294, kIdCasLbl, kIdCas, kIdCasVal, upscale::kCasLo, upscale::kCasHi,
+             upscale::kCasStep, opt.cas_sharp);
+  row(0, 332, kIdFxaaLbl, kIdFxaa);
+  mk(0, L"STATIC", 0, lx, 370, 432, 60, kIdUpNote);
   // Gameplay.
   // Difficulty: Game Journalist turns on the player invulnerability. Loading
   // screens: Fast turns off the full lore interlude (afro_interlude_full).
@@ -1171,6 +1243,8 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   SetCur(h, kIdScale, (opt.scale >= 1 && opt.scale <= 3) ? opt.scale - 1 : 0);
   SetCur(h, kIdFps, opt.fps == 60 ? 1 : 0);
   SetCur(h, kIdXVsync, opt.vsync ? 1 : 0);
+  SetCur(h, kIdUp, std::clamp(opt.upscale_mode, 0, upscale::kModes - 1));
+  SetCur(h, kIdFxaa, std::clamp(opt.fxaa, 0, upscale::kFxaaModes - 1));
   SetCur(h, kIdCtrl, std::clamp(opt.control, 0, 2));
   SetCur(h, kIdCheatInv, opt.invuln ? 1 : 0);
   SetCur(h, kIdLore, opt.lore ? 1 : 0);
@@ -1569,6 +1643,14 @@ unsigned ApplyStartupLanguage() {
           opt.invert[a] = line[k.size()] - '0';
       }
       if (line.rfind("control=", 0) == 0) opt.control = std::clamp(std::atoi(line.c_str() + 8), 0, 2);
+      if (line.rfind("upscale=", 0) == 0)
+        opt.upscale_mode = std::clamp(std::atoi(line.c_str() + 8), 0, upscale::kModes - 1);
+      if (line.rfind("fsr_sharpness=", 0) == 0)
+        opt.fsr_sharp = std::clamp(std::atoi(line.c_str() + 14), upscale::kSharpLo, upscale::kSharpHi);
+      if (line.rfind("cas_sharpness=", 0) == 0)
+        opt.cas_sharp = std::clamp(std::atoi(line.c_str() + 14), upscale::kCasLo, upscale::kCasHi);
+      if (line.rfind("fxaa=", 0) == 0)
+        opt.fxaa = std::clamp(std::atoi(line.c_str() + 5), 0, upscale::kFxaaModes - 1);
       for (int r = 0; r < 3; ++r) {
         std::string k = std::string(kMouse[r].key) + "=";
         if (line.rfind(k, 0) == 0)
@@ -1661,6 +1743,8 @@ unsigned ApplyStartupLanguage() {
         << "\nwindow=" << (opt.window ? 1 : 0) << "\nexclusive=" << (opt.exclusive ? 1 : 0)
         << "\nlore=" << opt.lore << "\ncontrol=" << opt.control
         << "\nscale=" << opt.scale << "\ndifficulty=" << opt.invuln
+        << "\nupscale=" << opt.upscale_mode << "\nfsr_sharpness=" << opt.fsr_sharp
+        << "\ncas_sharpness=" << opt.cas_sharp << "\nfxaa=" << opt.fxaa
         << "\nversion=" << AFRO_VERSION << "\n";
     for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
     for (int i = 0; i < kKeyN; ++i) out << KeyCfgName(i) << "=" << opt.keys[i] << "\n";
@@ -1758,6 +1842,17 @@ unsigned ApplyStartupLanguage() {
                rt_explicit ? "; cmdline/config already set" : "");
   if (!Explicit("resolution_scale") && opt.scale > 1)
     SetCvar("resolution_scale", std::to_string(opt.scale));
+  // Upscaling (Settings -> Graphics): the presenter's effect, FSR and CAS sharpness,
+  // and FXAA (upscale.h). The defaults (bilinear, 90 %, 0 %, off) are the runtime's
+  // own: nothing to set. swap_post_effect is a GPU plugin cvar (deferred via REX_).
+  if (opt.upscale_mode > 0 && !Explicit("present_effect"))
+    SetCvar("present_effect", upscale::Effect(opt.upscale_mode));
+  if (opt.fsr_sharp != upscale::kSharpDefault && !Explicit("present_fsr_sharpness_reduction"))
+    SetCvar("present_fsr_sharpness_reduction", upscale::SharpnessReduction(opt.fsr_sharp));
+  if (opt.cas_sharp != upscale::kCasDefault && !Explicit("present_cas_additional_sharpness"))
+    SetCvar("present_cas_additional_sharpness", upscale::CasSharpness(opt.cas_sharp));
+  if (opt.fxaa > 0 && !Explicit("swap_post_effect"))
+    SetCvar("swap_post_effect", upscale::PostEffect(opt.fxaa));
   // The USA disc has English and French text only: Spanish and Italian keep the
   // launcher in that language and run the game (and its menus) in English.
   const unsigned game_lang = (AFRO_REGION_USA && lang != 1 && lang != 4) ? 1 : lang;

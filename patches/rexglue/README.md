@@ -268,6 +268,55 @@ Two small helpers for the app's loading interlude (`app/src/frame_pacing.cpp`,
   guest's input is blocked) and `afro_ui_input_block(on)` (the guest reads a
   neutral pad while on; what is still held when it goes off stays masked).
 
+## zzzzzzzzzzz-afro-fsr.patch (runtime, `rexruntime.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last.
+The Upscaling setting (launcher Settings -> Graphics, the in-game options and
+RecompLauncher; `app/src/upscale.h`).
+- `src/ui/CMakeLists.txt`: `REX_HAS_FIDELITYFX_SDK` is now defined for `rexui`
+  without the FidelityFX SDK download (`REXGLUE_ENABLE_FIDELITYFX`, off in this
+  build). In the presenter that define only gates the spatial AMD FidelityFX
+  effects, FSR 1 (EASU upscaling passes, then RCAS sharpening) and CAS. They run
+  from the precompiled shaders already in `src/ui/shaders/bytecode`. The temporal
+  `fsr2` / `fsr3` path needs the SDK's runtime (`REX_HAS_FIDELITYFX_RUNTIME`) and
+  is still not built; chosen anyway, it runs as FSR 1.
+- With it come the presenter cvars `present_effect` (`bilinear`, the default and
+  the original look, `cas`, `fsr`, `fsr2`, `fsr3`), `present_fsr_sharpness_reduction`
+  (0 to 2 stops, 0 is the sharpest, default 0.2), `present_cas_additional_sharpness`
+  (0 to 1, default 0), `present_fsr_max_upsampling_passes` (1 to 4, default 4)
+  and `present_fsr_quality_mode` (temporal path only).
+- Live changes: the presenter reads these once when it starts (they were
+  `kRequiresRestart`). It now registers a change callback for each of them (once
+  per process) and rebuilds its paint settings on the UI thread
+  (`Presenter::AfroOnPaintCvarChanged` -> `ReloadGuestOutputPaintConfigFromUIThread`),
+  for the newest presenter, which is tracked under a mutex and cleared when it is
+  destroyed. They are `kHotReload` now. The callbacks are not in `ReXApp`
+  (`src/ui/rex_app.cpp`), where upstream keeps its window cvar callbacks: the
+  setup builds `ReXApp` into `afrorecomp.exe` from the prebuilt SDK, so a patch
+  there would not reach the game.
+- `afro.log` shows the effect in use: `afro presenter (start|change):
+  present_effect=fsr fsr_sharpness_reduction=0.20 cas_additional_sharpness=0.00`.
+- FSR upscales only when the output is larger than the game's picture (1280x720
+  at 1x internal resolution): one EASU pass per 2x step, then RCAS. At the same
+  size `fsr` sharpens with CAS instead, so `present_fsr_sharpness_reduction` has no
+  effect there. CAS sharpens, or resamples up to 2x and stretches the rest bilinearly.
+- The define stays private to `rexui`, as in upstream's FidelityFX build. The
+  classes whose layout it changes (`Presenter`, `D3D12Presenter`) are only built
+  and used inside `rexruntime.dll`; the GPU plugin and the app reach the
+  presenter through exported functions.
+
+## zzzzzzzzzzzz-afro-fxaa-live.patch (GPU plugin, `rexgpu-xenos.dll`)
+Same license (BSD 3-Clause, modifies ReXGlue code; code only). Applied last.
+The Anti-aliasing setting. The GPU plugin's `swap_post_effect` (`none`, `fxaa`,
+`fxaa_extreme`; precompiled FXAA shaders, already in the stock plugin) runs FXAA
+on the game's picture at each swap, before the presenter's upscaling. It was read
+once at start-up (`kRequiresRestart`). `GraphicsSystem::SetupGuestGpu`
+(`src/graphics/graphics_system.cpp`) now registers a change callback that hands
+the new effect to the command processor (`SetDesiredSwapPostEffect`, which already
+switches it on the GPU thread between frames), and `Shutdown` removes the callback
+before the command processor goes away. The cvar is `kHotReload`. A change shows
+from the next game frame, so not while the in-game options pause the game.
+`afro.log` gets `afro swap_post_effect (start|change): fxaa`.
+
 ## Build
 `tools\build_gpu_plugin.bat` applies every `patches\rexglue\*.patch` in name
 order to `<root>\rexglue-sdk`, builds only `rexgpu-xenos.dll` and

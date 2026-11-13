@@ -20,6 +20,26 @@ the Git history and the release notes in `docs/releases/`.
 - The options under **Experimental** (launcher or the in-game menu) are not fully
   tested.
 
+## Graphics
+- Upscaling (AMD FSR 1, AMD CAS) and anti-aliasing (FXAA) are new. They were
+  checked on one PC with an AMD Radeon RX 9060 XT, in borderless fullscreen at
+  2560x1440: the intro logos and movie of the Europe and USA discs, and one level
+  of the Europe disc loaded from a save. FSR gives sharper edges than bilinear.
+  Not checked on NVIDIA or Intel GPUs.
+- Changes in the in-game options were checked on the Europe disc: upscaling and
+  both sharpness sliders change the picture at once (also the paused picture
+  behind the menu), FXAA from the next frame, so once the menu is closed. The
+  launcher shows the values afterwards. RecompLauncher was checked separately: it
+  shows the four settings and writes their keys.
+- FXAA changed little in the scenes checked (dark rooms, low-contrast edges).
+- FSR only upscales when the screen or window is larger than the game's picture
+  (1280x720 at 1x internal resolution, 2560x1440 at 2x). At the same size it
+  sharpens like CAS; then CAS sharpness applies and FSR sharpness does not.
+- The in-game options, the start-up hint and the F3 overlay are drawn over the
+  upscaled picture; this setting does not change them.
+- Only the spatial FSR 1 is included. The runtime's temporal FSR 2 / 3 path is
+  not built.
+
 ## Controls and button prompts
 - The game's prompts for A, B, X, Y, LB, LT, RT and the D-pad follow your device.
   RB, Start, Back and the stick clicks have not been found yet and keep the Xbox

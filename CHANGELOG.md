@@ -2,6 +2,27 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.3.3 – FSR upscaling
+- Upscaling setting: **Bilinear (original)**, the default and the look of
+  earlier versions, **AMD FSR 1** or **AMD CAS**, with an **FSR sharpness** slider
+  (0 to 100 %, default 90 %) and a **CAS sharpness** slider (0 to 100 %, default
+  0 %). In the launcher (Settings -> Graphics), the in-game options (F1) and
+  RecompLauncher, saved as `upscale` (0, 1, 2), `fsr_sharpness` and
+  `cas_sharpness` in `afro_language.cfg`. FSR 1 upscales the game's picture (720p
+  at 1x internal resolution) to a larger screen or window with sharper edges; at
+  the same size it only sharpens, like CAS.
+- Anti-aliasing setting in the same three places: **Off** (default), **FXAA** or
+  **FXAA (extreme quality)**, saved as `fxaa` (0, 1, 2). It is the GPU plugin's
+  `swap_post_effect`.
+- A change in the in-game options applies at once (FXAA from the next frame,
+  once the options are closed).
+- New runtime patch `zzzzzzzzzzz-afro-fsr.patch`: ReXGlue's presenter already has
+  FSR 1 and CAS as precompiled shaders, but they were only built with the
+  FidelityFX SDK download. They are now built without it, and the presenter
+  applies a change of `present_effect` or its sharpness while the game runs.
+- New GPU plugin patch `zzzzzzzzzzzz-afro-fxaa-live.patch`: `swap_post_effect`
+  was read once at start-up; a change now reaches the command processor at once.
+
 ## 0.3.2 – Options hint
 - Start-up hint: a few seconds after the game starts, a small note at the
   bottom left shows how to open the options while playing ("Hold [LS] + [RS]

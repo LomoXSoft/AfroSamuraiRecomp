@@ -26,7 +26,7 @@
         }
       ],
       "new": {
-        "version": "0.3.2",
+        "version": "0.3.3",
         "ask": "0"
       }
     }
@@ -173,6 +173,96 @@
           "label": "Off",
           "set": {
             "vsync": "1"
+          }
+        }
+      ],
+      "group": "Graphics"
+    },
+    {
+      "id": "upscale",
+      "label": "Upscaling",
+      "help": "FSR 1 gives sharper edges when the screen is larger than the game's picture (720p at 1x internal resolution). CAS sharpens the picture.",
+      "defaults": {
+        "upscale": "0"
+      },
+      "choices": [
+        {
+          "label": "Bilinear (original)",
+          "set": {
+            "upscale": "0"
+          }
+        },
+        {
+          "label": "AMD FSR 1",
+          "set": {
+            "upscale": "1"
+          }
+        },
+        {
+          "label": "AMD CAS",
+          "set": {
+            "upscale": "2"
+          }
+        }
+      ],
+      "group": "Graphics"
+    },
+    {
+      "id": "fsr_sharpness",
+      "label": "FSR sharpness",
+      "group": "Graphics",
+      "help": "Only with AMD FSR 1, in percent: 100 is the sharpest, 90 is FSR's default.",
+      "slider": {
+        "key": "fsr_sharpness",
+        "min": 0,
+        "max": 100,
+        "step": 5,
+        "format": "%d"
+      },
+      "defaults": {
+        "fsr_sharpness": "90"
+      }
+    },
+    {
+      "id": "cas_sharpness",
+      "label": "CAS sharpness",
+      "group": "Graphics",
+      "help": "AMD CAS, and FSR 1 when the screen is not larger than the game's picture, in percent: 0 is CAS's lightest sharpening (default), 100 the strongest.",
+      "slider": {
+        "key": "cas_sharpness",
+        "min": 0,
+        "max": 100,
+        "step": 5,
+        "format": "%d"
+      },
+      "defaults": {
+        "cas_sharpness": "0"
+      }
+    },
+    {
+      "id": "fxaa",
+      "label": "Anti-aliasing",
+      "help": "FXAA smooths jagged edges of the game's picture. Extreme is the stronger, slower variant.",
+      "defaults": {
+        "fxaa": "0"
+      },
+      "choices": [
+        {
+          "label": "Off",
+          "set": {
+            "fxaa": "0"
+          }
+        },
+        {
+          "label": "FXAA",
+          "set": {
+            "fxaa": "1"
+          }
+        },
+        {
+          "label": "FXAA (extreme quality)",
+          "set": {
+            "fxaa": "2"
           }
         }
       ],

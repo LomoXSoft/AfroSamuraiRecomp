@@ -1,0 +1,40 @@
+diff --git a/src/graphics/graphics_system.cpp b/src/graphics/graphics_system.cpp
+index 8f2fcb0..0f0cc5d 100644
+--- a/src/graphics/graphics_system.cpp
++++ b/src/graphics/graphics_system.cpp
+@@ -33,7 +33,7 @@
+ 
+ REXCVAR_DEFINE_STRING(swap_post_effect, "none", "GPU", "Swap post effect: none, fxaa, fxaa_extreme")
+     .allowed({"none", "fxaa", "fxaa_extreme"})
+-    .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
++    .lifecycle(rex::cvar::Lifecycle::kHotReload);
+ 
+ REXCVAR_DEFINE_BOOL(store_shaders, true, "GPU",
+                     "Store shaders persistently and load them when loading games to avoid "
+@@ -136,6 +136,18 @@ X_STATUS GraphicsSystem::SetupGuestGpu(runtime::FunctionDispatcher* function_dis
+     return X_STATUS_UNSUCCESSFUL;
+   }
+   command_processor_->SetDesiredSwapPostEffect(ParseSwapPostEffect(REXCVAR_GET(swap_post_effect)));
++  // afro: apply a change of swap_post_effect (FXAA) at once, as Xenia's menu does: the
++  // command processor takes the new effect on its own thread, from the next frame.
++  // Callbacks run under the cvar registry lock, so after the unregister in Shutdown
++  // none can still be using command_processor_.
++  REXGPU_INFO("afro swap_post_effect (start): {}", REXCVAR_GET(swap_post_effect));
++  rex::cvar::RegisterChangeCallback(
++      "swap_post_effect", [this](std::string_view, std::string_view value) {
++        if (command_processor_) {
++          command_processor_->SetDesiredSwapPostEffect(ParseSwapPostEffect(std::string(value)));
++          REXGPU_INFO("afro swap_post_effect (change): {}", value);
++        }
++      });
+ 
+   // Register GPU MMIO handlers
+   // GPU registers are at 0x7FC80000-0x7FCFFFFF
+@@ -179,6 +191,7 @@ X_STATUS GraphicsSystem::SetupGuestGpu(runtime::FunctionDispatcher* function_dis
+ }
+ 
+ void GraphicsSystem::Shutdown() {
++  rex::cvar::UnregisterChangeCallbacks("swap_post_effect");  // afro: see SetupGuestGpu
+   if (command_processor_) {
+     command_processor_->Shutdown();
+     command_processor_.reset();

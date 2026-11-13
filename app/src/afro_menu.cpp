@@ -9,6 +9,7 @@
 // through its remap.
 
 #include "afro_menu.h"
+#include "upscale.h"
 
 #include <algorithm>
 #include <atomic>
@@ -188,24 +189,33 @@ std::vector<Item> MakeItems() {
     i.restart = restart;
     v.push_back(std::move(i));
   };
-  auto slider = [&](T4& l, const char* key, int lo, int hi, int step, int def, int scale,
-                    const char* unit, const char* cvar) {
+  auto slider_fn = [&](T4& l, const char* key, int lo, int hi, int step, int def, int scale,
+                       const char* unit, std::function<void(int)> apply) {
     Item i{Item::kSlider, l};
     i.key = key;
     i.lo = lo, i.hi = hi, i.step = step, i.def = def, i.scale = scale, i.unit = unit;
-    i.apply = [cvar, scale](int val) {
+    i.apply = std::move(apply);
+    v.push_back(std::move(i));
+  };
+  auto slider = [&](T4& l, const char* key, int lo, int hi, int step, int def, int scale,
+                    const char* unit, const char* cvar) {
+    slider_fn(l, key, lo, hi, step, def, scale, unit, [cvar, scale](int val) {
       char b[32];
       if (scale == 100) std::snprintf(b, sizeof(b), "%d.%02d", val / 100, val % 100);
       else std::snprintf(b, sizeof(b), "%d", val);
       SetCvar(cvar, b);
-    };
-    v.push_back(std::move(i));
+    });
   };
   static T4 lDisplay = {"Display", "Pantalla", "Affichage", "Schermo"};
   static T4 lFps = {"Frame rate", "Fotogramas", "Images/s", "Fotogrammi"};
   static T4 lVsync = {"VSync", "VSync", "VSync", "VSync"};
   static T4 lScale = {"Internal resolution", "Resoluci\xC3\xB3n interna", "R\xC3\xA9solution interne",
                       "Risoluzione interna"};
+  static T4 lUpscale = {"Upscaling", "Escalado", "Mise \xC3\xA0 l'\xC3\xA9" "chelle",
+                        "Ridimensionamento"};
+  static T4 lFsrSharp = {"FSR sharpness", "Nitidez de FSR", "Nettet\xC3\xA9 FSR", "Nitidezza FSR"};
+  static T4 lCasSharp = {"CAS sharpness", "Nitidez de CAS", "Nettet\xC3\xA9 CAS", "Nitidezza CAS"};
+  static T4 lFxaa = {"Anti-aliasing", "Antialiasing", "Anticr\xC3\xA9nelage", "Antialiasing"};
   static T4 lDiff = {"Difficulty", "Dificultad", "Difficult\xC3\xA9", "Difficolt\xC3\xA0"};
   static T4 lLore = {"Loading screens", "Pantallas de carga", "\xC3\x89" "crans de chargement",
                      "Schermate di caricamento"};
@@ -268,6 +278,32 @@ std::vector<Item> MakeItems() {
           {{"2x (1440p)", "2x (1440p)", "2x (1440p)", "2x (1440p)"}, {{"scale", "2"}}},
           {{"3x (2160p)", "3x (2160p)", "3x (2160p)", "3x (2160p)"}, {{"scale", "3"}}}},
          {{"scale", "1"}}, nullptr, true);
+  // Upscaling: the presenter's present_effect, applied at once (the runtime
+  // reloads it when the cvar changes). FSR only upscales when the window is
+  // larger than the game's picture; at the same size it sharpens.
+  choice(lUpscale,
+         {{{"Bilinear (original)", "Bilineal (original)", "Bilin\xC3\xA9" "aire (original)",
+            "Bilineare (originale)"},
+           {{"upscale", "0"}}},
+          {{"AMD FSR 1", "AMD FSR 1", "AMD FSR 1", "AMD FSR 1"}, {{"upscale", "1"}}},
+          {{"AMD CAS", "AMD CAS", "AMD CAS", "AMD CAS"}, {{"upscale", "2"}}}},
+         {{"upscale", "0"}}, [](int i) { SetCvar("present_effect", upscale::Effect(i)); });
+  slider_fn(lFsrSharp, "fsr_sharpness", upscale::kSharpLo, upscale::kSharpHi, upscale::kSharpStep,
+            upscale::kSharpDefault, 1, "%", [](int val) {
+              SetCvar("present_fsr_sharpness_reduction", upscale::SharpnessReduction(val));
+            });
+  slider_fn(lCasSharp, "cas_sharpness", upscale::kCasLo, upscale::kCasHi, upscale::kCasStep,
+            upscale::kCasDefault, 1, "%", [](int val) {
+              SetCvar("present_cas_additional_sharpness", upscale::CasSharpness(val));
+            });
+  // FXAA: the GPU plugin's swap_post_effect. It changes from the next game frame,
+  // so it shows once the menu is closed (the game is paused while it is open).
+  choice(lFxaa,
+         {{{"Off", "No", "Non", "No"}, {{"fxaa", "0"}}},
+          {{"FXAA", "FXAA", "FXAA", "FXAA"}, {{"fxaa", "1"}}},
+          {{"FXAA (extreme)", "FXAA (extremo)", "FXAA (extr\xC3\xAAme)", "FXAA (estremo)"},
+           {{"fxaa", "2"}}}},
+         {{"fxaa", "0"}}, [](int i) { SetCvar("swap_post_effect", upscale::PostEffect(i)); });
 
   header(kPlay);
   choice(lDiff,

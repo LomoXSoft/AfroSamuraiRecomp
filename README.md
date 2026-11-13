@@ -9,7 +9,7 @@ Europe and USA, title ID 4E4D07D8) to native Windows x64 using
 **This repository contains no game files.** You need your own original disc
 (or an ISO you dumped from it). The game executable is not released: it
 contains code translated from the game, so everyone builds it from their own copy.
-The only program attached to a release is `afrosetup-v0.3.2.exe`, the setup installer.
+The only program attached to a release is `afrosetup-v0.3.3.exe`, the setup installer.
 
 ## Quick start
 
@@ -24,10 +24,10 @@ The only program attached to a release is `afrosetup-v0.3.2.exe`, the setup inst
   and a generic controller; others SDL recognises may work), or keyboard and mouse.
 
 ### Install
-1. Download **[`afrosetup-v0.3.2.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.3.2.exe)**
+1. Download **[`afrosetup-v0.3.3.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.3.3.exe)**
    from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
    That file is the setup program, not the game. It builds the game on your PC from your disc.
-2. Run `afrosetup-v0.3.2.exe`. Choose a language, then **Install**.
+2. Run `afrosetup-v0.3.3.exe`. Choose a language, then **Install**.
 3. Choose a folder, then your ISO or the extracted game folder (`default.xex` must be inside it).
 4. Accept the Microsoft Visual Studio Build Tools license (the box starts unchecked). Shortcuts are optional. You can keep the downloaded tools or delete them when setup finishes. Deleting them does not remove `game`, the extracted game, the logs, your ISO, or your saves.
 5. The window says this takes several minutes. It does not promise a fixed duration.
@@ -38,7 +38,7 @@ Nothing is installed system-wide and no admin rights are needed. To uninstall,
 delete the install folder and the shortcuts. Saves are not in that folder.
 
 ### Update
-Run `afrosetup-v0.3.2.exe` again, choose **Update**, and select the existing installation
+Run `afrosetup-v0.3.3.exe` again, choose **Update**, and select the existing installation
 folder (the one that contains `game\Play.bat`). Close the game first. If
 `gamedata\default.xex` is already there, the ISO is not asked for again. Tools
 still on disk are reused, and only missing tools are downloaded again. The
@@ -57,7 +57,7 @@ to show it again) use **Manage saved games...** to open, back up, restore or
 delete them. Details: [Saves](#saves).
 
 ### If something goes wrong
-- If the window says **Installation did not finish**, read the details (shown by default) and `install.log` in the install folder. Run `afrosetup-v0.3.2.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
+- If the window says **Installation did not finish**, read the details (shown by default) and `install.log` in the install folder. Run `afrosetup-v0.3.3.exe` again. Use **Update** when that folder already contains `game\Play.bat`, and close the game first. **Back** on the failure page returns to the summary and does not start the build by itself. This is not a promise that an interrupted download always resumes.
 - [`install.bat`](https://raw.githubusercontent.com/LomoXSoft/AfroSamuraiRecomp/main/install.bat) is a separate console fallback. See [Console installer](#console-installer). Without `-Ref` it builds `main`.
 - The game log is `afro.log` in the install folder.
 - Open an issue at <https://github.com/LomoXSoft/AfroSamuraiRecomp/issues> with what
@@ -71,6 +71,9 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
 ## Improvements over the Xbox 360 version
 - **Native Windows x64** program, no emulator. Borderless fullscreen, window or exclusive fullscreen.
 - **Up to 4K**: internal resolution 1x (native), 2x or 3x.
+- **AMD FSR 1 and CAS** upscaling (0.3.3): sharper edges when your screen is larger than
+  the game's picture. Bilinear, the original look, stays the default. **FXAA**
+  anti-aliasing smooths jagged edges (off by default).
 - **Native multi-controller support** through SDL. Tested: Xbox, PlayStation
   (DualShock 4/DualSense, USB and Bluetooth), a Switch controller and a generic
   controller. Steam Deck and other controllers are not tested.
@@ -84,7 +87,7 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
   smoothing are sliders in the launcher.
 - **60 FPS** (0.2.0): the whole game, cutscenes included, at the right speed.
 - **Launcher**: language, Play, Settings and saved games. Settings has Graphics
-  (display, resolution, frame rate, VSync), Gameplay (difficulty), Controls
+  (display, resolution, frame rate, VSync, upscaling, anti-aliasing), Gameplay (difficulty), Controls
   (control mode, mouse, key bindings) and Experimental (effects, render path) tabs.
 - **Fixes over earlier recompilation builds**: all cutscene voices, black frames,
   and the headband texture.
@@ -113,7 +116,7 @@ Xenia). This repository holds only the project configuration (function
 boundaries, hooks), a small launcher, build scripts and a GPU plugin patch.
 
 ### Status and limitations
-Preview (**0.3.2**). The default is the original 30 FPS at 720p. **60 FPS** is a
+Preview (**0.3.3**). The default is the original 30 FPS at 720p. **60 FPS** is a
 supported option (see [60 FPS](#60-fps)): gameplay, cutscenes and dialogue scenes were
 played at 60 on one PC, also at 2x resolution. That is not an independent playthrough
 of the whole game.
@@ -180,15 +183,15 @@ Please attach that log to the issue.
 
 ### Console installer
 `install.bat` is a fallback for a source checkout. The program players download
-is [`afrosetup-v0.3.2.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.3.2.exe)
+is [`afrosetup-v0.3.3.exe`](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest/download/afrosetup-v0.3.3.exe)
 from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest).
 That setup builds the source stored inside the file. It does not clone public `main`.
 
 When it asks its questions interactively, `install.bat` with no `-Ref` builds the
 `main` branch. With `-NonInteractive` it refuses to build `main`, both with no
 `-Ref` and with `-Ref main`: pass an explicit `-Ref` that is not `main`, or
-`-LocalTree` with a 0.3.2 source tree. To build the tagged 0.3.2 source from the
-console installer, pass `-Ref v0.3.2`.
+`-LocalTree` with a 0.3.3 source tree. To build the tagged 0.3.3 source from the
+console installer, pass `-Ref v0.3.3`.
 
 1. Make an ISO of your own Afro Samurai disc (Europe or USA), or use an extracted folder
    that contains `default.xex` (see [Getting your game files](#getting-your-game-files)).
@@ -203,7 +206,7 @@ console installer, pass `-Ref v0.3.2`.
    records that language in `game\afro_language.cfg`.
 5. At the end it can delete the toolchain, ReXGlue SDK and source, build files, and
    downloads, and keep `<root>\game`, `<root>\gamedata`, and the logs. Your ISO and
-   your saves are not part of that delete. A later **Update** in `afrosetup-v0.3.2.exe`
+   your saves are not part of that delete. A later **Update** in `afrosetup-v0.3.3.exe`
    downloads again only the tools that are missing and keeps the extracted game.
 
 What the installer does (`tools/install.ps1`, run with the PowerShell execution
@@ -227,7 +230,7 @@ Visual Studio installer changes) and nothing is uploaded. Downloads are about
 and about 2 GB of ReXGlue source; the whole folder ends up around 12-13 GB
 (`<root>\downloads` can be deleted afterwards). A run takes several minutes; there is
 no fixed duration. The console shows its own progress lines. A normal console re-run
-skips steps already stamped in `<root>\.install`. **Update** in `afrosetup-v0.3.2.exe` clears
+skips steps already stamped in `<root>\.install`. **Update** in `afrosetup-v0.3.3.exe` clears
 the compile stamps and rebuilds the program. Neither path promises that an interrupted
 download always resumes. The log is `<root>\install.log`. To uninstall, delete the
 install folder and the shortcuts. Saves stay in `Documents\afrorecomp`
@@ -406,8 +409,9 @@ folder back into `Documents\afrorecomp\`).
 Press **F1**, or hold both stick clicks (L3 + R3) for half a second, to open the
 options over the paused game (a note at the bottom left says so for a few
 seconds after the game starts). It has the launcher's main settings: display, frame
-rate, VSync, internal resolution, difficulty, loading screens, language, control
-mode, camera X and Y invert, the three mouse sliders and the Experimental effects. Each change is saved
+rate, VSync, internal resolution, upscaling with FSR and CAS sharpness,
+anti-aliasing, difficulty, loading screens, language, control mode, camera X and Y
+invert, the three mouse sliders and the Experimental effects. Each change is saved
 to `afro_language.cfg` at once; most also apply at once, and the ones marked
 **(after restart)** (internal resolution, language, control mode) apply the next
 time the game starts. Move with the D-pad or the arrow keys, change with left and
@@ -422,6 +426,18 @@ language (English, Español, Français, Italiano) and three buttons: **Play**,
   whole screen, no display mode change, instant Alt+Tab; **Window**; or **Exclusive
   fullscreen**, which takes the display), internal resolution (1x native by default /
   2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
+  **Upscaling** sets how the game's picture is stretched to your screen:
+  **Bilinear (original, default)**, the look of earlier versions; **AMD FSR 1**,
+  which keeps edges sharp when the screen or window is larger than the game's
+  picture (1280x720 at 1x internal resolution, 2560x1440 at 2x) and only sharpens
+  it at the same size; or **AMD CAS**, a sharpening filter. **FSR sharpness**
+  (0 to 100 %, default 90 %) applies to FSR 1 when it upscales; **CAS sharpness**
+  (0 to 100 %, default 0 %, CAS's lightest) applies to CAS, and to FSR 1 at the same
+  size. FSR 1 and CAS are AMD's open shaders and are not limited to AMD GPUs (so far
+  checked on an AMD GPU only). **Anti-aliasing**: **Off (default)**, **FXAA** or
+  **FXAA (extreme quality)** smooths jagged edges of the game's picture before it is
+  upscaled. A change made in the in-game options applies at once; FXAA shows from
+  the next frame, so once the options are closed.
 - **Gameplay**: **Difficulty**: **Normal** (default, the game as it is) or **Game
   Journalist**, which makes the player invulnerable. Saved like the other settings.
   **Loading screens**: **Full lore** (default) lets the story shown while a level
@@ -454,9 +470,9 @@ it there runs this project's setup (pick your disc image in it as usual). An
 installation you already have works too: in RecompLauncher, Settings → Developers →
 Developer tools, then **Add a build** and pick its `game` folder. The setup puts a
 `recomplauncher.json` in the installation folder and next to `afrorecomp.exe`. RecompLauncher starts the game and shows its settings
-(language, display, internal resolution, frame rate, VSync, difficulty, loading
-screens, controls, camera invert), which it writes to `afro_language.cfg`; it also backs up the
-saves. Mouse sensitivity, dead zone and smoothing are sliders there, and a button
+(language, display, internal resolution, frame rate, VSync, upscaling, anti-aliasing,
+difficulty, loading screens, controls, camera invert), which it writes to `afro_language.cfg`; it also backs up the
+saves. FSR and CAS sharpness and the mouse sensitivity, dead zone and smoothing are sliders there, and a button
 clears the shader cache. Started from RecompLauncher, the game's own launcher window
 stays closed (hold Shift at start to open it); in its Big Picture mode the game
 always starts fullscreen. Installing and updating stay with the setup:
@@ -503,7 +519,7 @@ unless a maintainer specifically asks.
 - `app/` – ReXGlue project: manifest, `afro_functions.toml` (extra function
   boundaries), `afro_hooks.toml` (mid-asm hooks), launcher and hooks in `src/`.
   These use Europe addresses; `regions/usa.toml` maps each one to the USA disc.
-- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.3.2.exe`, not committed.
+- `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.3.3.exe`, not committed.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`); `tools/analysis/` has the
   reverse-engineering helpers used while mapping the game, `tools/artwork/` the

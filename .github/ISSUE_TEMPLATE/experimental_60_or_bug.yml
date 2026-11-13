@@ -70,7 +70,7 @@ body:
     attributes:
       label: Build version / commit
       description: App version from the launcher title (afrorecomp_v…) and/or `git log -1 --oneline` from the source checkout if you have one.
-      placeholder: "0.3.2 / <sha>"
+      placeholder: "0.3.3 / <sha>"
     validations:
       required: true
   - type: markdown
