@@ -835,10 +835,14 @@ void HintDialog::OnDraw(ImGuiIO& io) {
                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing);
   ImDrawList* dl = ImGui::GetWindowDrawList();
   const float ts = 28 * s, gs = 44 * s, gap = 10 * s;
-  const bool keyboard = GlyphFamily() == 5;
-  rex::ui::ImmediateTexture* g1 =
-      keyboard ? Glyph("keyboard/key_F1") : ButtonGlyph("LS", nullptr, nullptr);
-  rex::ui::ImmediateTexture* g2 = keyboard ? nullptr : ButtonGlyph("RS", nullptr, nullptr);
+  // F1 only when the controls are set to Keyboard. Otherwise both: in Auto the
+  // icons follow the keyboard until a controller is used, and a controller
+  // player may not have touched it yet (Xbox icons until then).
+  const bool keyboard = rex::cvar::GetFlagByName("afro_button_glyphs") == "keyboard";
+  static const char* kDirs[] = {"xbox", "xbox", "playstation", "nintendo", "steam", "xbox"};
+  const std::string pad_dir = std::string(kDirs[GlyphFamily()]) + "/";
+  rex::ui::ImmediateTexture* g1 = keyboard ? Glyph("keyboard/key_F1") : Glyph(pad_dir + "LS");
+  rex::ui::ImmediateTexture* g2 = keyboard ? nullptr : Glyph(pad_dir + "RS");
   // One row of parts: text, or an icon (key cap text when the icon is missing).
   struct Part { const char* text; rex::ui::ImmediateTexture* tex; bool icon; };
   std::vector<Part> parts;

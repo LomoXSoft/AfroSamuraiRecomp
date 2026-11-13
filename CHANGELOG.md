@@ -5,8 +5,9 @@ Newest first. Versions are in `app/VERSION`.
 ## 0.3.2 – Options hint
 - Start-up hint: a few seconds after the game starts, a small note at the
   bottom left shows how to open the options while playing ("Hold [LS] + [RS]
-  or [F1]  Options" with the controller's icons, "[F1]  Options" on the
-  keyboard), then fades out after about 10 s, or as soon as the menu opens.
+  or [F1]  Options", with the controller's icons once one is used; "[F1]  Options"
+  when Controls is set to Keyboard), then fades out after about 10 s, or as soon
+  as the menu opens.
   Useful when the game is started without the launcher (RecompLauncher).
   `--afro_options_hint=false` turns it off.
 - Options while playing: the confirm button (A) steps to the next value on a
