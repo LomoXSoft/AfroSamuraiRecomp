@@ -40,6 +40,9 @@
 #pragma comment(lib, "windowscodecs.lib")
 #endif
 
+REXCVAR_DEFINE_BOOL(afro_options_hint, true, "Afro",
+                    "Show how to open the in-game options for a few seconds at start-up");
+
 namespace afro {
 namespace {
 
@@ -150,6 +153,10 @@ T4 kHintKeys = {"Key bindings: launcher (hold Shift at start)",
                 "Asignar teclas: en el lanzador (Mayus al iniciar)",
                 "Touches : dans le lanceur (Maj au d\xC3\xA9marrage)",
                 "Assegna tasti: nel launcher (Maiusc all'avvio)"};
+// Start-up hint: "Hold [LS] + [RS] or [F1]  Options" / "[F1]  Options".
+T4 kStartHold = {"Hold", "Mant\xC3\xA9n", "Maintiens", "Tieni premuto"};
+T4 kStartOptions = {"Options", "Opciones", "Options", "Opzioni"};
+T4 kStartOr = {"or", "o", "ou", "o"};
 
 // ---------------------------------------------------------------------- items
 struct Choice {
@@ -746,7 +753,9 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
   }
   dl->PopClipRect();
 
-  // Hints, bottom right like the game's: [ok] change  [back] back to the game.
+  // Hints, bottom right like the game's. On a setting A steps to the next value
+  // like right does, so both show as "Change": [<][>][ok] Change  [back] Back.
+  // On "Back to the game": [ok] Select  [back] Back.
   const char *ok, *back;
   ButtonNames(&ok, &back);
   const float hs = 24 * s;
@@ -754,20 +763,25 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
   float hx = px0 + 40 * s;
   const float hy = H - 78 * s;
   const ImVec2 gp{0, hy + 2 * s + hs * 0.5f - gs * 0.5f};
-  rex::ui::ImmediateTexture* left = ButtonGlyph("DPAD_LEFT", nullptr, "Left");
-  rex::ui::ImmediateTexture* right = ButtonGlyph("DPAD_RIGHT", nullptr, "Right");
-  if (left && right) {
-    hx += Prompt(dl, fS, gs, {hx, gp.y}, left, "") + 2 * s;
-    hx += Prompt(dl, fS, gs, {hx, gp.y}, right, "") + 10 * s;
+  rex::ui::ImmediateTexture* ok_tex = ButtonGlyph("A", "keybind_a", nullptr);
+  if (items_[sel_].kind != Item::kResume) {
+    rex::ui::ImmediateTexture* left = ButtonGlyph("DPAD_LEFT", nullptr, "Left");
+    rex::ui::ImmediateTexture* right = ButtonGlyph("DPAD_RIGHT", nullptr, "Right");
+    if (left && right) {
+      hx += Prompt(dl, fS, gs, {hx, gp.y}, left, "") + 2 * s;
+      hx += Prompt(dl, fS, gs, {hx, gp.y}, right, "") + 2 * s;
+    } else {
+      dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kWhite), "\xE2\x97\x84 \xE2\x96\xBA");  // ◄ ►
+      hx += fS->CalcTextSizeA(hs, 1e9f, 0, "\xE2\x97\x84 \xE2\x96\xBA").x + 8 * s;
+    }
+    hx += Prompt(dl, fS, gs, {hx, gp.y}, ok_tex, ok) + 10 * s;
+    dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintChange));
+    hx += fS->CalcTextSizeA(hs, 1e9f, 0, Tr(kHintChange)).x + 34 * s;
   } else {
-    dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kWhite), "\xE2\x97\x84 \xE2\x96\xBA");  // ◄ ►
-    hx += fS->CalcTextSizeA(hs, 1e9f, 0, "\xE2\x97\x84 \xE2\x96\xBA").x + 10 * s;
+    hx += Prompt(dl, fS, gs, {hx, gp.y}, ok_tex, ok) + 10 * s;
+    dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintSelect));
+    hx += fS->CalcTextSizeA(hs, 1e9f, 0, Tr(kHintSelect)).x + 34 * s;
   }
-  dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintChange));
-  hx += fS->CalcTextSizeA(hs, 1e9f, 0, Tr(kHintChange)).x + 34 * s;
-  hx += Prompt(dl, fS, gs, {hx, gp.y}, ButtonGlyph("A", "keybind_a", nullptr), ok) + 10 * s;
-  dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintSelect));
-  hx += fS->CalcTextSizeA(hs, 1e9f, 0, Tr(kHintSelect)).x + 34 * s;
   hx += Prompt(dl, fS, gs, {hx, gp.y}, ButtonGlyph("B", "keybind_b", nullptr), back) + 10 * s;
   dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintBack));
   dl->AddText(fS, 20 * s, {px0 + 40 * s, H - 40 * s}, A(kDim), Tr(kHintKeys));
@@ -780,6 +794,88 @@ std::function<void(std::function<void()>)> g_post_ui;
 std::unique_ptr<MenuDialog> g_dialog;
 std::atomic<bool> g_open{false};
 std::atomic<bool> g_closing{false};
+
+// Start-up hint (afro_options_hint): a few seconds after the game starts, a small
+// note at the bottom left says how to open these options, with the device's
+// icons. Fades out by itself, or as soon as the menu opens.
+class HintDialog : public rex::ui::ImGuiDialog {
+ public:
+  explicit HintDialog(rex::ui::ImGuiDrawer* drawer) : ImGuiDialog(drawer), shown_(clk::now()) {}
+
+ protected:
+  void OnDraw(ImGuiIO& io) override;
+
+ private:
+  clk::time_point shown_;
+  bool ending_ = false;
+};
+std::unique_ptr<HintDialog> g_hint;
+
+void HintDialog::OnDraw(ImGuiIO& io) {
+  constexpr float kIn = 0.4f, kHold = 10.0f, kOut = 0.8f;
+  const float t = std::chrono::duration<float>(clk::now() - shown_).count();
+  if (t > kIn + kHold + kOut || g_open) {
+    if (!ending_) {
+      ending_ = true;
+      if (g_post_ui) g_post_ui([] { g_hint.reset(); });
+    }
+    return;
+  }
+  const float a = t < kIn ? t / kIn : t > kIn + kHold ? 1.0f - (t - kIn - kHold) / kOut : 1.0f;
+  const auto A = [a](ImU32 c, float k = 1.0f) {
+    return (c & 0x00FFFFFF) | (ImU32(((c >> 24) & 0xFF) * k * a) << 24);
+  };
+  const float H = io.DisplaySize.y, s = H / 1080.0f;
+  ImFont* fS = g_font_small ? g_font_small : ImGui::GetFont();
+  ImGui::SetNextWindowPos({0, 0});
+  ImGui::SetNextWindowSize(io.DisplaySize);
+  ImGui::Begin("##afro_hint", nullptr,
+               ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+                   ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings |
+                   ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing);
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+  const float ts = 28 * s, gs = 44 * s, gap = 10 * s;
+  const bool keyboard = GlyphFamily() == 5;
+  rex::ui::ImmediateTexture* g1 =
+      keyboard ? Glyph("keyboard/key_F1") : ButtonGlyph("LS", nullptr, nullptr);
+  rex::ui::ImmediateTexture* g2 = keyboard ? nullptr : ButtonGlyph("RS", nullptr, nullptr);
+  // One row of parts: text, or an icon (key cap text when the icon is missing).
+  struct Part { const char* text; rex::ui::ImmediateTexture* tex; bool icon; };
+  std::vector<Part> parts;
+  if (keyboard) {
+    parts = {{"F1", g1, true}, {Tr(kStartOptions), nullptr, false}};
+  } else {
+    parts = {{Tr(kStartHold), nullptr, false}, {"L3", g1, true}, {"+", nullptr, false},
+             {"R3", g2, true}, {Tr(kStartOr), nullptr, false},
+             {"F1", Glyph("keyboard/key_F1"), true}, {Tr(kStartOptions), nullptr, false}};
+  }
+  auto width = [&](const Part& p) {
+    if (!p.icon) return fS->CalcTextSizeA(ts, 1e9f, 0, p.text).x;
+    if (!p.tex) return fS->CalcTextSizeA(ts * 0.62f, 1e9f, 0, p.text).x + ts * 0.62f * 0.7f;
+    return gs * float(p.tex->width) / float(std::max<uint32_t>(1, p.tex->height));
+  };
+  float w = 0;
+  for (const Part& p : parts) w += width(p) + gap;
+  const float pad = 22 * s, x0 = 48 * s, y1 = H - 64 * s, y0 = y1 - gs - pad;
+  dl->AddRectFilled({x0, y0}, {x0 + w - gap + pad * 2, y1}, A(IM_COL32(0, 0, 0, 190)), 10 * s);
+  dl->AddRectFilled({x0, y0}, {x0 + 6 * s, y1}, A(kRed));
+  float x = x0 + pad;
+  const float cy = (y0 + y1) * 0.5f;
+  for (size_t i = 0; i < parts.size(); ++i) {
+    const Part& p = parts[i];
+    if (!p.icon) {
+      const bool last = i + 1 == parts.size();
+      dl->AddText(fS, ts, {x, cy - ts * 0.6f}, A(last ? kWhite : kGrey), p.text);
+    } else if (p.tex) {
+      dl->AddImage(reinterpret_cast<ImTextureID>(p.tex), {x, cy - gs * 0.5f},
+                   {x + width(p), cy + gs * 0.5f}, {0, 0}, {1, 1}, A(IM_COL32(255, 255, 255, 255)));
+    } else {
+      KeyCap(dl, fS, ts * 0.62f, {x, cy - ts * 0.45f}, p.text);
+    }
+    x += width(p) + gap;
+  }
+  ImGui::End();
+}
 
 }  // namespace
 
@@ -839,6 +935,20 @@ void MenuToggle() {
 }
 
 void MenuGuestFrame() {
+  // Start-up hint, once, 4 s after the first frame.
+  static clk::time_point first_frame{};
+  static bool hint_sent = false;
+  if (!hint_sent) {
+    if (first_frame.time_since_epoch().count() == 0) {
+      first_frame = clk::now();
+    } else if (clk::now() - first_frame > std::chrono::seconds(4)) {
+      hint_sent = true;
+      if (REXCVAR_GET(afro_options_hint) && g_post_ui)
+        g_post_ui([] {
+          if (g_drawer && !g_open && !g_hint) g_hint = std::make_unique<HintDialog>(g_drawer);
+        });
+    }
+  }
   // Hold both stick clicks for half a second to open it.
   static clk::time_point held_since{};
   static bool latched = false;
@@ -863,6 +973,7 @@ void MenuShutdown() {
   g_open = false;
   // Before the app destroys the immediate drawer the icons belong to.
   g_dialog.reset();
+  g_hint.reset();
   g_glyphs.clear();
   g_imm = nullptr;
 }
