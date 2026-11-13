@@ -249,6 +249,60 @@ Command-line options (`install.bat -Option value`): `-InstallDir <dir>` (full in
 `-GameDataDir <dir>` uses an already extracted disc folder (containing `default.xex`)
 instead of an ISO.
 
+### Linux and SteamOS (Proton)
+**Experimental, not tested under Proton yet.** `install.sh` builds the same
+**Windows** game on Linux from your own disc, for Steam Deck, Steam Machine and
+other Linux PCs, and Steam runs it through Proton. It is not a native Linux
+port: the Direct3D 12 renderer runs on vkd3d-proton, as in any Windows game.
+
+It needs no root and installs no packages: bash, python3 3.9 or newer, git,
+curl, tar and xz are enough, which SteamOS has. Every tool is downloaded from
+its official source, pinned and SHA-256 checked, into the install folder:
+LLVM/Clang 20.1.8 (llvm-mingw), CMake, Ninja, xwin with the Microsoft C++
+runtime and Windows SDK (Microsoft license, asked first), the ReXGlue SDK
+nightly and the ReXGlue source. About 20 GB must be free.
+
+In Desktop Mode, open a terminal (Konsole on SteamOS):
+
+```bash
+git clone https://github.com/LomoXSoft/AfroSamuraiRecomp.git
+cd AfroSamuraiRecomp
+./install.sh --iso "/path/to/Afro Samurai (Europe).iso"
+```
+
+It asks for the install folder (default `~/Games/AfroSamuraiRecomp`), the
+Microsoft license and the game language. At the end it prints the Steam steps
+and writes them to `<install folder>/STEAM_SETUP.txt`:
+
+1. Steam: *Games → Add a Non-Steam Game to My Library → Browse*, choose
+   `<install folder>/game/afrorecomp.exe` (set the file type to *All Files*).
+2. *Properties → Shortcut*: **Start in** `"<install folder>/game"`, **Launch
+   options** `--game_data_root="../gamedata" --gpu_plugin=xenos --log_file="../afro.log"`.
+3. *Properties → Compatibility*: force Proton (the newest stable version).
+
+The launcher window has no controller support, so a Linux install skips it.
+The options are in the game: **F1**, or hold both stick clicks. The saves are
+in the shortcut's Proton prefix, under
+`steamapps/compatdata/<id>/pfx/drive_c/users/steamuser/Documents/afrorecomp`.
+
+Options: `--dir <folder>`, `--iso <file>` or `--gamedata <folder>` (an
+extracted disc), `--accept-msvc-license`, `--language en|es|fr|it`,
+`--jobs <n>` (fewer parallel compiles if memory is tight), `--cleanup` /
+`--keep-build-files`, `--yes` (no questions). On the test PC (8 threads) a clean
+build takes about 6 minutes plus downloads; expect about 8–11 minutes on a
+Steam Deck.
+
+**Update:** get the new source (`git pull`), then run
+`./install.sh --update --dir <install folder>`. It keeps the extracted game,
+`app/region`, the saves and the settings, compiles only what changed, and
+replaces the program files only after the build succeeded. Keep the build
+files for fast updates.
+
+How it builds: the Linux `rexglue` from the same nightly generates the code
+(the same functions as on Windows), and clang cross-compiles it for Windows
+with `tools/linux/win-cross.cmake`. Details and measurements are in
+[docs/LINUX_FEASIBILITY.md](docs/LINUX_FEASIBILITY.md).
+
 ### Requirements
 - Windows 10/11 x64, a GPU with Direct3D 12 and current drivers.
 - Original Afro Samurai disc (Europe or USA) and a way to make an ISO of it.

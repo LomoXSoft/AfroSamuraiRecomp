@@ -2,6 +2,28 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.3.7 – Linux installer (Proton)
+- `install.sh`: builds the Windows game on Linux and SteamOS from your own
+  disc (Europe or USA) to run through Proton on Steam Deck, Steam Machine and
+  other Linux PCs. No root: llvm-mingw (clang 20.1.8), CMake, Ninja, xwin
+  (MSVC CRT 14.44 and Windows SDK 10.0.26100), the ReXGlue nightly (its Linux
+  `rexglue` does the codegen) and the ReXGlue source are downloaded pinned and
+  SHA-256 checked. It applies the same patches as `build_gpu_plugin.bat`, sets
+  up `game/` and prints the Steam shortcut steps. `--update` keeps the game
+  files, region, saves and settings. The launcher window is skipped there
+  (no controller support); the options are in the game (F1 or both stick
+  clicks).
+- Tested on a Steam Machine under Proton: installed with these steps, the game
+  runs in 60 FPS mode at 1440p, with some drops to 40–50 FPS in places. Not
+  tested on a Steam Deck yet.
+- `tools/linux/`: the cross-compile toolchain file, `sync_tree.py` and
+  `xwin_case_links.py` (symlinks for header and library names that the sources
+  spell in another case).
+- `docs/LINUX_FEASIBILITY.md`: what was checked in WSL. Linux codegen gives the
+  same functions as Windows, and the three program files have the same DLL
+  imports as the Windows build.
+- The Windows setup and the game are unchanged from 0.3.6.
+
 ## 0.3.6 – Setup antivirus fix
 - The setup (`afrosetup-v0.3.6.exe`) is flagged by fewer antivirus engines. The
   v0.3.5 setup was flagged by 19 of 74 engines on VirusTotal (0.3.4: 3 of 71) and
