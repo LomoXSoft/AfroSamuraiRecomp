@@ -246,6 +246,10 @@ instead of an ISO.
 - Original Afro Samurai disc (Europe or USA) and a way to make an ISO of it.
 - About 20 GB free disk space (the finished install uses about 12-13 GB).
 - A controller (see [Controls](#controls)).
+- Reported working by players (RecompLauncher reports, November 2026): v0.3.0 on a
+  Ryzen 7 4800H laptop with a GTX 1650 and 15 GB, and v0.3.1 on a Core i7-10700F with
+  a Radeon RX 9060 XT and 32 GB, both on Windows 11. The upscaling and FXAA options
+  (new in v0.3.3) have not been reported on NVIDIA yet.
 - For a manual build only (the installer downloads all of this):
   - MSVC + Windows SDK: Visual Studio 2022 Build Tools ("Desktop development with C++"),
     run from an "x64 Native Tools Command Prompt", or a portable MSVC in
