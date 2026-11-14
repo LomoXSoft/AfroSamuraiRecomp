@@ -51,7 +51,7 @@ def main() -> None:
         fail("cancel kills by image name")
     if "[string]$Ref = 'main'" not in ps1:
         fail("console default branch was removed")
-    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.3'" not in ps1:
+    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.4'" not in ps1:
         fail("local-tree guard missing")
     if "logwrite.ps1" not in ps1 or "Add-Content" in ps1:
         fail("install.ps1 still appends the log with Add-Content")
@@ -59,7 +59,7 @@ def main() -> None:
     if "FileShare]::ReadWrite" not in logwrite or "LogBusy" not in logwrite:
         fail("log writer is missing the share mode or the recursion guard")
     version = (ROOT / "app" / "VERSION").read_text(encoding="utf-8").strip()
-    if version != "0.3.3":
+    if version != "0.3.4":
         fail(f"VERSION is {version!r}")
     if b"Lomorsin Afro header 1200x240" not in image:
         fail("setup image is missing the header art marker")

@@ -2,7 +2,7 @@
 
 Newest first. Versions are in `app/VERSION`.
 
-## Unreleased
+## 0.3.4 – Black screen fix
 - Black screen fix: started without `--gpu_plugin` (a shortcut to
   `afrorecomp.exe`, a double-click in the game folder), the game ran with no GPU
   emulation and the window stayed black. It now loads the `xenos` GPU plugin by
