@@ -494,7 +494,9 @@ RecompLauncher cannot build the game from your disc.
   `git -C <root>\rexglue-sdk clean -fd src include` and delete `.git\afro-patches`, then run the script again.
 - **`CODEGEN FAILED`**: see `<root>\codegen_win.log`. Usually `gamedata\default.xex`
   is not from the Europe or USA disc or the extraction was incomplete.
-- **Black screen, black frames or broken image**: make sure `build_gpu_plugin.bat`
+- **Black screen, black frames or broken image**: if `afro.log` says `gpu_plugin not set`,
+  the game was started without `--gpu_plugin=xenos` (up to v0.3.3 the game needs it);
+  start it with `Play.bat`, the setup's shortcut or RecompLauncher. Otherwise make sure `build_gpu_plugin.bat`
   ran after the last `build_win.bat` and printed `GPU PLUGIN + RUNTIME OK`, and update the GPU driver.
   As a fallback, try the ROV path: `tools\run_win.bat --render_target_path_d3d12=rov` (slower).
 - **No voices in cutscenes or no sound**: the patched `rexruntime.dll` is missing

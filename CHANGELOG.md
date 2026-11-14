@@ -2,6 +2,13 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## Unreleased
+- Black screen fix: started without `--gpu_plugin` (a shortcut to
+  `afrorecomp.exe`, a double-click in the game folder), the game ran with no GPU
+  emulation and the window stayed black. It now loads the `xenos` GPU plugin by
+  itself and logs "no --gpu_plugin given, using xenos". `--gpu_plugin` on the
+  command line still wins.
+
 ## 0.3.3 – FSR upscaling
 - Upscaling setting: **Bilinear (original)**, the default and the look of
   earlier versions, **AMD FSR 1** or **AMD CAS**, with an **FSR sharpness** slider

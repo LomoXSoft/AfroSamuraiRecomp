@@ -9,6 +9,7 @@
 #include <system_error>
 
 #include <rex/filesystem.h>
+#include <rex/logging.h>
 #include <rex/rex_app.h>
 
 #include <functional>
@@ -42,6 +43,13 @@ class AfrorecompApp : public rex::ReXApp {
   // void OnPostInitLogging() override {}
   void OnPreSetup(rex::RuntimeConfig& config) override {
     afro::ApplyStartupLanguage();
+    // Without --gpu_plugin the runtime runs with no GPU emulation and the
+    // window stays black. Play.bat and RecompLauncher pass it; a shortcut to
+    // the exe or a double-click does not, so load the plugin here too.
+    if (config.gpu_plugin.empty()) {
+      config.gpu_plugin = "xenos";
+      REXLOG_INFO("afro: no --gpu_plugin given, using xenos");
+    }
   }
   // void OnLoadXexImage(std::string& xex_image) override {}
   // void OnPostLoadXexImage() override {}
