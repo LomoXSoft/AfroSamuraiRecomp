@@ -2,6 +2,25 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## Unreleased
+- Aspect ratio setting for ultrawide screens: **16:9 (original)**, the default,
+  **21:9 (ultrawide)**, **32:9 (super ultrawide)** or **Auto** (the shape of the
+  screen the game opens on, from 16:9 up to 32:9). In the launcher (Settings ->
+  Graphics), the in-game options (F1, after restart) and RecompLauncher, saved as
+  `aspect` (0, 1, 2, 3) in `afro_language.cfg`. It applies when the game starts.
+- Wider than 16:9 is Hor+: the game shows more of the scene at the sides. The game
+  draws a 1280x720 picture with every camera at 16:9; the runtime now renders that
+  picture with more columns than rows (`draw_resolution_scale_x` above `_y`, 2x1
+  at 1x internal resolution), the presenter shows it at the wide aspect, and three
+  hooks (`AfroAspect*Hook`, cvar `afro_aspect`) widen each 16:9 camera: perspective
+  cameras for the 3D scene, orthographic ones for the menus and HUD, which stay
+  16:9 in the middle. The game itself still sees a 1280x720 display.
+- Start-up logos, full-screen movies (Bink, 1280x720, found by a hook on
+  `BinkWait`) and loading screens are drawn for 16:9: they show at 16:9 with bars
+  at the sides. New runtime patch `zzzzzzzzzzzzz-afro-aspect-screens.patch` lets
+  the executable switch the presenter's aspect per frame (`afro_display_aspect`).
+- `checks/test_aspect.cpp` checks the ratios, scales and video modes per choice.
+
 ## 0.3.4 – Black screen fix
 - Black screen fix: started without `--gpu_plugin` (a shortcut to
   `afrorecomp.exe`, a double-click in the game folder), the game ran with no GPU

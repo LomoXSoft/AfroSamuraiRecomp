@@ -220,3 +220,28 @@ address = 0x8269BA6C
 name = "AfroInvertDefaultsHook"
 registers = ["r10"]
 after_instruction = true
+
+# Ultrawide, Hor+ (src/frame_pacing.cpp, afro_aspect). sub_825B1610 right after
+# XGetVideoMode: the game keeps a 1280x720 display.
+[[midasm_hook]]
+address = 0x825B162C
+name = "AfroAspectVideoModeHook"
+registers = ["r1"]
+
+# sub_826B10E8 perspective branch (loc_826B1190): widen 16:9 cameras.
+[[midasm_hook]]
+address = 0x826B1190
+name = "AfroAspectWidenHook"
+registers = ["r3"]
+
+# sub_826B10E8 orthographic branch (after the bne): widen 16:9 2D pane cameras.
+[[midasm_hook]]
+address = 0x826B10F4
+name = "AfroAspectOrthoHook"
+registers = ["r3"]
+
+# BinkWait (sub_82831468) entry: a 1280x720 movie shows at 16:9 (afro_aspect).
+[[midasm_hook]]
+address = 0x82831468
+name = "AfroAspectBinkHook"
+registers = ["r3"]

@@ -4,6 +4,7 @@
 // at launch, or with --choose_language. An explicit --user_language wins.
 #include "language_picker.h"
 #include "afro_region.h"  // AFRO_REGION_USA, AFRO_REGION_NAME
+#include "aspect.h"
 #include "upscale.h"
 
 #include <rex/cvar.h>
@@ -137,7 +138,7 @@ std::string MouseCvarValue(int r, int v) {
   return buf;
 }
 
-struct Options { int fps = 0; /* 0=Original(30), 60 */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ int lore = 0; /* Loading screens: 0 full lore (default), 1 fast */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ int invert[2] = {-1, -1}; /* camera X, Y: -1 as the game's save (not written), 0 default, 1 invert */ int upscale_mode = 0; /* 0 bilinear (default), 1 AMD FSR 1, 2 AMD CAS (upscale.h) */ int fsr_sharp = upscale::kSharpDefault; /* FSR sharpness, % */ int cas_sharp = upscale::kCasDefault; /* CAS sharpness, % */ int fxaa = 0; /* 0 off (default), 1 FXAA, 2 FXAA extreme */ };
+struct Options { int fps = 0; /* 0=Original(30), 60 */ int sepia = 0; /* 0 on, 1 off */ int vsync = 0; /* 0 on, 1 off (guest vblank timer) */ int invuln = 0; /* Difficulty: 0 Normal, 1 Game Journalist (invulnerable); saved */ int tick = 0; /* legacy only: migrate 60+non-orig tick → Experimental */ int lore = 0; /* Loading screens: 0 full lore (default), 1 fast */ bool window = false; bool exclusive = false; /* Display: borderless (default), window, exclusive fullscreen */ int scale = 1; int adv[kAdvN] = {}; int control = 0; /* 0 auto (keyboard, a pad takes over when used), 1 controller only, 2 keyboard icons */ int mouse[3] = {kMouse[0].def, kMouse[1].def, kMouse[2].def}; std::string keys[24]; /* key bindings, empty = default (see kKeyActions) */ std::string padmap[3]; /* controller remap per pad family (kPadFamilies), empty = as the pad is */ int invert[2] = {-1, -1}; /* camera X, Y: -1 as the game's save (not written), 0 default, 1 invert */ int upscale_mode = 0; /* 0 bilinear (default), 1 AMD FSR 1, 2 AMD CAS (upscale.h) */ int fsr_sharp = upscale::kSharpDefault; /* FSR sharpness, % */ int cas_sharp = upscale::kCasDefault; /* CAS sharpness, % */ int fxaa = 0; /* 0 off (default), 1 FXAA, 2 FXAA extreme */ int aspect = 0; /* 0 16:9 (default), 1 21:9, 2 32:9, 3 auto (aspect.h) */ };
 
 struct KeyAction { const char* cvar; const char* def; };
 constexpr int kKeyN = 24;
@@ -416,6 +417,20 @@ constexpr int kIdUpLbl = 182, kIdUp = 183, kIdFsrLbl = 184, kIdFsr = 185, kIdFsr
               kIdUpNote = 187, kIdCasLbl = 188, kIdCas = 189, kIdCasVal = 190, kIdFxaaLbl = 191,
               kIdFxaa = 192;
 std::wstring PctText(int v) { return std::to_wstring(v) + L"%"; }
+
+// Graphics -> aspect ratio (ultrawide, Hor+; aspect.h). Set when the game starts.
+struct AspectText { const wchar_t *lbl, *r169, *r219, *r329, *auto_; };
+const AspectText kAspectText[] = {
+    {L"Aspect ratio:", L"16:9 (original, default)", L"21:9 (ultrawide)", L"32:9 (super ultrawide)",
+     L"Auto (the screen's shape)"},
+    {L"Relaci\u00f3n de aspecto:", L"16:9 (original, por defecto)", L"21:9 (ultrapanor\u00e1mica)",
+     L"32:9 (s\u00faper ultrapanor\u00e1mica)", L"Autom\u00e1tica (forma de la pantalla)"},
+    {L"Format d'image :", L"16:9 (original, par d\u00e9faut)", L"21:9 (ultra-large)",
+     L"32:9 (super ultra-large)", L"Auto (format de l'\u00e9cran)"},
+    {L"Proporzioni:", L"16:9 (originale, predefinito)", L"21:9 (ultrawide)", L"32:9 (super ultrawide)",
+     L"Automatico (forma dello schermo)"},
+};
+constexpr int kIdAspectLbl = 193, kIdAspect = 194;
 
 const wchar_t* const kExclText[] = {L"Exclusive fullscreen", L"Pantalla completa exclusiva",
                                     L"Plein écran exclusif", L"Schermo intero esclusivo"};
@@ -1006,6 +1021,9 @@ void ApplySettingsTexts(HWND h, const SettingsState& st) {
   SetDlgItemTextW(h, kIdFxaaLbl, up.fxaa);
   FillCombo(h, kIdFxaa, {up.fxaa_off, up.fxaa_on, up.fxaa_extreme});
   SetDlgItemTextW(h, kIdUpNote, up.note);
+  const AspectText& at = kAspectText[st.sel];
+  SetDlgItemTextW(h, kIdAspectLbl, at.lbl);
+  FillCombo(h, kIdAspect, {at.r169, at.r219, at.r329, at.auto_});
   SetDlgItemTextW(h, kIdXWarn, t.xwarn);
   const wchar_t* fx_lbl[5] = {t.sepia, t.blood, t.dof, t.bloom, t.focus};
   for (int i = 0; i < 5; ++i) {
@@ -1103,6 +1121,7 @@ LRESULT CALLBACK SettingsProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       o.cas_sharp = std::clamp(static_cast<int>(SendDlgItemMessageW(h, kIdCas, TBM_GETPOS, 0, 0)),
                                upscale::kCasLo, upscale::kCasHi);
       o.fxaa = std::clamp(Cur(h, kIdFxaa), 0, upscale::kFxaaModes - 1);
+      o.aspect = std::clamp(Cur(h, kIdAspect), 0, aspect::kModes - 1);
       o.control = std::clamp(Cur(h, kIdCtrl), 0, 2);
       for (int r = 0; r < 3; ++r)
         o.mouse[r] = std::clamp(static_cast<int>(SendDlgItemMessageW(h, kIdXMouse + r, TBM_GETPOS, 0, 0)),
@@ -1139,7 +1158,7 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   auto S = [&](int v) { return static_cast<int>(v * sc + 0.5); };
   const bool adv = REXCVAR_GET(advanced);
   const DWORD style = WS_CAPTION | WS_SYSMENU;
-  const int yLine2 = 440, yCheck = 450, yHint = 474, yBtn = 504, yEnd = yBtn + 32 + 14;
+  const int yLine2 = 478, yCheck = 488, yHint = 512, yBtn = 542, yEnd = yBtn + 32 + 14;
   RECT rc{0, 0, S(480), S(yEnd)};
   AdjustWindowRectEx(&rc, style, FALSE, WS_EX_DLGMODALFRAME);
   RECT orc{};
@@ -1178,11 +1197,13 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   HWND scale = row(0, 104, kIdScaleLbl, kIdScale);
   for (auto* i : {L"1x (720p)", L"2x (1440p)", L"3x (2160p)"})
     SendMessageW(scale, CB_ADDSTRING, 0, (LPARAM)i);
-  row(0, 142, kIdFpsLbl, kIdFps);
-  row(0, 180, kIdXVsyncLbl, kIdXVsync);
+  // Aspect ratio (ultrawide, Hor+; aspect.h).
+  row(0, 142, kIdAspectLbl, kIdAspect);
+  row(0, 180, kIdFpsLbl, kIdFps);
+  row(0, 218, kIdXVsyncLbl, kIdXVsync);
   // Upscaling (the presenter's effect), FSR and CAS sharpness (percent sliders),
   // anti-aliasing (FXAA), with a short note.
-  row(0, 218, kIdUpLbl, kIdUp);
+  row(0, 256, kIdUpLbl, kIdUp);
   auto pct_slider = [&](int yy, int lbl_id, int tb_id, int val_id, int lo, int hi, int step, int v) {
     v = std::clamp(v, lo, hi);
     mk(0, L"STATIC", SS_CENTERIMAGE, lx, yy, lw, 26, lbl_id);
@@ -1195,12 +1216,12 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
     HWND val = mk(0, L"STATIC", SS_CENTERIMAGE | SS_RIGHT, 404, yy, 52, 26, val_id);
     SetWindowTextW(val, PctText(v).c_str());
   };
-  pct_slider(256, kIdFsrLbl, kIdFsr, kIdFsrVal, upscale::kSharpLo, upscale::kSharpHi,
+  pct_slider(294, kIdFsrLbl, kIdFsr, kIdFsrVal, upscale::kSharpLo, upscale::kSharpHi,
              upscale::kSharpStep, opt.fsr_sharp);
-  pct_slider(294, kIdCasLbl, kIdCas, kIdCasVal, upscale::kCasLo, upscale::kCasHi,
+  pct_slider(332, kIdCasLbl, kIdCas, kIdCasVal, upscale::kCasLo, upscale::kCasHi,
              upscale::kCasStep, opt.cas_sharp);
-  row(0, 332, kIdFxaaLbl, kIdFxaa);
-  mk(0, L"STATIC", 0, lx, 370, 432, 60, kIdUpNote);
+  row(0, 370, kIdFxaaLbl, kIdFxaa);
+  mk(0, L"STATIC", 0, lx, 408, 432, 60, kIdUpNote);
   // Gameplay.
   // Difficulty: Game Journalist turns on the player invulnerability. Loading
   // screens: Fast turns off the full lore interlude (afro_interlude_full).
@@ -1245,6 +1266,7 @@ bool ShowSettings(HWND owner, int& sel, bool& remember, Options& opt) {
   SetCur(h, kIdXVsync, opt.vsync ? 1 : 0);
   SetCur(h, kIdUp, std::clamp(opt.upscale_mode, 0, upscale::kModes - 1));
   SetCur(h, kIdFxaa, std::clamp(opt.fxaa, 0, upscale::kFxaaModes - 1));
+  SetCur(h, kIdAspect, std::clamp(opt.aspect, 0, aspect::kModes - 1));
   SetCur(h, kIdCtrl, std::clamp(opt.control, 0, 2));
   SetCur(h, kIdCheatInv, opt.invuln ? 1 : 0);
   SetCur(h, kIdLore, opt.lore ? 1 : 0);
@@ -1610,6 +1632,16 @@ unsigned ShowPicker(unsigned initial, bool* remember, Options* o) {
 
 }  // namespace
 
+// The primary screen's size (Auto aspect ratio): only its shape is used, so
+// logical or physical pixels give the same answer.
+int ScreenDim(bool w) {
+  MONITORINFO mi{sizeof(mi)};
+  if (!GetMonitorInfoW(MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY), &mi)) return 0;
+  return w ? mi.rcMonitor.right - mi.rcMonitor.left : mi.rcMonitor.bottom - mi.rcMonitor.top;
+}
+int ScreenW() { return ScreenDim(true); }
+int ScreenH() { return ScreenDim(false); }
+
 unsigned ApplyStartupLanguage() {
   // Explicit --user_language (command line / env / toml) wins.
   for (auto& f : rex::cvar::GetRegistry()) {
@@ -1651,6 +1683,8 @@ unsigned ApplyStartupLanguage() {
         opt.cas_sharp = std::clamp(std::atoi(line.c_str() + 14), upscale::kCasLo, upscale::kCasHi);
       if (line.rfind("fxaa=", 0) == 0)
         opt.fxaa = std::clamp(std::atoi(line.c_str() + 5), 0, upscale::kFxaaModes - 1);
+      if (line.rfind("aspect=", 0) == 0)
+        opt.aspect = std::clamp(std::atoi(line.c_str() + 7), 0, aspect::kModes - 1);
       for (int r = 0; r < 3; ++r) {
         std::string k = std::string(kMouse[r].key) + "=";
         if (line.rfind(k, 0) == 0)
@@ -1745,6 +1779,7 @@ unsigned ApplyStartupLanguage() {
         << "\nscale=" << opt.scale << "\ndifficulty=" << opt.invuln
         << "\nupscale=" << opt.upscale_mode << "\nfsr_sharpness=" << opt.fsr_sharp
         << "\ncas_sharpness=" << opt.cas_sharp << "\nfxaa=" << opt.fxaa
+        << "\naspect=" << opt.aspect
         << "\nversion=" << AFRO_VERSION << "\n";
     for (int r = 0; r < 3; ++r) out << kMouse[r].key << "=" << opt.mouse[r] << "\n";
     for (int i = 0; i < kKeyN; ++i) out << KeyCfgName(i) << "=" << opt.keys[i] << "\n";
@@ -1840,8 +1875,30 @@ unsigned ApplyStartupLanguage() {
                "[afro] render_target_path_d3d12 requested=%s (launcher rt=%d%s)\n",
                rt_req, opt.adv[0],
                rt_explicit ? "; cmdline/config already set" : "");
-  if (!Explicit("resolution_scale") && opt.scale > 1)
+  // Aspect ratio (Settings -> Graphics; aspect.h): wider than 16:9 renders the
+  // game's 1280x720 with more columns than rows, presents it at that aspect and
+  // widens the cameras (afro_aspect). Auto takes the shape of the screen the game
+  // opens on (the primary one). An explicit scale, video mode or afro_aspect on
+  // the command line wins.
+  const double ratio = aspect::Ratio(opt.aspect, ScreenW(), ScreenH());
+  const bool scale_explicit = Explicit("resolution_scale") ||
+                              Explicit("draw_resolution_scale_x") ||
+                              Explicit("draw_resolution_scale_y");
+  if (aspect::IsWide(ratio)) {
+    if (!Explicit("afro_aspect")) SetCvar("afro_aspect", std::to_string(ratio));
+    if (!Explicit("video_mode_width") && !Explicit("video_mode_height")) {
+      SetCvar("video_mode_width", std::to_string(aspect::VideoModeWidth(ratio)));
+      SetCvar("video_mode_height", "720");
+    }
+    if (!scale_explicit) {
+      SetCvar("draw_resolution_scale_x", std::to_string(aspect::ScaleX(opt.scale, ratio)));
+      SetCvar("draw_resolution_scale_y", std::to_string(opt.scale));
+    }
+  } else if (!scale_explicit && opt.scale > 1) {
     SetCvar("resolution_scale", std::to_string(opt.scale));
+  }
+  std::fprintf(stderr, "[afro] aspect=%d ratio %.4f (screen %dx%d)\n", opt.aspect, ratio, ScreenW(),
+               ScreenH());
   // Upscaling (Settings -> Graphics): the presenter's effect, FSR and CAS sharpness,
   // and FXAA (upscale.h). The defaults (bilinear, 90 %, 0 %, off) are the runtime's
   // own: nothing to set. swap_post_effect is a GPU plugin cvar (deferred via REX_).

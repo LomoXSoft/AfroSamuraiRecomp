@@ -92,6 +92,11 @@ REXCVAR_DEFINE_INT32(afro_invert_x, -1, "Afro",
 REXCVAR_DEFINE_INT32(afro_invert_y, -1, "Afro",
                      "Camera Y axis: -1 as the game's save, 0 default, 1 invert");
 
+// Picture aspect ratio (launcher / F1 / RecompLauncher "aspect", aspect.h), set at
+// start-up. 0 or 16:9 = the original picture. Wider: Hor+ (see AfroAspectWidenHook).
+REXCVAR_DEFINE_DOUBLE(afro_aspect, 0.0, "Afro",
+                      "Picture aspect ratio, Hor+ (0 = 16:9 original; set at start-up)");
+
 namespace {
 struct FxFlag { const char* name; uint32_t addr; bool (*on)(); };
 const FxFlag kFx[] = {
@@ -1044,6 +1049,158 @@ void AfroDt30_f1(PPCRegister& f1) { AfroDt30Rewrite(f1); }
 void AfroDt30_f9(PPCRegister& f9) { AfroDt30Rewrite(f9); }
 void AfroDt30_f31(PPCRegister& f31) { AfroDt30Rewrite(f31); }
 
+// Ultrawide, Hor+. The game draws 1280x720 (back buffer and effect targets are
+// hard-coded) and builds every camera with the 16:9 at 0x828B1404 + 28. The
+// runtime renders that picture wider than tall (draw_resolution_scale_x > _y,
+// language_picker.cpp) and presents it at afro_aspect (video_mode_width/height),
+// so each 16:9 camera has to see more at the sides to match.
+// sub_826B10E8 builds a camera's projection at +352 from near +176, far +180,
+// width +184 and height +188 (at the near plane), orthographic when +208 is 1.
+namespace {
+double AspectWiden() {  // > 1 when the picture is wider than 16:9
+  const double a = REXCVAR_GET(afro_aspect);
+  const double k = a / (16.0 / 9.0);
+  return k > 1.001 ? k : 1.0;
+}
+template <typename M>
+float LoadF(M* mem, uint32_t addr) {
+  const uint32_t u = rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(addr));
+  float f;
+  std::memcpy(&f, &u, 4);
+  return f;
+}
+template <typename M>
+void StoreF(M* mem, uint32_t addr, float f) {
+  uint32_t u;
+  std::memcpy(&u, &f, 4);
+  rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(addr), u);
+}
+bool IsRatio(float w, float h, double r) {
+  return h != 0.f && std::fabs(std::fabs(double(w) / double(h)) - r) < 2e-3 * r;
+}
+bool Is169(float w, float h) { return IsRatio(w, h, 16.0 / 9.0); }
+
+// Screens the game draws for a 16:9 screen in screen space, which a wider picture
+// would stretch: full-screen movies (Bink, 1280x720) and the loading screen. While
+// one shows, the cameras are not widened and the presenter gets 16:9 back, so it
+// looks as on the original picture, with bars at the sides (AspectScreenTick).
+// The start-up logos (on black) also keep their original 16:9 framing: from the
+// start until the first full-screen movie (the intro, or the title screen's
+// background when the logos are skipped).
+std::atomic<uint64_t> g_movie_frame{0};  // g_frames + 1 at the last 1280x720 BinkWait
+std::atomic<bool> g_aspect_169{true};
+// Loading screen: the transition state machine (InterludeTick) shows it in states
+// 6 (the lore) to 9 (fades around it).
+constexpr uint32_t kTransitionState = AfroGameAddr(0x828E62C0);
+}  // namespace
+
+// Widen a 16:9 camera (width +184 = height +188 * aspect), or, while a 16:9
+// screen shows, give a camera widened earlier its 16:9 width back (panes and
+// cameras can outlive a switch). Both are no-ops on the other shape, so a rebuild
+// does not change a camera twice. Returns the new width, 0 when unchanged.
+static float AspectCamera(uint32_t cam, double k) {
+  auto* mem = rex::system::kernel_memory();
+  if (!mem || cam < 0x1000) return 0.f;
+  const float w = LoadF(mem, cam + 184), h = LoadF(mem, cam + 188);
+  float nw = 0.f;
+  if (!g_aspect_169.load(std::memory_order_relaxed)) {
+    if (Is169(w, h)) nw = float(double(w) * k);
+  } else if (IsRatio(w, h, 16.0 / 9.0 * k)) {
+    nw = float(double(w) / k);
+  }
+  if (nw != 0.f) StoreF(mem, cam + 184, nw);
+  return nw;
+}
+
+// sub_825B1610 right after XGetVideoMode: the game keeps a 1280x720 (16:9) display,
+// whatever video mode the presenter was given for the wide aspect.
+void AfroAspectVideoModeHook(PPCRegister& r1) {
+  if (AspectWiden() <= 1.0) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(r1.u32 + 80), 1280);
+  rex::memory::store_and_swap<uint32_t>(mem->TranslateVirtual(r1.u32 + 84), 720);
+}
+
+// Perspective branch (loc_826B1190), before width/height are read: a 16:9 camera
+// keeps its height and gets width = height * aspect (AspectCamera). Written to the
+// camera, so everything that reads it later (culling included) sees the wider view.
+void AfroAspectWidenHook(PPCRegister& r3) {
+  const double k = AspectWiden();
+  if (k <= 1.0) return;
+  const float w = AspectCamera(r3.u32, k);
+  static std::atomic<bool> logged{false};
+  if (w != 0.f && !logged.exchange(true))
+    REXLOG_INFO("afro aspect: perspective camera {:08X} width -> {:.5f} (x{:.4f})", r3.u32, w, k);
+}
+
+// Orthographic branch (0x826B10F4), before width/height are read: the same for the
+// 2D panes (menus, HUD). Their elements are laid out from the middle, so they stay
+// 16:9 in the middle of the wider view, and panes that show a full-screen picture
+// (render targets, sized from the camera's width) still fill it.
+void AfroAspectOrthoHook(PPCRegister& r3) {
+  const double k = AspectWiden();
+  if (k <= 1.0) return;
+  const float w = AspectCamera(r3.u32, k);
+  static std::atomic<bool> logged{false};
+  if (w != 0.f && !logged.exchange(true))
+    REXLOG_INFO("afro aspect: orthographic camera {:08X} width -> {:.3f} (x{:.4f})", r3.u32, w, k);
+}
+
+// BinkWait (sub_82831468) entry, called each frame a movie plays: r3 = the BINK,
+// which starts with its width and height. 1280x720 = a full-screen movie (menu and
+// skill movies are 640x480 or smaller and sit in the 16:9 panes).
+void AfroAspectBinkHook(PPCRegister& r3) {
+  if (AspectWiden() <= 1.0 || r3.u32 < 0x1000) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  const uint32_t w = rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(r3.u32));
+  const uint32_t h = rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(r3.u32 + 4));
+  if (w == 1280 && h == 720) g_movie_frame.store(g_frames + 1, std::memory_order_relaxed);
+}
+
+// Asked by the GPU plugin at every swap (patches/rexglue/
+// zzzzzzzzzzzzz-afro-aspect-screens.patch, looked up by name): 1 and 16:9 while a
+// 16:9 screen shows, else 0 and the video mode's (wide) aspect stays.
+extern "C" __declspec(dllexport) int afro_display_aspect(uint32_t* w, uint32_t* h) {
+  if (AspectWiden() <= 1.0 || !g_aspect_169.load(std::memory_order_relaxed)) return 0;
+  *w = 1280;
+  *h = 720;
+  return 1;
+}
+
+namespace {
+// Once per guest frame (AfroSwapHook): a 16:9 screen (start-up logos, movie or
+// loading screen) stops the widening and the presenter shows the picture at 16:9
+// (afro_display_aspect); afterwards the wide picture comes back.
+void AspectScreenTick() {
+  if (AspectWiden() <= 1.0) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  const uint32_t ts = rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kTransitionState));
+  static uint32_t last_ts = ~0u;
+  if (ts != last_ts) {
+    last_ts = ts;
+    REXLOG_INFO("afro aspect: transition state {}", ts);
+  }
+  const uint64_t mf = g_movie_frame.load(std::memory_order_relaxed);
+  const bool movie = mf && g_frames + 1 - mf < 4;
+  const bool loading = ts >= 6 && ts <= 9;
+  static bool logos = true;  // until the first full-screen movie
+  if (movie) logos = false;
+  const bool want = logos || movie || loading;
+  static bool logged_start = false;
+  if (!logged_start) {
+    logged_start = true;
+    REXLOG_INFO("afro aspect: 16:9 screen (start-up logos)");
+  }
+  if (want == g_aspect_169.load(std::memory_order_relaxed)) return;
+  g_aspect_169.store(want, std::memory_order_relaxed);
+  REXLOG_INFO("afro aspect: {} ({})", want ? "16:9 screen" : "wide picture",
+              want ? (movie ? "movie" : loading ? "loading screen" : "start-up logos") : "back");
+}
+}  // namespace
+
 
 // sub_82676300 timeType converter (anim/NTG property eval).
 // mode0: *=1/30 (frameIn30hz), mode1: *=1/60, mode2: raw, 3/4: other.
@@ -1135,6 +1292,7 @@ void AfroSwapHook(PPCRegister& r31) {
   InvertTick();
   TickModeOnce();
   FxTick();
+  AspectScreenTick();
   PlayerInvulnTick();
   ForceDevicePresentInterval(r31.u32);
   ForceExperimentalPrimaryDt();

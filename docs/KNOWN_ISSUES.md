@@ -39,6 +39,26 @@ the Git history and the release notes in `docs/releases/`.
   upscaled picture; this setting does not change them.
 - Only the spatial FSR 1 is included. The runtime's temporal FSR 2 / 3 path is
   not built.
+- Aspect ratio (21:9, 32:9, Auto; not released yet): checked on one PC with a
+  16:9 screen (AMD Radeon RX 9060 XT), in a window of the wide shape, on the
+  Europe disc: start-up logos, intro movie, title screen, main menu, loading
+  screen, one level (walking and turning), pause menu and the in-game options.
+  Not checked on a real ultrawide monitor, in combat (HUD), in in-engine
+  cutscenes or open levels.
+- With a wide aspect, the start-up logos, full-screen movies, loading screens and
+  the menus over the title screen's movie show at 16:9 with black bars at the
+  sides: they are drawn for a 16:9 screen.
+- 21:9 is 64:27 (2560x1080). On a 3440x1440 screen it leaves thin bars (under 1 %
+  of the width); **Auto** uses the screen's exact shape.
+- A wider picture costs GPU time: 32:9 renders twice the pixels of 16:9 at the
+  same internal resolution (2560x720 at 1x, 5120x1440 at 2x). On the test PC 32:9
+  at 1x kept 60 FPS; 5120x1440 dipped to about 53 FPS while walking.
+- At 32:9 the sides of the 3D scene look stretched, as with any very wide field
+  of view.
+- Effects that blur over a fixed number of the game's pixels (bloom, depth of
+  field) spread a little more sideways on a wide picture.
+- In a window, the window takes the picture's shape (2560x720 for 32:9 at 100 %
+  display scaling), which can be wider than a 16:9 screen.
 
 ## Controls and button prompts
 - The game's prompts for A, B, X, Y, LB, LT, RT and the D-pad follow your device.

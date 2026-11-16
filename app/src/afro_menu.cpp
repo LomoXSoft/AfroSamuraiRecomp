@@ -211,6 +211,8 @@ std::vector<Item> MakeItems() {
   static T4 lVsync = {"VSync", "VSync", "VSync", "VSync"};
   static T4 lScale = {"Internal resolution", "Resoluci\xC3\xB3n interna", "R\xC3\xA9solution interne",
                       "Risoluzione interna"};
+  static T4 lAspect = {"Aspect ratio", "Relaci\xC3\xB3n de aspecto", "Format d'image",
+                       "Proporzioni"};
   static T4 lUpscale = {"Upscaling", "Escalado", "Mise \xC3\xA0 l'\xC3\xA9" "chelle",
                         "Ridimensionamento"};
   static T4 lFsrSharp = {"FSR sharpness", "Nitidez de FSR", "Nettet\xC3\xA9 FSR", "Nitidezza FSR"};
@@ -278,6 +280,17 @@ std::vector<Item> MakeItems() {
           {{"2x (1440p)", "2x (1440p)", "2x (1440p)", "2x (1440p)"}, {{"scale", "2"}}},
           {{"3x (2160p)", "3x (2160p)", "3x (2160p)", "3x (2160p)"}, {{"scale", "3"}}}},
          {{"scale", "1"}}, nullptr, true);
+  // Aspect ratio (ultrawide, Hor+; aspect.h): the picture's size and cameras are
+  // set when the game starts.
+  choice(lAspect,
+         {{{"16:9 (original)", "16:9 (original)", "16:9 (original)", "16:9 (originale)"},
+           {{"aspect", "0"}}},
+          {{"21:9", "21:9", "21:9", "21:9"}, {{"aspect", "1"}}},
+          {{"32:9", "32:9", "32:9", "32:9"}, {{"aspect", "2"}}},
+          {{"Auto (screen)", "Autom\xC3\xA1tica (pantalla)", "Auto (\xC3\xA9" "cran)",
+            "Automatico (schermo)"},
+           {{"aspect", "3"}}}},
+         {{"aspect", "0"}}, nullptr, true);
   // Upscaling: the presenter's present_effect, applied at once (the runtime
   // reloads it when the cvar changes). FSR only upscales when the window is
   // larger than the game's picture; at the same size it sharpens.

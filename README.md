@@ -74,6 +74,9 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
 - **AMD FSR 1 and CAS** upscaling (0.3.3): sharper edges when your screen is larger than
   the game's picture. Bilinear, the original look, stays the default. **FXAA**
   anti-aliasing smooths jagged edges (off by default).
+- **Ultrawide screens** (21:9 and 32:9, not released yet): the game shows more
+  of the scene at the sides instead of black bars; menus and the HUD stay 16:9
+  in the middle. 16:9 stays the default. See [Launcher and options](#launcher-and-options).
 - **Native multi-controller support** through SDL. Tested: Xbox, PlayStation
   (DualShock 4/DualSense, USB and Bluetooth), a Switch controller and a generic
   controller. Steam Deck and other controllers are not tested.
@@ -87,7 +90,7 @@ at 60. See [60 FPS](#60-fps) and [Status and limitations](#status-and-limitation
   smoothing are sliders in the launcher.
 - **60 FPS** (0.2.0): the whole game, cutscenes included, at the right speed.
 - **Launcher**: language, Play, Settings and saved games. Settings has Graphics
-  (display, resolution, frame rate, VSync, upscaling, anti-aliasing), Gameplay (difficulty), Controls
+  (display, resolution, aspect ratio, frame rate, VSync, upscaling, anti-aliasing), Gameplay (difficulty), Controls
   (control mode, mouse, key bindings) and Experimental (effects, render path) tabs.
 - **Fixes over earlier recompilation builds**: all cutscene voices, black frames,
   and the headband texture.
@@ -413,11 +416,11 @@ folder back into `Documents\afrorecomp\`).
 Press **F1**, or hold both stick clicks (L3 + R3) for half a second, to open the
 options over the paused game (a note at the bottom left says so for a few
 seconds after the game starts). It has the launcher's main settings: display, frame
-rate, VSync, internal resolution, upscaling with FSR and CAS sharpness,
+rate, VSync, internal resolution, aspect ratio, upscaling with FSR and CAS sharpness,
 anti-aliasing, difficulty, loading screens, language, control mode, camera X and Y
 invert, the three mouse sliders and the Experimental effects. Each change is saved
 to `afro_language.cfg` at once; most also apply at once, and the ones marked
-**(after restart)** (internal resolution, language, control mode) apply the next
+**(after restart)** (internal resolution, aspect ratio, language, control mode) apply the next
 time the game starts. Move with the D-pad or the arrow keys, change with left and
 right, and close with B, Start, Back, Esc or F1 again (the game ignores that press).
 Key bindings stay in the launcher.
@@ -430,6 +433,16 @@ language (English, Español, Français, Italiano) and three buttons: **Play**,
   whole screen, no display mode change, instant Alt+Tab; **Window**; or **Exclusive
   fullscreen**, which takes the display), internal resolution (1x native by default /
   2x / 3x), frame rate (**30 (original, default)** or **60**) and VSync.
+  **Aspect ratio** is for ultrawide screens: **16:9 (original, default)**, **21:9
+  (ultrawide)**, **32:9 (super ultrawide)** or **Auto**, which takes the shape of
+  the screen the game opens on (16:9, 16:10 and 4:3 screens keep 16:9; up to
+  32:9). Wider than 16:9, the game shows more of the scene at the sides, not a
+  stretched picture: the cameras are widened and the game's picture is rendered
+  wider than tall (21:9 at 1x internal resolution renders 2560x720 and 32:9 at 2x
+  renders 5120x1440). Menus and the HUD stay 16:9 in the middle. The start-up
+  logos, the full-screen movies and the loading screens were made for 16:9 and
+  show at 16:9 with black bars at the sides. It applies when the game starts.
+  See [Known issues](docs/KNOWN_ISSUES.md#graphics).
   **Upscaling** sets how the game's picture is stretched to your screen:
   **Bilinear (original, default)**, the look of earlier versions; **AMD FSR 1**,
   which keeps edges sharp when the screen or window is larger than the game's
@@ -474,7 +487,7 @@ it there runs this project's setup (pick your disc image in it as usual). An
 installation you already have works too: in RecompLauncher, Settings → Developers →
 Developer tools, then **Add a build** and pick its `game` folder. The setup puts a
 `recomplauncher.json` in the installation folder and next to `afrorecomp.exe`. RecompLauncher starts the game and shows its settings
-(language, display, internal resolution, frame rate, VSync, upscaling, anti-aliasing,
+(language, display, internal resolution, aspect ratio, frame rate, VSync, upscaling, anti-aliasing,
 difficulty, loading screens, controls, camera invert), which it writes to `afro_language.cfg`; it also backs up the
 saves. FSR and CAS sharpness and the mouse sensitivity, dead zone and smoothing are sliders there, and a button
 clears the shader cache. Started from RecompLauncher, the game's own launcher window

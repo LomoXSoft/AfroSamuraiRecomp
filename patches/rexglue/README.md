@@ -1,5 +1,15 @@
 # ReXGlue GPU plugin and runtime patches
 
+## zzzzzzzzzzzzz-afro-aspect-screens.patch (GPU plugin, our own)
+Modifies BSD-3 ReXGlue code and is distributed under the same BSD 3-Clause
+license; code only. At each swap the D3D12 command processor asks the executable
+for the display aspect of this frame (`afro_display_aspect`, looked up by name in
+the running executable, so other executables are not affected) before it hands
+the picture to the presenter. With a wide aspect ratio setting, afrorecomp.exe
+answers 16:9 while the start-up logos, a full-screen movie or a loading screen
+show, so they keep their 16:9 shape with bars at the sides; otherwise the video
+mode's aspect is used as before. The Vulkan path is not changed.
+
 ## xenia-d119505.patch (backport of xenia-canary d119505, part A)
 
 Base: ReXGlue `development` @ `bd833a2a` (same commit as the SDK nightly

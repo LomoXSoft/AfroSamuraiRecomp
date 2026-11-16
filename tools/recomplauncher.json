@@ -130,6 +130,41 @@
       "group": "Graphics"
     },
     {
+      "id": "aspect",
+      "label": "Aspect ratio",
+      "help": "Wider than 16:9 shows more of the scene at the sides (ultrawide screens); menus and HUD stay 16:9 in the middle. Auto takes the shape of the screen. Applies when the game starts.",
+      "defaults": {
+        "aspect": "0"
+      },
+      "choices": [
+        {
+          "label": "16:9 (original)",
+          "set": {
+            "aspect": "0"
+          }
+        },
+        {
+          "label": "21:9 (ultrawide)",
+          "set": {
+            "aspect": "1"
+          }
+        },
+        {
+          "label": "32:9 (super ultrawide)",
+          "set": {
+            "aspect": "2"
+          }
+        },
+        {
+          "label": "Auto (the screen's shape)",
+          "set": {
+            "aspect": "3"
+          }
+        }
+      ],
+      "group": "Graphics"
+    },
+    {
       "id": "fps",
       "label": "Frame rate",
       "help": "60 plays the whole game, cutscenes included, at 60 FPS.",
