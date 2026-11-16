@@ -2,7 +2,7 @@
 
 Newest first. Versions are in `app/VERSION`.
 
-## Unreleased
+## 0.3.5 – Ultrawide
 - Aspect ratio setting for ultrawide screens: **16:9 (original)**, the default,
   **21:9 (ultrawide)**, **32:9 (super ultrawide)** or **Auto** (the shape of the
   screen the game opens on, from 16:9 up to 32:9). In the launcher (Settings ->

@@ -39,7 +39,7 @@ the Git history and the release notes in `docs/releases/`.
   upscaled picture; this setting does not change them.
 - Only the spatial FSR 1 is included. The runtime's temporal FSR 2 / 3 path is
   not built.
-- Aspect ratio (21:9, 32:9, Auto; not released yet): checked on one PC with a
+- Aspect ratio (21:9, 32:9, Auto; new in v0.3.5): checked on one PC with a
   16:9 screen (AMD Radeon RX 9060 XT), in a window of the wide shape, on the
   Europe disc: start-up logos, intro movie, title screen, main menu, loading
   screen, one level (walking and turning), pause menu, quitting back to the
