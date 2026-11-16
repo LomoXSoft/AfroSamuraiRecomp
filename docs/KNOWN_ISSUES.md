@@ -43,10 +43,10 @@ the Git history and the release notes in `docs/releases/`.
   16:9 screen (AMD Radeon RX 9060 XT), in a window of the wide shape, on the
   Europe disc: start-up logos, intro movie, title screen, main menu, loading
   screen, one level (walking and turning), pause menu, quitting back to the
-  title screen and the in-game options; on the USA disc: start-up, title screen
-  and one level at 21:9.
-  Not checked on a real ultrawide monitor, in combat (HUD), in in-engine
-  cutscenes or open levels.
+  title screen and the in-game options, Level Select, the Daimyo level's opening
+  cutscene (with subtitles), an in-level dialogue scene and the first fight in its
+  open street; on the USA disc: start-up, title screen and one level at 21:9.
+  Not checked on a real ultrawide monitor.
 - With a wide aspect, the start-up logos, full-screen movies, loading screens and
   the menus over the title screen's movie show at 16:9 with black bars at the
   sides: they are drawn for a 16:9 screen.
@@ -59,6 +59,9 @@ the Git history and the release notes in `docs/releases/`.
   of view.
 - Effects that blur over a fixed number of the game's pixels (bloom, depth of
   field) spread a little more sideways on a wide picture.
+- In-engine cutscenes are wide too. Their sets were built for the 16:9 frame, so
+  at the sides the wider view can show where a set ends (small black areas were
+  seen at the edges of two shots of the Daimyo level's opening cutscene).
 - A few 2D overlays cover only the 16:9 middle on a wide picture: the dark
   backdrop of the pause menu's quit question leaves the game visible at the sides.
 - In a window, the window takes the picture's shape (2560x720 for 32:9 at 100 %
