@@ -6,8 +6,8 @@ license; code only. At each swap the D3D12 command processor asks the executable
 for the display aspect of this frame (`afro_display_aspect`, looked up by name in
 the running executable, so other executables are not affected) before it hands
 the picture to the presenter. With a wide aspect ratio setting, afrorecomp.exe
-answers 16:9 while the start-up logos, a full-screen movie or a loading screen
-show, so they keep their 16:9 shape with bars at the sides; otherwise the video
+answers 16:9 while the start-up logos or a full-screen movie show, so they keep
+their 16:9 shape with bars at the sides; otherwise the video
 mode's aspect is used as before. The Vulkan path is not changed.
 
 ## xenia-d119505.patch (backport of xenia-canary d119505, part A)

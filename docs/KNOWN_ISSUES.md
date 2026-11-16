@@ -47,9 +47,11 @@ the Git history and the release notes in `docs/releases/`.
   cutscene (with subtitles), an in-level dialogue scene and the first fight in its
   open street; on the USA disc: start-up, title screen and one level at 21:9.
   Not checked on a real ultrawide monitor.
-- With a wide aspect, the start-up logos, full-screen movies, loading screens and
-  the menus over the title screen's movie show at 16:9 with black bars at the
-  sides: they are drawn for a 16:9 screen.
+- With a wide aspect, the start-up logos, full-screen movies and the menus over
+  the title screen's movie show at 16:9 with black bars at the sides: they are
+  drawn for a 16:9 screen.
+- Loading screens are wide. Their white background is a lit sheet in 3D: at 21:9
+  thin dark edges show at the sides, at 32:9 wide dark slanted areas.
 - 21:9 is 64:27 (2560x1080). On a 3440x1440 screen it leaves thin bars (under 1 %
   of the width); **Auto** uses the screen's exact shape.
 - A wider picture costs GPU time: 32:9 renders twice the pixels of 16:9 at the

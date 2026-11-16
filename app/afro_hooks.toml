@@ -245,3 +245,10 @@ registers = ["r3"]
 address = 0x82831468
 name = "AfroAspectBinkHook"
 registers = ["r3"]
+
+# Loading screen text, before sub_826B8518 calls sub_826B41F0: keep it in the 16:9
+# middle on a wider picture (afro_aspect).
+[[midasm_hook]]
+address = 0x826B8690
+name = "AfroAspectLoadingTextHook"
+registers = ["r8", "f1"]

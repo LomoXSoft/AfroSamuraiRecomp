@@ -15,10 +15,14 @@ Newest first. Versions are in `app/VERSION`.
   hooks (`AfroAspect*Hook`, cvar `afro_aspect`) widen each 16:9 camera: perspective
   cameras for the 3D scene, orthographic ones for the menus and HUD, which stay
   16:9 in the middle. The game itself still sees a 1280x720 display.
-- Start-up logos, full-screen movies (Bink, 1280x720, found by a hook on
-  `BinkWait`) and loading screens are drawn for 16:9: they show at 16:9 with bars
-  at the sides. New runtime patch `zzzzzzzzzzzzz-afro-aspect-screens.patch` lets
-  the executable switch the presenter's aspect per frame (`afro_display_aspect`).
+- Start-up logos and full-screen movies (Bink, 1280x720, found by a hook on
+  `BinkWait`) are drawn for 16:9: they show at 16:9 with bars at the sides. New
+  runtime patch `zzzzzzzzzzzzz-afro-aspect-screens.patch` lets the executable
+  switch the presenter's aspect per frame (`afro_display_aspect`).
+- Loading screens and in-engine cutscenes stay wide. The loading screen's
+  "Loading" / "Press any button to continue" text is drawn in screen pixels; a hook
+  before it is drawn (`AfroAspectLoadingTextHook`) gives it its place and width in
+  the 16:9 middle.
 - `checks/test_aspect.cpp` checks the ratios, scales and video modes per choice.
 
 ## 0.3.4 – Black screen fix

@@ -1081,17 +1081,14 @@ bool IsRatio(float w, float h, double r) {
 bool Is169(float w, float h) { return IsRatio(w, h, 16.0 / 9.0); }
 
 // Screens the game draws for a 16:9 screen in screen space, which a wider picture
-// would stretch: full-screen movies (Bink, 1280x720) and the loading screen. While
-// one shows, the cameras are not widened and the presenter gets 16:9 back, so it
-// looks as on the original picture, with bars at the sides (AspectScreenTick).
+// would stretch: full-screen movies (Bink, 1280x720). While one shows, the cameras
+// are not widened and the presenter gets 16:9 back, so it looks as on the
+// original picture, with bars at the sides (AspectScreenTick).
 // The start-up logos (on black) also keep their original 16:9 framing: from the
 // start until the first full-screen movie (the intro, or the title screen's
 // background when the logos are skipped).
 std::atomic<uint64_t> g_movie_frame{0};  // g_frames + 1 at the last 1280x720 BinkWait
 std::atomic<bool> g_aspect_169{true};
-// Loading screen: the transition state machine (InterludeTick) shows it in states
-// 6 (the lore) to 9 (fades around it).
-constexpr uint32_t kTransitionState = AfroGameAddr(0x828E62C0);
 }  // namespace
 
 // Widen a 16:9 camera (width +184 = height +188 * aspect), or, while a 16:9
@@ -1159,6 +1156,27 @@ void AfroAspectBinkHook(PPCRegister& r3) {
   if (w == 1280 && h == 720) g_movie_frame.store(g_frames + 1, std::memory_order_relaxed);
 }
 
+// Loading screen text ("Loading", or "Press any button to continue" while the lore
+// is held, AfroLoadingTextHook): sub_826B8518 draws it in screen pixels of the
+// 1280x720 picture with sub_826B41F0 (f1 = x, f2 = y, r8 = its style from
+// sub_825B48C0; +68 and +72 are the x and y scale). On a wider picture that text
+// would stretch and sit at the far left; here, before the call, it gets the place
+// and width it has in the 16:9 middle. The rest of the loading screen is 3D and panes.
+void AfroAspectLoadingTextHook(PPCRegister& r8, PPCRegister& f1) {
+  const double k = AspectWiden();
+  if (k <= 1.0 || g_aspect_169.load(std::memory_order_relaxed) || r8.u32 < 0x1000) return;
+  auto* mem = rex::system::kernel_memory();
+  if (!mem) return;
+  const double x = f1.f64;
+  f1.f64 = 640.0 + (x - 640.0) / k;
+  const float sx = LoadF(mem, r8.u32 + 68);
+  StoreF(mem, r8.u32 + 68, float(double(sx) / k));
+  static std::atomic<bool> logged{false};
+  if (!logged.exchange(true))
+    REXLOG_INFO("afro aspect: loading text x {:.1f} -> {:.1f}, x scale {:.3f} -> {:.3f} (y scale {:.3f})",
+                x, f1.f64, sx, double(sx) / k, LoadF(mem, r8.u32 + 72));
+}
+
 // Asked by the GPU plugin at every swap (patches/rexglue/
 // zzzzzzzzzzzzz-afro-aspect-screens.patch, looked up by name): 1 and 16:9 while a
 // 16:9 screen shows, else 0 and the video mode's (wide) aspect stays.
@@ -1170,25 +1188,18 @@ extern "C" __declspec(dllexport) int afro_display_aspect(uint32_t* w, uint32_t* 
 }
 
 namespace {
-// Once per guest frame (AfroSwapHook): a 16:9 screen (start-up logos, movie or
-// loading screen) stops the widening and the presenter shows the picture at 16:9
+// Once per guest frame (AfroSwapHook): a 16:9 screen (start-up logos or a movie)
+// stops the widening and the presenter shows the picture at 16:9
 // (afro_display_aspect); afterwards the wide picture comes back.
 void AspectScreenTick() {
   if (AspectWiden() <= 1.0) return;
   auto* mem = rex::system::kernel_memory();
   if (!mem) return;
-  const uint32_t ts = rex::memory::load_and_swap<uint32_t>(mem->TranslateVirtual(kTransitionState));
-  static uint32_t last_ts = ~0u;
-  if (ts != last_ts) {
-    last_ts = ts;
-    REXLOG_INFO("afro aspect: transition state {}", ts);
-  }
   const uint64_t mf = g_movie_frame.load(std::memory_order_relaxed);
   const bool movie = mf && g_frames + 1 - mf < 4;
-  const bool loading = ts >= 6 && ts <= 9;
   static bool logos = true;  // until the first full-screen movie
   if (movie) logos = false;
-  const bool want = logos || movie || loading;
+  const bool want = logos || movie;
   static bool logged_start = false;
   if (!logged_start) {
     logged_start = true;
@@ -1197,7 +1208,7 @@ void AspectScreenTick() {
   if (want == g_aspect_169.load(std::memory_order_relaxed)) return;
   g_aspect_169.store(want, std::memory_order_relaxed);
   REXLOG_INFO("afro aspect: {} ({})", want ? "16:9 screen" : "wide picture",
-              want ? (movie ? "movie" : loading ? "loading screen" : "start-up logos") : "back");
+              want ? (movie ? "movie" : "start-up logos") : "back");
 }
 }  // namespace
 

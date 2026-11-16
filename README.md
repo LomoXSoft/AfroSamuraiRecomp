@@ -439,9 +439,10 @@ language (English, Español, Français, Italiano) and three buttons: **Play**,
   32:9). Wider than 16:9, the game shows more of the scene at the sides, not a
   stretched picture: the cameras are widened and the game's picture is rendered
   wider than tall (21:9 at 1x internal resolution renders 2560x720 and 32:9 at 2x
-  renders 5120x1440). Menus and the HUD stay 16:9 in the middle. The start-up
-  logos, the full-screen movies and the loading screens were made for 16:9 and
-  show at 16:9 with black bars at the sides. It applies when the game starts.
+  renders 5120x1440). Menus, the HUD and the loading screens' text stay 16:9 in
+  the middle; cutscenes and loading screens are wide too. The start-up logos and
+  the full-screen movies were made for 16:9 and show at 16:9 with black bars at
+  the sides. It applies when the game starts.
   See [Known issues](docs/KNOWN_ISSUES.md#graphics).
   **Upscaling** sets how the game's picture is stretched to your screen:
   **Bilinear (original, default)**, the look of earlier versions; **AMD FSR 1**,
