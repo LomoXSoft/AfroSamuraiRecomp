@@ -9,6 +9,7 @@
 # to tools/afrosetup.ico, which stays ignored.
 !tools/artwork/**/*.ico
 tools/afrosetup_header.inc
+tools/afrosetup_version.rc2
 assets/
 app/generated/default/
 app/afro_switch_tables.toml

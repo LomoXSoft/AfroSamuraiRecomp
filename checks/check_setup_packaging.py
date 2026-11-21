@@ -66,6 +66,14 @@ def main() -> None:
     icon = (ROOT / "tools" / "artwork" / "lomorsin-afro" / "icono_32.png").read_bytes()
     if icon not in image:
         fail("setup image is missing the supplied 32px icon")
+    # Version info (Properties > Details) and no suspended child process: an
+    # anonymous unsigned exe that starts a hidden process suspended and then
+    # resumes it is what antivirus heuristics flag as a dropper.
+    for text in ("LomoXSoft", "AfroSamuraiRecomp Setup", f"afrosetup-v{version}.exe"):
+        if text.encode("utf-16-le") not in image:
+            fail(f"version info is missing {text!r}")
+    if "CREATE_SUSPENDED" in cpp or "ResumeThread" in cpp:
+        fail("setup starts a process suspended")
     print("setup packaging checks: ok")
     print(f"  {EXE}  {len(blob)} bytes  amd64 GUI  asInvoker")
     print(f"  payload at {off} size {size}")

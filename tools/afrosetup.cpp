@@ -838,25 +838,33 @@ void StartInstall() {
   PROCESS_INFORMATION pi{};
   std::vector<wchar_t> mutable_cmd(cmd.begin(), cmd.end());
   mutable_cmd.push_back(L'\0');
-  if (!CreateProcessW(nullptr, mutable_cmd.data(), nullptr, nullptr, TRUE,
-                      CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, (tree + L"\\tools").c_str(), &si, &pi)) {
-    CloseHandle(read_pipe);
-    CloseHandle(write_pipe);
-    ShowError(L"PowerShell was not started.");
-    return;
-  }
+  // The job is ready before PowerShell starts, and PowerShell is attached to it
+  // right after CreateProcessW. It is not started suspended: a hidden process
+  // created suspended and then resumed is what antivirus heuristics look for in
+  // process injection. PowerShell takes far longer to load than this takes, and
+  // Cancel also stops the run's descendants by PID (DescendantPids).
   g_job = CreateJobObjectW(nullptr, nullptr);
   if (g_job) {
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
     limits.BasicLimitInformation.LimitFlags =
         JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
     SetInformationJobObject(g_job, JobObjectExtendedLimitInformation, &limits, sizeof limits);
-    if (!AssignProcessToJobObject(g_job, pi.hProcess)) {
+  }
+  if (!CreateProcessW(nullptr, mutable_cmd.data(), nullptr, nullptr, TRUE,
+                      CREATE_NO_WINDOW, nullptr, (tree + L"\\tools").c_str(), &si, &pi)) {
+    CloseHandle(read_pipe);
+    CloseHandle(write_pipe);
+    if (g_job) {
       CloseHandle(g_job);
       g_job = nullptr;
     }
+    ShowError(L"PowerShell was not started.");
+    return;
   }
-  ResumeThread(pi.hThread);
+  if (g_job && !AssignProcessToJobObject(g_job, pi.hProcess)) {
+    CloseHandle(g_job);
+    g_job = nullptr;
+  }
   CloseHandle(write_pipe);
   CloseHandle(pi.hThread);
   g_proc = pi.hProcess;
