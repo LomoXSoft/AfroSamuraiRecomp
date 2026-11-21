@@ -2,6 +2,20 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.3.6 – Setup antivirus fix
+- The setup (`afrosetup-v0.3.6.exe`) is flagged by fewer antivirus engines. The
+  v0.3.5 setup was flagged by 19 of 74 engines on VirusTotal (0.3.4: 3 of 71) and
+  was held back on RecompLauncher. It looked like a dropper: an unsigned program
+  with no version information that started a hidden PowerShell suspended, put it
+  in a job, then resumed it.
+- The setup now has version information (company, product, description and
+  version in Properties > Details), written by `make_setup_art.py` from
+  `app/VERSION` into `afrosetup_version.rc2`.
+- PowerShell is no longer started suspended: the job is created first and
+  PowerShell joins it right after it starts. Cancel still stops the whole run.
+- `checks/check_setup_packaging.py` checks both. The game itself is unchanged
+  from 0.3.5.
+
 ## 0.3.5 – Ultrawide
 - Aspect ratio setting for ultrawide screens: **16:9 (original)**, the default,
   **21:9 (ultrawide)**, **32:9 (super ultrawide)** or **Auto** (the shape of the
