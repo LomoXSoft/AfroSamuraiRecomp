@@ -2,7 +2,19 @@
 
 Newest first. Versions are in `app/VERSION`.
 
-## Unreleased
+## 0.3.8 – Setup payload as a resource
+- The setup (`afrosetup-v0.3.8.exe`) carries its files as a normal Windows
+  resource (RCDATA 101) instead of bytes appended after the program (an
+  overlay), and reads them from memory instead of opening its own exe file.
+  Both are traits antivirus engines look for in droppers. The released 0.3.7
+  setup was flagged by 3 of 71 engines on VirusTotal (Bkav, SecureAge/APEX,
+  Symantec) and held back on RecompLauncher. A test build of 0.3.7 with only
+  this change was flagged by 1 of 71 (Huorong).
+- `pack_setup_payload.py --out` writes `afrosetup_payload.bin`, which
+  `afrosetup.rc` embeds, so the payload is packed before the resource step
+  (`build_release_setup.ps1`, `build_setup.bat`, `build_setup.sh`).
+  `check_setup_packaging.py` reads the payload from the resource table and
+  fails if anything is appended after the program.
 - The setup can be built on GitHub Actions: `.github/workflows/setup.yml`
   (started by hand) runs the new `tools/build_release_setup.ps1`. That script is
   the local release recipe: a `git archive` export of one commit, clang 20.1.8
@@ -13,6 +25,7 @@ Newest first. Versions are in `app/VERSION`.
   about 35 KB larger. The workflow keeps the setup as an artifact with a build provenance
   attestation, and attaches it only to a draft release. This is also the build
   that free code signing for open source (SignPath) needs.
+- The game and `install.sh` are unchanged from 0.3.7.
 
 ## 0.3.7 – Linux installer (Proton)
 - `install.sh`: builds the Windows game on Linux and SteamOS from your own

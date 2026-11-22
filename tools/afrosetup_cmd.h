@@ -10,7 +10,7 @@
 
 namespace afrosetup {
 
-inline constexpr wchar_t kExpectedVersion[] = L"0.3.7";
+inline constexpr wchar_t kExpectedVersion[] = L"0.3.8";
 
 struct Request {
   std::wstring powershell_exe;
@@ -462,7 +462,7 @@ inline std::vector<std::wstring> Validate(const Request& in) {
   if (!in.accept_license && !in.license_recorded)
     errors.push_back(L"the Build Tools license checkbox is required");
   if (!LanguageOk(in.language)) errors.push_back(L"language must be en, es, fr, or it");
-  if (in.local_tree.empty()) errors.push_back(L"local 0.3.7 source is required");
+  if (in.local_tree.empty()) errors.push_back(L"local 0.3.8 source is required");
   for (const std::wstring* p : {&in.install_dir, &in.iso, &in.gamedata_dir, &in.local_tree, &in.script_path,
                                  &in.accept_unverified_iso}) {
     if (p->find(L'"') != std::wstring::npos) errors.push_back(L"paths cannot contain a double quote");
@@ -746,6 +746,68 @@ inline bool ParsePayload(const uint8_t* image, size_t n, std::vector<PayloadFile
     return false;
   }
   return ParsePayloadBody(image + offset, static_cast<size_t>(size), out, error);
+}
+
+// Finds resource type/id (first language) in a PE file read from disk, without
+// Windows calls, so checks can read a built setup's payload on any OS.
+inline bool FindPeResource(const uint8_t* image, size_t n, uint32_t type, uint32_t id, const uint8_t*& data,
+                           size_t& size) {
+  auto u16 = [&](size_t off, uint32_t& v) {
+    if (off + 2 > n) return false;
+    v = image[off] | (image[off + 1] << 8);
+    return true;
+  };
+  auto u32 = [&](size_t off, uint32_t& v) {
+    if (off + 4 > n) return false;
+    v = image[off] | (image[off + 1] << 8) | (image[off + 2] << 16) | (static_cast<uint32_t>(image[off + 3]) << 24);
+    return true;
+  };
+  uint32_t pe = 0, sections = 0, opt = 0, magic = 0;
+  if (n < 0x40 || image[0] != 'M' || image[1] != 'Z' || !u32(0x3C, pe) || !u16(pe + 6, sections) ||
+      !u16(pe + 20, opt) || !u16(pe + 24, magic) || magic != 0x20B)
+    return false;
+  uint32_t rsrc = 0;
+  if (!u32(pe + 24 + 112 + 2 * 8, rsrc) || rsrc == 0) return false;
+  const size_t first = pe + 24 + opt;
+  auto to_file = [&](uint32_t rva, size_t& off) {
+    for (uint32_t i = 0; i < sections; ++i) {
+      uint32_t vsize = 0, va = 0, rsize = 0, raw = 0;
+      const size_t h = first + 40 * i;
+      if (!u32(h + 8, vsize) || !u32(h + 12, va) || !u32(h + 16, rsize) || !u32(h + 20, raw)) return false;
+      const uint32_t span = vsize > rsize ? vsize : rsize;
+      if (rva >= va && rva - va < span) {
+        off = static_cast<size_t>(raw) + (rva - va);
+        return off < n;
+      }
+    }
+    return false;
+  };
+  size_t base = 0;
+  if (!to_file(rsrc, base)) return false;
+  // Returns the entry target for `want` (any entry when want_any) in the directory at `dir`.
+  auto child = [&](size_t dir, uint32_t want, bool want_any, uint32_t& target) {
+    uint32_t named = 0, ids = 0;
+    if (!u16(dir + 12, named) || !u16(dir + 14, ids)) return false;
+    for (uint32_t i = 0; i < named + ids; ++i) {
+      uint32_t name = 0, to = 0;
+      if (!u32(dir + 16 + 8 * i, name) || !u32(dir + 20 + 8 * i, to)) return false;
+      if (want_any || (!(name & 0x80000000u) && name == want)) {
+        target = to;
+        return true;
+      }
+    }
+    return false;
+  };
+  uint32_t t = 0, r = 0, leaf = 0, data_rva = 0, data_size = 0;
+  if (!child(base, type, false, t) || !(t & 0x80000000u)) return false;
+  if (!child(base + (t & 0x7FFFFFFFu), id, false, r) || !(r & 0x80000000u)) return false;
+  if (!child(base + (r & 0x7FFFFFFFu), 0, true, leaf) || (leaf & 0x80000000u)) return false;
+  if (!u32(base + leaf, data_rva) || !u32(base + leaf + 4, data_size)) return false;
+  size_t off = 0;
+  if (!to_file(data_rva, off) || data_size > n - off) return false;
+  data = image + off;
+  size = data_size;
+  return true;
 }
 
 // `body` is the payload alone (the RCDATA resource, or the overlay without its footer).

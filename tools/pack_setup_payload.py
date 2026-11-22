@@ -84,10 +84,10 @@ def main() -> None:
         if need not in names:
             raise SystemExit(f"snapshot missing {need}")
     version = dict(files)["app/VERSION"].decode("utf-8").strip()
-    if version != "0.3.7":
+    if version != "0.3.8":
         raise SystemExit(f"snapshot VERSION is {version!r}")
     ps1 = dict(files)["tools/install.ps1"].decode("utf-8")
-    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.7'" not in ps1:
+    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.8'" not in ps1:
         raise SystemExit("snapshot install.ps1 is not the local-tree build")
     body = encode(files)
     if args.out:

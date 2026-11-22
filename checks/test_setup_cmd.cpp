@@ -415,19 +415,27 @@ int main(int argc, char** argv) {
     std::vector<uint8_t> exe((std::istreambuf_iterator<char>(in)), {});
     std::vector<afrosetup::PayloadFile> packed;
     std::string perr;
-    Expect(afrosetup::ParsePayload(exe.data(), exe.size(), packed, perr), perr.c_str());
+    // 0.3.8 and later: the payload is RCDATA resource kPayloadResourceId, not an overlay.
+    const uint8_t* res = nullptr;
+    size_t res_size = 0;
+    Expect(afrosetup::FindPeResource(exe.data(), exe.size(), 10, afrosetup::kPayloadResourceId, res, res_size),
+           "built setup has the payload resource");
+    Expect(res && afrosetup::ParsePayloadBody(res, res_size, packed, perr), perr.c_str());
+    std::vector<afrosetup::PayloadFile> overlay;
+    std::string oerr;
+    Expect(!afrosetup::ParsePayload(exe.data(), exe.size(), overlay, oerr), "built setup has no overlay payload");
     bool version_ok = false, ps1_ok = false, bat_ok = false, hooks_ok = false, manifest_lf = false;
     for (const auto& f : packed) {
       if (f.path == "app/VERSION") {
         std::string text(f.bytes.begin(), f.bytes.end());
         while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
           text.pop_back();
-        version_ok = text == "0.3.7";
+        version_ok = text == "0.3.8";
       }
       if (f.path == "tools/install.ps1") {
         std::string text(f.bytes.begin(), f.bytes.end());
         ps1_ok = text.find("LocalTree") != std::string::npos &&
-                 text.find("$LOCAL_TREE_VERSION = '0.3.7'") != std::string::npos &&
+                 text.find("$LOCAL_TREE_VERSION = '0.3.8'") != std::string::npos &&
                  text.find("Refusing -Ref main") != std::string::npos &&
                  text.find("AFROSTEP ") != std::string::npos &&
                  text.find("AFROPHASE compile") != std::string::npos &&
@@ -442,8 +450,8 @@ int main(int argc, char** argv) {
                    text.find("AfroPlayerMeterDeathGate") != std::string::npos;
       }
     }
-    Expect(version_ok, "bundled VERSION is 0.3.7");
-    Expect(ps1_ok, "bundled install.ps1 is the 0.3.7 local-tree script");
+    Expect(version_ok, "bundled VERSION is 0.3.8");
+    Expect(ps1_ok, "bundled install.ps1 is the 0.3.8 local-tree script");
     Expect(bat_ok, "bundled tree still contains install.bat");
     Expect(hooks_ok, "bundled hooks include the meter death gate");
     Expect(manifest_lf, "bundled codegen manifest has LF line ends, as rexglue writes it");
@@ -455,7 +463,7 @@ int main(int argc, char** argv) {
     return std::string(std::istreambuf_iterator<char>(in), {});
   };
   std::string script_text, window_cpp, build_bat;
-  for (const char* dir : {"/tmp/afro-0.3.7", "..", "."}) {
+  for (const char* dir : {"/tmp/afro-0.3.8", "..", "."}) {
     if (script_text.empty()) script_text = read_text(std::string(dir) + "/tools/install.ps1");
     if (window_cpp.empty()) window_cpp = read_text(std::string(dir) + "/tools/afrosetup.cpp");
     if (build_bat.empty()) build_bat = read_text(std::string(dir) + "/tools/build_win.bat");
