@@ -18,6 +18,70 @@ def fail(msg: str) -> None:
     raise SystemExit(1)
 
 
+def sections(blob: bytes, pe: int) -> list[tuple[int, int, int, int]]:
+    """(virtual address, virtual size, raw offset, raw size) of each section."""
+    count = struct.unpack_from("<H", blob, pe + 6)[0]
+    opt_size = struct.unpack_from("<H", blob, pe + 20)[0]
+    first = pe + 24 + opt_size
+    out = []
+    for i in range(count):
+        va_size, va, raw_size, raw = struct.unpack_from("<IIII", blob, first + 40 * i + 8)
+        out.append((va, va_size, raw, raw_size))
+    return out
+
+
+def rva_to_offset(secs: list[tuple[int, int, int, int]], rva: int) -> int:
+    for va, va_size, raw, raw_size in secs:
+        if va <= rva < va + max(va_size, raw_size):
+            return raw + (rva - va)
+    fail(f"RVA {rva:#x} is in no section")
+    return 0
+
+
+def rcdata(blob: bytes, pe: int, res_id: int) -> tuple[int, int]:
+    """File offset and size of RT_RCDATA resource `res_id` (first language)."""
+    rsrc_rva = struct.unpack_from("<I", blob, pe + 24 + 112 + 2 * 8)[0]
+    if not rsrc_rva:
+        fail("PE has no resource directory")
+    secs = sections(blob, pe)
+    base = rva_to_offset(secs, rsrc_rva)
+
+    def entries(off: int) -> list[tuple[int, int]]:
+        named, ids = struct.unpack_from("<HH", blob, off + 12)
+        return [struct.unpack_from("<II", blob, off + 16 + 8 * i) for i in range(named + ids)]
+
+    def child(off: int, want: int | None) -> int:
+        for name, target in entries(off):
+            if want is None or (not name & 0x80000000 and name == want):
+                return target
+        fail(f"resource {want} not found")
+        return 0
+
+    t = child(base, 10)  # RT_RCDATA
+    n = child(base + (t & 0x7FFFFFFF), res_id)
+    leaf = child(base + (n & 0x7FFFFFFF), None)
+    if leaf & 0x80000000:
+        fail("resource leaf is a directory")
+    data_rva, size = struct.unpack_from("<II", blob, base + leaf)[:2]
+    return rva_to_offset(secs, data_rva), size
+
+
+def payload_files(body: bytes) -> dict[str, bytes]:
+    count = struct.unpack_from("<I", body, 0)[0]
+    pos, out = 4, {}
+    for _ in range(count):
+        n = struct.unpack_from("<H", body, pos)[0]
+        rel = body[pos + 2 : pos + 2 + n].decode("utf-8")
+        pos += 2 + n
+        size = struct.unpack_from("<Q", body, pos)[0]
+        pos += 8
+        out[rel] = body[pos : pos + size]
+        pos += size
+    if pos != len(body):
+        fail("payload has trailing bytes")
+    return out
+
+
 def main() -> None:
     if not EXE.is_file():
         fail(f"missing {EXE}")
@@ -35,10 +99,21 @@ def main() -> None:
     subsystem = struct.unpack_from("<H", blob, pe + 24 + 68)[0]
     if subsystem != 2:
         fail(f"subsystem {subsystem}, expected Windows GUI (2)")
-    off, size = struct.unpack_from("<QQ", blob, len(blob) - 24)
-    if blob[-8:] != MAGIC:
-        fail("payload magic missing")
-    image = blob[:off]
+    # No overlay: the file ends with the last section (or with an Authenticode
+    # certificate, once the setup is signed). The payload is RCDATA 101.
+    secs = sections(blob, pe)
+    image_end = max(raw + raw_size for _, _, raw, raw_size in secs)
+    cert_off, cert_size = struct.unpack_from("<II", blob, pe + 24 + 112 + 4 * 8)
+    if len(blob) != image_end and not (cert_off == image_end and cert_off + cert_size == len(blob)):
+        fail(f"{len(blob) - image_end} bytes follow the PE image (overlay)")
+    if blob[-8:] == MAGIC:
+        fail("old overlay footer present")
+    off, size = rcdata(blob, pe, 101)
+    files = payload_files(blob[off : off + size])
+    for need in ("app/VERSION", "tools/install.ps1", "tools/build_win.bat", "install.bat", "app/afro_hooks.toml"):
+        if need not in files:
+            fail(f"payload is missing {need}")
+    image = blob
     if b"requireAdministrator" in image:
         fail("PE image requests administrator")
     if b"asInvoker" not in image:
@@ -74,9 +149,17 @@ def main() -> None:
             fail(f"version info is missing {text!r}")
     if "CREATE_SUSPENDED" in cpp or "ResumeThread" in cpp:
         fail("setup starts a process suspended")
+    if files["app/VERSION"].decode("utf-8").strip() != version:
+        fail("payload app/VERSION differs from app/VERSION")
+    rc = (ROOT / "tools" / "afrosetup.rc").read_text(encoding="utf-8")
+    hdr = (ROOT / "tools" / "afrosetup_cmd.h").read_text(encoding="utf-8")
+    if '101 RCDATA "afrosetup_payload.bin"' not in rc or "kPayloadResourceId = 101;" not in hdr:
+        fail("payload resource id differs between afrosetup.rc and afrosetup_cmd.h")
+    if "FindResourceW(nullptr, MAKEINTRESOURCEW(afrosetup::kPayloadResourceId)" not in cpp or "_wfopen_s(&f, path, L\"rb\")" in cpp:
+        fail("setup does not read its payload from the resource")
     print("setup packaging checks: ok")
     print(f"  {EXE}  {len(blob)} bytes  amd64 GUI  asInvoker")
-    print(f"  payload at {off} size {size}")
+    print(f"  payload: RCDATA 101 at {off}, {size} bytes, {len(files)} files, no overlay")
     print("  no Windows install was run")
 
 

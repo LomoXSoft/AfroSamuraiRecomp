@@ -10,6 +10,7 @@
 !tools/artwork/**/*.ico
 tools/afrosetup_header.inc
 tools/afrosetup_version.rc2
+tools/afrosetup_payload.bin
 assets/
 app/generated/default/
 app/afro_switch_tables.toml

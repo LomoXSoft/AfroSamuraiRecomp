@@ -559,21 +559,22 @@ void Go(Page p) {
   Layout();
 }
 
+// The payload is RCDATA resource kPayloadResourceId, mapped with the image.
+// The setup does not open or read its own exe file.
 bool LoadOwnPayload(std::vector<afrosetup::PayloadFile>& files, std::string& error) {
-  wchar_t path[MAX_PATH];
-  GetModuleFileNameW(nullptr, path, MAX_PATH);
-  FILE* f = nullptr;
-  if (_wfopen_s(&f, path, L"rb") != 0 || !f) {
-    error = "cannot read setup exe";
+  HRSRC res = FindResourceW(nullptr, MAKEINTRESOURCEW(afrosetup::kPayloadResourceId), MAKEINTRESOURCEW(10));
+  if (!res) {
+    error = "payload resource missing";
     return false;
   }
-  fseek(f, 0, SEEK_END);
-  const long n = ftell(f);
-  fseek(f, 0, SEEK_SET);
-  std::vector<uint8_t> buf(static_cast<size_t>(n > 0 ? n : 0));
-  if (!buf.empty()) fread(buf.data(), 1, buf.size(), f);
-  fclose(f);
-  return afrosetup::ParsePayload(buf.data(), buf.size(), files, error);
+  HGLOBAL blob = LoadResource(nullptr, res);
+  const void* data = blob ? LockResource(blob) : nullptr;
+  const DWORD n = SizeofResource(nullptr, res);
+  if (!data || n == 0) {
+    error = "payload resource is empty";
+    return false;
+  }
+  return afrosetup::ParsePayloadBody(static_cast<const uint8_t*>(data), n, files, error);
 }
 
 std::wstring TempRoot() {

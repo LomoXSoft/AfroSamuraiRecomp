@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Append the 0.1.0 source snapshot to afrosetup.exe.
+"""Encode the source snapshot that afrosetup.exe carries.
 
-The Windows loader ignores this overlay. The setup program reads the footer
-and extracts the files only after the user presses Install.
+--out writes the payload file that afrosetup.rc embeds as RCDATA resource 101
+(the release build: run this before llvm-rc). --exe appends it to an exe as
+an overlay with a footer instead (the old layout, kept for comparison builds).
+The setup extracts the files only after the user presses Install.
 """
 
 from __future__ import annotations
@@ -44,7 +46,7 @@ def collect(repo: pathlib.Path, overlay: pathlib.Path) -> list[tuple[str, bytes]
                 continue
             if path.suffix.lower() in skip_suffix and path.name != "install.bat":
                 continue
-            if path.name == "afrosetup.exe" or (
+            if path.name in ("afrosetup.exe", "afrosetup_payload.bin") or (
                 path.name.startswith("afrosetup-v") and path.suffix.lower() == ".exe"
             ):
                 continue
@@ -70,7 +72,9 @@ def encode(files: list[tuple[str, bytes]]) -> bytes:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exe", type=pathlib.Path, required=True)
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--out", type=pathlib.Path, help="write the RCDATA payload file")
+    target.add_argument("--exe", type=pathlib.Path, help="append the payload to this exe")
     parser.add_argument("--repo", type=pathlib.Path, required=True)
     parser.add_argument("--overlay", type=pathlib.Path, required=True)
     args = parser.parse_args()
@@ -86,6 +90,11 @@ def main() -> None:
     if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.7'" not in ps1:
         raise SystemExit("snapshot install.ps1 is not the local-tree build")
     body = encode(files)
+    if args.out:
+        args.out.write_bytes(body)
+        print(f"payload files: {len(files)}")
+        print(f"payload bytes: {len(body)} (resource file {args.out.name})")
+        return
     exe = args.exe.read_bytes()
     if exe[:2] != b"MZ":
         raise SystemExit("exe is not a PE")

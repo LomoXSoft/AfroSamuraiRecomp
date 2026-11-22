@@ -12,11 +12,9 @@ for /f "usebackq delims=" %%V in ("%~dp0..\app\VERSION") do if not defined VER s
 if not defined VER (echo app\VERSION is empty. & exit /b 1)
 set "OUT=afrosetup-v%VER%.exe"
 python make_setup_art.py
+rem The payload is RCDATA resource 101 in afrosetup.rc, so it is packed first.
+python pack_setup_payload.py --out afrosetup_payload.bin --repo "%~dp0.." --overlay "%~dp0.." || exit /b 1
 windres -O coff afrosetup.rc -o afrosetup.res 2>nul
-if exist afrosetup.res (
-  clang++ -std=c++17 -O2 -Wall -Wextra -Werror -DUNICODE -D_UNICODE -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -municode -mwindows -static -static-libgcc -static-libstdc++ -o "%OUT%" afrosetup.cpp afrosetup.res -lcomdlg32 -lshell32 -lole32 -luuid -lgdi32 -lcomctl32 || exit /b 1
-) else (
-  clang++ -std=c++17 -O2 -Wall -Wextra -Werror -DUNICODE -D_UNICODE -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -municode -mwindows -static -static-libgcc -static-libstdc++ -o "%OUT%" afrosetup.cpp -lcomdlg32 -lshell32 -lole32 -luuid -lgdi32 -lcomctl32 || exit /b 1
-)
-python pack_setup_payload.py --exe "%OUT%" --repo "%~dp0.." --overlay "%~dp0.." || exit /b 1
+if not exist afrosetup.res (echo windres could not compile afrosetup.rc; the payload resource is required. & exit /b 1)
+clang++ -std=c++17 -O2 -Wall -Wextra -Werror -DUNICODE -D_UNICODE -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -municode -mwindows -static -static-libgcc -static-libstdc++ -o "%OUT%" afrosetup.cpp afrosetup.res -lcomdlg32 -lshell32 -lole32 -luuid -lgdi32 -lcomctl32 || exit /b 1
 echo built %~dp0%OUT%

@@ -2,8 +2,9 @@
 Build afrosetup-v<app\VERSION>.exe the way releases are built.
 
 1. Export one commit with `git archive` (CRLF text files, as a Windows checkout).
-2. In that export: make_setup_art.py, llvm-rc, clang++ (MSVC target, static CRT).
-3. Append the export as the setup payload with pack_setup_payload.py.
+2. In that export: make_setup_art.py, then pack_setup_payload.py --out writes
+   the export as afrosetup_payload.bin (RCDATA resource 101 in afrosetup.rc).
+3. llvm-rc, clang++ (MSVC target, static CRT). The exe has no overlay.
 
 The GitHub Actions workflow .github/workflows/setup.yml runs this script.
 It can also run locally once clang++, llvm-rc, git and python are on PATH
@@ -60,6 +61,8 @@ try {
   Push-Location (Join-Path $src 'tools')
   try {
     Invoke-Tool python @('make_setup_art.py')
+    # The payload goes in as RCDATA resource 101, so it is packed before llvm-rc.
+    Invoke-Tool python @('pack_setup_payload.py', '--out', 'afrosetup_payload.bin', '--repo', $src, '--overlay', $src)
     Invoke-Tool llvm-rc @('/fo', 'afrosetup.res', 'afrosetup.rc')
     Invoke-Tool clang++ @(
       '-std=c++17', '-O2', '-Wall', '-Wextra',
@@ -68,7 +71,6 @@ try {
       '-o', $name, 'afrosetup.cpp', 'afrosetup.res',
       '-lcomdlg32', '-lshell32', '-lole32', '-luuid', '-lgdi32', '-lcomctl32', '-luser32', '-ladvapi32',
       '-Wl,/SUBSYSTEM:WINDOWS', '-Wl,/ENTRY:wWinMainCRTStartup')
-    Invoke-Tool python @('pack_setup_payload.py', '--exe', $name, '--repo', $src, '--overlay', $src)
   } finally {
     Pop-Location
   }

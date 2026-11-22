@@ -657,6 +657,9 @@ struct PayloadFile {
 };
 
 inline constexpr char kPayloadMagic[8] = {'A', 'F', 'S', 'T', 'P', '0', '0', '1'};
+// The setup carries its payload as RCDATA resource 101 (afrosetup.rc), not as
+// bytes appended after the PE image: an overlay is a classic dropper trait.
+inline constexpr int kPayloadResourceId = 101;
 
 inline bool PayloadPathOk(const std::string& path) {
   if (path.empty() || path[0] == '/' || path[0] == '\\') return false;
@@ -719,6 +722,8 @@ inline std::vector<uint8_t> EncodePayload(const std::vector<PayloadFile>& files)
   return body;
 }
 
+inline bool ParsePayloadBody(const uint8_t* body, size_t size, std::vector<PayloadFile>& out, std::string& error);
+
 // `image` is the whole file, including the 24-byte footer.
 inline bool ParsePayload(const uint8_t* image, size_t n, std::vector<PayloadFile>& out, std::string& error) {
   out.clear();
@@ -740,7 +745,13 @@ inline bool ParsePayload(const uint8_t* image, size_t n, std::vector<PayloadFile
     error = "payload range is outside the file";
     return false;
   }
-  const uint8_t* p = image + offset;
+  return ParsePayloadBody(image + offset, static_cast<size_t>(size), out, error);
+}
+
+// `body` is the payload alone (the RCDATA resource, or the overlay without its footer).
+inline bool ParsePayloadBody(const uint8_t* body, size_t size, std::vector<PayloadFile>& out, std::string& error) {
+  out.clear();
+  const uint8_t* p = body;
   const uint8_t* end = p + size;
   uint32_t count = 0;
   if (!ReadU32(p, end, count)) {

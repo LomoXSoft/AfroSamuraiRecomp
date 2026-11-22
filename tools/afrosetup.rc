@@ -1,3 +1,4 @@
 1 ICON "afrosetup.ico"
 1 24 "afrosetup.manifest"
 #include "afrosetup_version.rc2"
+101 RCDATA "afrosetup_payload.bin"

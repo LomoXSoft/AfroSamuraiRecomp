@@ -399,6 +399,13 @@ int main(int argc, char** argv) {
   std::string error;
   Expect(afrosetup::ParsePayload(image.data(), image.size(), parsed, error), error.c_str());
   Expect(parsed.size() == 2 && parsed[0].path == "app/VERSION", "payload roundtrip");
+  Expect(afrosetup::ParsePayloadBody(body.data(), body.size(), parsed, error) && parsed.size() == 2 &&
+             parsed[1].path == "tools/install.ps1",
+         "resource payload roundtrip");
+  std::vector<uint8_t> padded = body;
+  padded.push_back(0);
+  Expect(!afrosetup::ParsePayloadBody(padded.data(), padded.size(), parsed, error), "resource payload with a trailing byte is rejected");
+  Expect(!afrosetup::ParsePayloadBody(body.data(), body.size() - 1, parsed, error), "truncated resource payload is rejected");
 
   files[0].path = "../app/VERSION";
   Expect(afrosetup::EncodePayload(files).empty(), "parent segments are rejected");
