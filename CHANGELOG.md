@@ -7,8 +7,10 @@ Newest first. Versions are in `app/VERSION`.
   (started by hand) runs the new `tools/build_release_setup.ps1`. That script is
   the local release recipe: a `git archive` export of one commit, clang 20.1.8
   (the LLVM that `install.ps1` pins) and the same payload. A build of v0.3.7
-  with it matches the released `afrosetup-v0.3.7.exe` except for the link
-  timestamps. The workflow keeps the setup as an artifact with a build provenance
+  with it on the release PC matches the released `afrosetup-v0.3.7.exe` except
+  for the link timestamps. On GitHub (windows-2022, MSVC 14.44 instead of the
+  14.51 that `install.ps1` pins) the payload is the same and the program part is
+  about 35 KB larger. The workflow keeps the setup as an artifact with a build provenance
   attestation, and attaches it only to a draft release. This is also the build
   that free code signing for open source (SignPath) needs.
 
