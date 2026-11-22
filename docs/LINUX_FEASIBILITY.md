@@ -18,7 +18,7 @@ the way `install.sh` would have to work on SteamOS. Europe disc, v0.3.2 source.
 | Cross-compile `rexruntime.dll`, `rexgpu-xenos.dll` | Work. SDK tree checked equal to `bd833a2` + all 14 patches, and both markers that `install.ps1` checks are present. |
 | Imports and exports | Same DLL list as the Windows build for all three files. Every `rexruntime.dll` symbol the exe (432) and the GPU plugin (105) import is exported. |
 | Runs | The Linux-built files, in a copy of the game folder on the test PC (Windows, not Proton), boot into the game. The log matches the Windows build line for line except thread IDs, at a steady 30 FPS in game. |
-| Under Proton | **Not tested yet**: this needs the Steam Machine. |
+| Under Proton | **Works on a Steam Machine** (see [Phase 3](#phase-3-results-steam-machine-under-proton)). Not tested on a Steam Deck. |
 
 ## Findings that shape `install.sh`
 
@@ -70,6 +70,10 @@ the way `install.sh` would have to work on SteamOS. Europe disc, v0.3.2 source.
    10 and 11 and in Wine.
 
 ## Risks to check on the Steam Machine
+
+The first two did not stop the Steam Machine test: the install finished and
+the game started under Proton (see Phase 3). The third is still open for the
+Deck.
 
 - **VC++ runtime under Proton.** All three files import `msvcp140.dll`,
   `vcruntime140.dll`, `vcruntime140_1.dll` and `msvcp140_atomic_wait.dll`.
@@ -131,6 +135,18 @@ game files.
     recompiled sources are listed in `generated/default/sources.cmake`.
   - `install.sh` needs mode 100755 in git: Git on Windows does not record it
     by itself.
+
+## Phase 3 results (Steam Machine under Proton)
+
+Tested by hand in November 2026 from a test archive of the `install.sh`
+source, following the README steps (`install.sh`, then the non-Steam shortcut
+with Proton):
+
+- The install and the Steam shortcut steps worked without problems.
+- The game runs under Proton in 60 FPS mode at 1440p, with some drops to
+  40–50 FPS in places.
+- Not reported from there: build time, memory use and an `--update` run.
+  Not tested on a Steam Deck.
 
 ## Proposal for Phase 2 (`install.sh`)
 
