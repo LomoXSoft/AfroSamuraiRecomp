@@ -2,6 +2,16 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## Unreleased
+- The setup can be built on GitHub Actions: `.github/workflows/setup.yml`
+  (started by hand) runs the new `tools/build_release_setup.ps1`. That script is
+  the local release recipe: a `git archive` export of one commit, clang 20.1.8
+  (the LLVM that `install.ps1` pins) and the same payload. A build of v0.3.7
+  with it matches the released `afrosetup-v0.3.7.exe` except for the link
+  timestamps. The workflow keeps the setup as an artifact with a build provenance
+  attestation, and attaches it only to a draft release. This is also the build
+  that free code signing for open source (SignPath) needs.
+
 ## 0.3.7 – Linux installer (Proton)
 - `install.sh`: builds the Windows game on Linux and SteamOS from your own
   disc (Europe or USA) to run through Proton on Steam Deck, Steam Machine and

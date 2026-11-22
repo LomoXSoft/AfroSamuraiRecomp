@@ -602,6 +602,7 @@ unless a maintainer specifically asks.
   boundaries), `afro_hooks.toml` (mid-asm hooks), launcher and hooks in `src/`.
   These use Europe addresses; `regions/usa.toml` maps each one to the USA disc.
 - `install.bat`, `tools/install.ps1` – console installer. `tools/afrosetup.cpp` builds the graphical setup. The release file is `afrosetup-v0.3.7.exe`, not committed.
+- `tools/build_release_setup.ps1` – builds that release file from one commit (a `git archive` export, clang 20.1.8). `.github/workflows/setup.yml` runs it on GitHub Actions when started by hand. It uploads the setup as a workflow artifact with a build provenance attestation, and attaches it to a release only while that release is a draft.
 - `tools/` – build/run scripts and helpers (`xiso_extract.py`, `xex_to_pe.py`,
   `gen_switch_tables.py`, `extract_icon.py`); `tools/analysis/` has the
   reverse-engineering helpers used while mapping the game, `tools/artwork/` the
