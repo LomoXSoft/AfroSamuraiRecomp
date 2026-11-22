@@ -32,7 +32,10 @@ env:
 
 jobs:
   build:
-    runs-on: windows-2025
+    # windows-2022 has Visual Studio 2022 (MSVC 14.44). windows-2025 has Visual
+    # Studio 18 with MSVC 14.52, whose C++ library refuses Clang 20 (STL1000),
+    # the same reason install.ps1 pins MSVC 14.51.
+    runs-on: windows-2022
     permissions:
       contents: write      # only used by the draft release upload
       id-token: write      # build provenance attestation
@@ -93,6 +96,8 @@ jobs:
         shell: pwsh
         run: |
           $dist = Join-Path $env:GITHUB_WORKSPACE 'dist'
+          $vs = Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\*\*\VC\Tools\MSVC' -Directory -ErrorAction SilentlyContinue
+          Write-Host "MSVC toolsets: $(($vs | Get-ChildItem -Directory | ForEach-Object Name) -join ', ')"
           ./ci/tools/build_release_setup.ps1 -Repo src -Ref HEAD -OutDir $dist
           $exe = Get-ChildItem $dist -Filter 'afrosetup-v*.exe' | Select-Object -First 1
           if (-not $exe) { throw 'no setup was built' }

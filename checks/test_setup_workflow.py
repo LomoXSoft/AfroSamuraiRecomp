@@ -52,6 +52,9 @@ def main() -> None:
     if "Get-FileHash" not in wf or "$env:LLVM_SHA256" not in wf:
         fail("workflow does not verify the LLVM download")
 
+    # windows-2025 ships MSVC 14.52, whose C++ library refuses Clang 20 (STL1000).
+    if "runs-on: windows-2022" not in wf:
+        fail("setup build must run on windows-2022 (MSVC 14.44 accepts Clang 20)")
     if "permissions: {}" not in wf:
         fail("workflow must default to no token permissions")
     if "persist-credentials: false" not in wf:
