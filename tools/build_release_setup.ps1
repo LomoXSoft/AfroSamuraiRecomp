@@ -12,11 +12,14 @@ This script does not upload or replace a GitHub release asset.
 #>
 param(
   [string]$Ref = 'HEAD',
-  [string]$OutDir = ''
+  [string]$OutDir = '',
+  # Git checkout to export from. Default: the one this script is in. The
+  # workflow passes a second checkout, so older tags without this script build too.
+  [string]$Repo = ''
 )
 
 $ErrorActionPreference = 'Stop'
-$repo = Split-Path -Parent $PSScriptRoot
+if ($Repo) { $repo = (Resolve-Path $Repo).Path } else { $repo = Split-Path -Parent $PSScriptRoot }
 if (-not $OutDir) { $OutDir = $PSScriptRoot }
 
 function Invoke-Tool {

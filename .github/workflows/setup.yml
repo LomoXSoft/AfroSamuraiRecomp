@@ -38,10 +38,19 @@ jobs:
       id-token: write      # build provenance attestation
       attestations: write
     steps:
-      - name: Check out
+      # ci: this workflow's own commit (build script). src: the ref to build,
+      # so tags made before the build script existed can be built too.
+      - name: Check out the build script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ci
+          persist-credentials: false
+
+      - name: Check out the ref to build
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
+          path: src
           persist-credentials: false
 
       - name: Python
@@ -84,14 +93,14 @@ jobs:
         shell: pwsh
         run: |
           $dist = Join-Path $env:GITHUB_WORKSPACE 'dist'
-          ./tools/build_release_setup.ps1 -Ref HEAD -OutDir $dist
+          ./ci/tools/build_release_setup.ps1 -Repo src -Ref HEAD -OutDir $dist
           $exe = Get-ChildItem $dist -Filter 'afrosetup-v*.exe' | Select-Object -First 1
           if (-not $exe) { throw 'no setup was built' }
           $hash = (Get-FileHash -Algorithm SHA256 $exe.FullName).Hash.ToLowerInvariant()
           "$hash *$($exe.Name)" | Set-Content -Encoding ascii (Join-Path $dist 'SHA256SUMS.txt')
           "name=$($exe.Name)" | Add-Content -Path $env:GITHUB_OUTPUT
           "path=$($exe.FullName)" | Add-Content -Path $env:GITHUB_OUTPUT
-          $commit = git rev-parse HEAD
+          $commit = git -C src rev-parse HEAD
           @(
             "### $($exe.Name)",
             '',
@@ -105,8 +114,9 @@ jobs:
       - name: Run the packaging check
         shell: pwsh
         run: |
-          Copy-Item -Force $env:EXE (Join-Path $env:GITHUB_WORKSPACE 'tools')
-          python checks/check_setup_packaging.py
+          # The check of the built ref, which knows that ref's version.
+          Copy-Item -Force $env:EXE (Join-Path $env:GITHUB_WORKSPACE 'src/tools')
+          python src/checks/check_setup_packaging.py
           if ($LASTEXITCODE -ne 0) { throw 'check_setup_packaging.py failed' }
         env:
           EXE: ${{ steps.build.outputs.path }}
