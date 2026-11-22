@@ -113,7 +113,8 @@ def main() -> None:
     for need in ("app/VERSION", "tools/install.ps1", "tools/build_win.bat", "install.bat", "app/afro_hooks.toml"):
         if need not in files:
             fail(f"payload is missing {need}")
-    image = blob
+    # Search the program, not the payload (the payload holds this very check's text).
+    image = blob[:off] + blob[off + size :]
     if b"requireAdministrator" in image:
         fail("PE image requests administrator")
     if b"asInvoker" not in image:
