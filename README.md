@@ -266,7 +266,15 @@ LLVM/Clang 20.1.8 (llvm-mingw), CMake, Ninja, xwin with the Microsoft C++
 runtime and Windows SDK (Microsoft license, asked first), the ReXGlue SDK
 nightly and the ReXGlue source. About 20 GB must be free.
 
-In Desktop Mode, open a terminal (Konsole on SteamOS):
+**One click:** from the [latest release](https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/latest),
+download `AfroSamuraiRecomp-Linux-v<version>.desktop` in Desktop Mode and
+double-click it (if it opens as text: *Properties → Permissions → Is
+executable*). It opens a terminal, downloads that release's
+`afrorecomp-linux-v<version>.tar.gz`, checks its SHA-256 and runs its
+`install.sh`, with `--update` when `~/Games/AfroSamuraiRecomp` is already
+installed. It was tested in WSL, not yet by double-clicking it on SteamOS.
+
+Or in Desktop Mode, open a terminal (Konsole on SteamOS):
 
 ```bash
 git clone https://github.com/LomoXSoft/AfroSamuraiRecomp.git

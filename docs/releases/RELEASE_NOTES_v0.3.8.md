@@ -18,9 +18,8 @@ Already on 0.1.x, 0.2.x or 0.3.x: run it, choose **Update** and pick your instal
 folder. Your extracted game, saves and launcher settings stay. **Update** rebuilds
 only what changed (under a minute from 0.3.7 on the test PC).
 
-Linux, SteamOS (Steam Deck, Steam Machine): there is no file to download. Get
-the source with git and run `install.sh`, as in the README section
-[Linux and SteamOS (Proton)](https://github.com/LomoXSoft/AfroSamuraiRecomp#linux-and-steamos-proton).
+Linux and SteamOS (Steam Deck, Steam Machine): `AfroSamuraiRecomp-Linux-v0.3.8.desktop`,
+see [Linux and SteamOS](#linux-and-steamos-proton) at the bottom.
 
 ## New
 
@@ -74,5 +73,45 @@ The game and `install.sh` are the same as in v0.3.7.
 - Antivirus results can change after release, and some engines may flag the
   setup.
 - The Steam Deck was not tested, and `install.sh` is unchanged from v0.3.7.
+- The `.desktop` launcher was tested in WSL (download, SHA-256 check, new
+  install and update start), not yet by double-clicking it on SteamOS.
 - RecompLauncher was not run with this release.
 - No install time is guaranteed on HDD, SSD, or NVMe.
+
+## Linux and SteamOS (Proton)
+
+The Linux install builds the same **Windows** game from your own disc, and Steam
+runs it through Proton. About 20 GB must be free. Tested on a Steam Machine
+(v0.3.7); not tested on a Steam Deck yet.
+
+**One click (Desktop Mode):**
+1. Download `AfroSamuraiRecomp-Linux-v0.3.8.desktop` from this release.
+2. Double-click it in the file manager. If it asks what to do with the file,
+   choose to run (execute) it. If it opens as text instead, right-click it,
+   *Properties → Permissions → Is executable*, then double-click it again.
+3. A terminal opens. It downloads `afrorecomp-linux-v0.3.8.tar.gz` from this
+   release, checks its SHA-256 and runs its `install.sh`. Answer the questions:
+   install folder (default `~/Games/AfroSamuraiRecomp`), the path to your ISO
+   (you can drag the ISO file onto the terminal window), the Microsoft license
+   and the game language.
+4. At the end it prints the Steam steps and writes them to
+   `<install folder>/STEAM_SETUP.txt`: add `game/afrorecomp.exe` as a non-Steam
+   game, set **Start in** and the launch options, and force Proton.
+
+To update an install in `~/Games/AfroSamuraiRecomp` later, download the newer
+version's `.desktop` file and double-click it: it updates in place and keeps
+the game files, saves and settings.
+
+**From a terminal**, or for an install in another folder:
+
+```bash
+tar -xzf afrorecomp-linux-v0.3.8.tar.gz
+cd afrorecomp-v0.3.8
+./install.sh --iso "/path/to/Afro Samurai (Europe).iso"
+# update an existing install:
+./install.sh --update --dir "/path/to/AfroSamuraiRecomp"
+```
+
+`git clone` of the tag `v0.3.8` gives the same files. Options and details:
+README section
+[Linux and SteamOS (Proton)](https://github.com/LomoXSoft/AfroSamuraiRecomp#linux-and-steamos-proton).

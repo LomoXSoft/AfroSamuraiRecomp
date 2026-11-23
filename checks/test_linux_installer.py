@@ -9,6 +9,10 @@
 - sync_tree.py writes only changed files, removes stale ones and leaves the
   kept paths alone.
 - xwin_case_links.py adds a link for a header the sources spell in another case.
+- make_release_assets.py writes a .desktop launcher whose Exec is one
+  `bash -c '...'` argument with no field codes, escapes or inner quotes, that
+  checks the tarball's SHA-256 and never names afrorecomp.exe (install.sh
+  would take its own launcher for the running game).
 """
 import os
 import pathlib
@@ -144,10 +148,37 @@ def check_case_links():
         shutil.rmtree(tmp)
 
 
+def check_release_assets():
+    import importlib.util
+    import shlex
+    spec = importlib.util.spec_from_file_location("mra", LINUX / "make_release_assets.py")
+    mra = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mra)
+    sha = "ab" * 32
+    text = mra.desktop_text("9.9.9", "afrorecomp-linux-v9.9.9.tar.gz", sha)
+    lines = text.splitlines()
+    if lines[0] != "[Desktop Entry]" or "Terminal=true" not in lines or "Type=Application" not in lines:
+        fail("launcher is not a terminal desktop entry")
+    exec_line = next(l for l in lines if l.startswith("Exec="))[5:]
+    argv = shlex.split(exec_line)
+    if argv[:2] != ["bash", "-c"] or len(argv) != 3:
+        fail(f"launcher Exec does not split into bash -c <script>: {argv[:3]}")
+    script = argv[2]
+    for bad in ("%", "\\", "afrorecomp.exe"):
+        if bad in exec_line:
+            fail(f"launcher Exec contains {bad!r}")
+    url = "https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/download/v9.9.9/afrorecomp-linux-v9.9.9.tar.gz"
+    if url not in script or f'echo "{sha}  $W/$T" | sha256sum -c -' not in script:
+        fail("launcher does not download the tag's tarball and check its SHA-256")
+    if '--update --dir "$D"' not in script or 'read -r -p' not in script:
+        fail("launcher lost the update path or the final pause")
+
+
 def main():
     check_script()
     check_sync()
     check_case_links()
+    check_release_assets()
     print("ok: install.sh and tools/linux")
 
 

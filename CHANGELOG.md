@@ -2,6 +2,15 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## Unreleased
+- Linux release assets, first attached to v0.3.8:
+  `afrorecomp-linux-v<ver>.tar.gz` (the tag's source with LF line endings) and
+  `AfroSamuraiRecomp-Linux-v<ver>.desktop`, a double-click launcher that
+  downloads that tarball, checks its SHA-256 and runs `install.sh` (with
+  `--update` for an existing `~/Games/AfroSamuraiRecomp`). Built by
+  `tools/linux/make_release_assets.py`; `checks/test_linux_installer.py` checks
+  the launcher.
+
 ## 0.3.8 – Setup payload as a resource
 - The setup (`afrosetup-v0.3.8.exe`) carries its files as a normal Windows
   resource (RCDATA 101) instead of bytes appended after the program (an
