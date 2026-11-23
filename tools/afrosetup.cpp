@@ -10,7 +10,6 @@ static const char kArtCredit[] = "Lomorsin Afro header 1200x240";
 #include <commdlg.h>
 #include <shellapi.h>
 #include <shlobj.h>
-#include <tlhelp32.h>
 
 #include <cstring>
 #include <cwchar>
@@ -409,19 +408,18 @@ bool FileExists(const std::wstring& path) {
 
 bool PathExists(const std::wstring& path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
 
+// This install's game is running: Windows does not let a running exe be
+// opened for writing (sharing violation). The file is only opened, never
+// written, and no other process is looked at.
 bool AfrorecompRunning() {
-  HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-  if (snap == INVALID_HANDLE_VALUE) return false;
-  PROCESSENTRY32W pe{};
-  pe.dwSize = sizeof pe;
-  bool found = false;
-  if (Process32FirstW(snap, &pe)) {
-    do {
-      if (_wcsicmp(pe.szExeFile, L"afrorecomp.exe") == 0) found = true;
-    } while (!found && Process32NextW(snap, &pe));
+  const std::wstring exe = g_install + L"\\game\\afrorecomp.exe";
+  HANDLE h = CreateFileW(exe.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                         nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (h != INVALID_HANDLE_VALUE) {
+    CloseHandle(h);
+    return false;
   }
-  CloseHandle(snap);
-  return found;
+  return GetLastError() == ERROR_SHARING_VIOLATION;
 }
 
 std::wstring InstalledVersion(const std::wstring& root) {
@@ -720,36 +718,15 @@ int ConfirmStop() {
   return pressed;
 }
 
-void TerminatePid(DWORD pid) {
-  if (pid == 0 || pid == GetCurrentProcessId()) return;
-  HANDLE proc = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-  if (!proc) return;
-  TerminateProcess(proc, 0xC000013A);
-  CloseHandle(proc);
-}
-
+// Cancel stops only the build this setup started: its job object holds
+// install.ps1 and everything it starts. Without a job, install.ps1 itself.
 void StopThisRun() {
   const UINT code = 0xC000013A;
   if (g_job) {
     TerminateJobObject(g_job, code);
     return;
   }
-  if (!g_proc) return;
-  const DWORD root = GetProcessId(g_proc);
-  HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-  std::vector<std::pair<uint32_t, uint32_t>> edges;
-  if (snap != INVALID_HANDLE_VALUE) {
-    PROCESSENTRY32W pe{};
-    pe.dwSize = sizeof pe;
-    if (Process32FirstW(snap, &pe)) {
-      do {
-        edges.emplace_back(pe.th32ProcessID, pe.th32ParentProcessID);
-      } while (Process32NextW(snap, &pe));
-    }
-    CloseHandle(snap);
-  }
-  const auto tree = afrosetup::DescendantPids(root, edges);
-  for (auto it = tree.rbegin(); it != tree.rend(); ++it) TerminatePid(*it);
+  if (g_proc) TerminateProcess(g_proc, code);
 }
 
 void NoteCancellation() {
@@ -843,7 +820,7 @@ void StartInstall() {
   // right after CreateProcessW. It is not started suspended: a hidden process
   // created suspended and then resumed is what antivirus heuristics look for in
   // process injection. PowerShell takes far longer to load than this takes, and
-  // Cancel also stops the run's descendants by PID (DescendantPids).
+  // the processes it starts join the job with it.
   g_job = CreateJobObjectW(nullptr, nullptr);
   if (g_job) {
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};

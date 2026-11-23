@@ -121,8 +121,17 @@ def main() -> None:
         fail("asInvoker manifest missing from the PE image")
     cpp = (ROOT / "tools" / "afrosetup.cpp").read_text(encoding="utf-8")
     ps1 = (ROOT / "tools" / "install.ps1").read_text(encoding="utf-8")
-    if "ConfirmedStop" not in cpp or "DescendantPids" not in cpp or "TerminateJobObject" not in cpp:
+    if "ConfirmedStop" not in cpp or "TerminateJobObject" not in cpp:
         fail("cancel is not limited to the process tree of this run")
+    # Antivirus heuristics: no process enumeration or opening other processes,
+    # and install.ps1 runs under RemoteSigned, not Bypass.
+    for name in (b"CreateToolhelp32Snapshot", b"Process32FirstW", b"OpenProcess"):
+        if name in image:
+            fail(f"setup imports {name.decode()}")
+    if "Bypass".encode("utf-16-le") in image:
+        fail("setup command line lowers the execution policy to Bypass")
+    if "RemoteSigned".encode("utf-16-le") not in image:
+        fail("setup command line lost -ExecutionPolicy RemoteSigned")
     if "taskkill" in cpp.lower() or "Stop-Process" in ps1:
         fail("cancel kills by image name")
     if "[string]$Ref = 'main'" not in ps1:

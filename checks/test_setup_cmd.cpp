@@ -38,10 +38,8 @@ int main(int argc, char** argv) {
   using afrosetup::BuildArgv;
   using afrosetup::CancelAnswer;
   using afrosetup::ConfirmedStop;
-  using afrosetup::DescendantPids;
   using afrosetup::MayMarkStepDone;
   using afrosetup::PartialCountsAsVerified;
-  using afrosetup::PidIsInRun;
   using afrosetup::JoinCommandLine;
   using afrosetup::MaySpawn;
   using afrosetup::QuoteWinArg;
@@ -91,6 +89,8 @@ int main(int argc, char** argv) {
   Expect(saw_tree && saw_license && saw_script_flag && saw_ps_nonint, "required flags present");
   Expect(args[0] == ok.powershell_exe, "powershell is not taken from PATH");
   Expect(args[5] == L"-File", "-File is used so paths are arguments");
+  Expect(args[3] == L"-ExecutionPolicy" && args[4] == L"RemoteSigned",
+         "install.ps1 runs under RemoteSigned, not Bypass");
   const std::wstring line = JoinCommandLine(args);
   Expect(line.find(L"\"C:\\Games\\Afro Samurai\"") != std::wstring::npos, "install dir is quoted");
   Expect(line.find(L"Mar\u00eda Jes\u00fas") != std::wstring::npos, "unicode path is preserved");
@@ -122,13 +122,6 @@ int main(int argc, char** argv) {
   Expect(!PartialCountsAsVerified(true, false) && !PartialCountsAsVerified(false, true) &&
              PartialCountsAsVerified(true, true),
          "a partial download is verified only after the hash matches and it is renamed");
-  const std::vector<std::pair<uint32_t, uint32_t>> edges = {{11, 10}, {12, 11}, {99, 1}, {50, 1}};
-  const auto tree = DescendantPids(10, edges);
-  Expect(PidIsInRun(10, tree) && PidIsInRun(11, tree) && PidIsInRun(12, tree),
-         "this run includes the process it started and its children");
-  Expect(!PidIsInRun(99, tree) && !PidIsInRun(50, tree),
-         "a game and another installer are not part of this run");
-
   Expect(SameOrInside(L"C:/Games", L"C:\\games\\Afro"), "case and slash insensitive containment");
   Expect(!SameOrInside(L"C:\\Games\\Afro", L"C:\\Games\\AfroExtra"), "prefix is not containment");
 

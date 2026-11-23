@@ -482,8 +482,10 @@ inline std::vector<std::wstring> BuildArgv(const Request& in) {
   argv.push_back(in.powershell_exe);
   argv.push_back(L"-NoProfile");
   argv.push_back(L"-NonInteractive");
+  // The scripts were just written by this setup, so they are local files
+  // (no download mark): RemoteSigned runs them without lowering the policy further.
   argv.push_back(L"-ExecutionPolicy");
-  argv.push_back(L"Bypass");
+  argv.push_back(L"RemoteSigned");
   argv.push_back(L"-File");
   argv.push_back(in.script_path);
   argv.push_back(L"-InstallDir");
@@ -533,32 +535,6 @@ inline bool MayMarkStepDone(bool run_cancelled) { return !run_cancelled; }
 // A .part file counts only after the hash matches and it is renamed into place.
 inline bool PartialCountsAsVerified(bool hash_ok, bool moved_into_place) {
   return hash_ok && moved_into_place;
-}
-
-// Pids of this run: the process we created and its descendants.
-// Edges are (pid, parent). A game or another installer is not in the list.
-inline std::vector<uint32_t> DescendantPids(
-    uint32_t root, const std::vector<std::pair<uint32_t, uint32_t>>& pid_parent) {
-  std::vector<uint32_t> out;
-  std::vector<uint32_t> queue{root};
-  size_t i = 0;
-  while (i < queue.size()) {
-    const uint32_t cur = queue[i++];
-    bool seen = false;
-    for (uint32_t have : out)
-      if (have == cur) seen = true;
-    if (seen || cur == 0) continue;
-    out.push_back(cur);
-    for (const auto& edge : pid_parent)
-      if (edge.second == cur && edge.first != cur) queue.push_back(edge.first);
-  }
-  return out;
-}
-
-inline bool PidIsInRun(uint32_t pid, const std::vector<uint32_t>& tree) {
-  for (uint32_t have : tree)
-    if (have == pid) return true;
-  return false;
 }
 
 // Success never starts the game by itself. Play is the only control that does.

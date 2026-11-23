@@ -3,6 +3,15 @@
 Newest first. Versions are in `app/VERSION`.
 
 ## Unreleased
+- Setup: fewer traits antivirus engines look for. The v0.3.8 setup was flagged
+  by 2 of 70 engines on VirusTotal (Huorong `Trojan/ShellLoader.gx`, AliCloud
+  `Trojan:Win/Strab.Gen`). The setup no longer lists or opens other processes:
+  Cancel stops its job object (install.ps1 and everything it starts), and
+  "the game is running" means this install's `game\afrorecomp.exe` cannot be
+  opened for writing. install.ps1 runs with `-ExecutionPolicy RemoteSigned`
+  instead of `Bypass`; the scripts the setup writes are local files, so
+  RemoteSigned runs them. `checks/check_setup_packaging.py` and
+  `checks/check_update_contract.py` guard both.
 - Prologue soft-lock fix (the original game has it too): in the courtyard fight
   before the boss, an enemy that should walk along the ledge and jump down can
   end up below the ledge instead, for example when Afro stands where it lands.
