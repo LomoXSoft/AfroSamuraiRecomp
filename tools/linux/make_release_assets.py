@@ -13,7 +13,7 @@
       its questions. It waits for
       Enter at the end so the window stays readable.
 
-usage: python3 tools/linux/make_release_assets.py --ref v0.3.8 --out <dir>
+usage: python3 tools/linux/make_release_assets.py --ref v0.3.9 --out <dir>
 """
 
 from __future__ import annotations
@@ -76,12 +76,12 @@ def desktop_text(ver: str, tarball: str, sha: str) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ref", required=True, help="release tag, for example v0.3.8")
+    ap.add_argument("--ref", required=True, help="release tag, for example v0.3.9")
     ap.add_argument("--out", type=pathlib.Path, required=True)
     args = ap.parse_args()
     m = re.fullmatch(r"v(\d+(?:\.\d+)+)", args.ref)
     if not m:
-        fail("--ref must be a release tag like v0.3.8")
+        fail("--ref must be a release tag like v0.3.9")
     ver = m.group(1)
 
     def git(*a: str) -> bytes:

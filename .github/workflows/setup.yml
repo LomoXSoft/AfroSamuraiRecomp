@@ -1,6 +1,6 @@
 # Builds the Windows setup (afrosetup-v<app/VERSION>.exe) on GitHub Actions.
 # Started by hand only (Actions tab > Setup build > Run workflow, or
-# `gh workflow run setup.yml -f ref=v0.3.8`). It never runs on push.
+# `gh workflow run setup.yml -f ref=v0.3.9`). It never runs on push.
 #
 # Every run uploads the setup as a workflow artifact and records a build
 # provenance attestation for it (`gh attestation verify <exe> -R LomoXSoft/AfroSamuraiRecomp`).
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Tag or commit to build (for example v0.3.8)
+        description: Tag or commit to build (for example v0.3.9)
         required: true
         type: string
       upload:
