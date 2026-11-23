@@ -2,7 +2,7 @@
 
 Newest first. Versions are in `app/VERSION`.
 
-## Unreleased
+## 0.3.9 – Prologue soft-lock fix
 - Setup: fewer traits antivirus engines look for. The v0.3.8 setup was flagged
   by 2 of 70 engines on VirusTotal (Huorong `Trojan/ShellLoader.gx`, AliCloud
   `Trojan:Win/Strab.Gen`). The setup no longer lists or opens other processes:
