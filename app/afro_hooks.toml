@@ -252,3 +252,24 @@ registers = ["r3"]
 address = 0x826B8690
 name = "AfroAspectLoadingTextHook"
 registers = ["r8", "f1"]
+
+# Spawn tracking for the prologue soft-lock fix and its diagnostics
+# (src/spawn_guard.cpp, afro_spawn_guard and afro_spawn_diag).
+# sub_826CA410 (EntSpawnPoint spawn), before lwz r10,0(r30): character r30
+# created, jump pending and delay stored on the spawn point r31.
+[[midasm_hook]]
+address = 0x826CA4DC
+name = "AfroSpawnPointSpawned"
+registers = ["r30", "r31"]
+
+# sub_826CA638 (EntSpawnManager update) after stwu and mr r31,r3.
+[[midasm_hook]]
+address = 0x826CA650
+name = "AfroSpawnMgrTick"
+registers = ["r31"]
+
+# sub_826C9F78 (EntSpawnPoint update) after stwu and mr r26,r3.
+[[midasm_hook]]
+address = 0x826C9F90
+name = "AfroSpawnPointTick"
+registers = ["r26"]

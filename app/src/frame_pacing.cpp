@@ -1296,6 +1296,8 @@ void AfroLoadingTextHook(PPCRegister& r9) {
   r9.u64 = buf;
 }
 
+namespace afro { void SpawnGuardFrame(); }
+
 void AfroSwapHook(PPCRegister& r31) {
   // In-game options menu: opens on its controller combination, and the game
   // waits here while it is open (afro_menu.cpp).
@@ -1305,6 +1307,7 @@ void AfroSwapHook(PPCRegister& r31) {
   FxTick();
   AspectScreenTick();
   PlayerInvulnTick();
+  afro::SpawnGuardFrame();
   ForceDevicePresentInterval(r31.u32);
   ForceExperimentalPrimaryDt();
   if (ClampedPresentInterval() == 1) {

@@ -3,6 +3,17 @@
 Newest first. Versions are in `app/VERSION`.
 
 ## Unreleased
+- Prologue soft-lock fix (the original game has it too): in the courtyard fight
+  before the boss, an enemy that should walk along the ledge and jump down can
+  end up below the ledge instead, for example when Afro stands where it lands.
+  It then follows a waypoint it can never reach (5.5 units above it; the game
+  needs 1.5), so it neither comes down nor fights and the fight never ends.
+  `src/spawn_guard.cpp` watches the enemies the spawn points create, only in
+  `combatintro`: one that follows an unreached waypoint more than 1.5 units
+  above or below it and does not move for `afro_spawn_guard_s` seconds (10)
+  stops following its waypoints and fights. `afro_spawn_guard=false` turns it
+  off; `afro_spawn_diag` logs the spawn managers and enemies once a
+  second.
 - Linux release assets, first attached to v0.3.8:
   `afrorecomp-linux-v<ver>.tar.gz` (the tag's source with LF line endings) and
   `AfroSamuraiRecomp-Linux-v<ver>.desktop`, a double-click launcher that

@@ -58,6 +58,9 @@
 0x826B8378 = 0x826B7F08
 0x826B8674 = 0x826B8204
 0x826B8690 = 0x826B8220
+0x826C9F90 = 0x826C9B18
+0x826CA4DC = 0x826CA064
+0x826CA650 = 0x826CA1D8
 0x826D5DD0 = 0x826D5938
 0x826DE0F0 = 0x826DDC18
 0x826F2B10 = 0x826F2638
@@ -75,6 +78,8 @@
 [data]
 0x820EB774 = 0x820EB6F4  # constant 1/30
 0x82045F6C = 0x82045F58  # constant 1.0 (full fade)
+0x820E0A48 = 0x820E09B8  # EntSpawnManager vtable (+224 interface)
+0x820E0A64 = 0x820E09D4  # EntSpawnPoint vtable
 0x8285CCBF = 0x8285CCBF  # camera X invert flag (no X in the USA menu or save)
 0x82897B20 = 0x82897B00
 0x82898D7C = 0x82898D5C  # fade target (struct at 0x82898D78 moved by -0x20)
@@ -99,6 +104,7 @@
 0x828B3070 = 0x828B3070
 0x828E55EB = 0x828E55EB  # camera Y invert flag
 0x828E5697 = 0x828E5697
+0x828E56E8 = 0x828E56E8  # Afro entity (spawn point distance checks)
 0x828E6172 = 0x828E6172  # cinematic flag
 0x828E6173 = 0x828E6173
 0x828E629C = 0x828E629C  # player pointer
@@ -109,3 +115,4 @@
 0x828E62DA = 0           # diagnostic watch only; not found
 0x828E63A3 = 0x828E63A2
 0x829F9470 = 0x829F9470  # profile pointer
+0x82A13CA0 = 0x82A13CA0  # level path string
