@@ -2,6 +2,23 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.3.10 – Setup without embedded files
+- The setup exe no longer carries the project's source files. Antivirus
+  engines read a small unsigned exe that holds a packed file tree and starts
+  PowerShell on it as a "shell loader" (v0.3.9: Huorong, Rising and AliCloud
+  `ShellLoader`/`Strab`, SecureAge), whether the tree was appended (up to
+  0.3.7) or a resource (0.3.8, 0.3.9). The tree is now a second release asset,
+  `afrosetup-v<version>-files.bin`. When **Install** is pressed the setup uses
+  that file if it lies next to the setup, or downloads it from this version's
+  GitHub release (WinHTTP), and accepts it only when its size and SHA-256 equal
+  the ones compiled into the exe (`afrosetup_files.h`, written by
+  `pack_setup_payload.py --header`). A wrong or missing file stops before
+  anything is written to the install folder.
+- `tools/build_release_setup.ps1`, `tools/build_setup.sh` and the Setup build
+  workflow build, check, attest and upload both files.
+  `checks/check_setup_packaging.py` fails if the exe has a data resource, an
+  overlay or install.ps1 text, or was not compiled with the asset's SHA-256.
+
 ## 0.3.9 – Prologue soft-lock fix
 - Setup: fewer traits antivirus engines look for. The v0.3.8 setup was flagged
   by 2 of 70 engines on VirusTotal (Huorong `Trojan/ShellLoader.gx`, AliCloud

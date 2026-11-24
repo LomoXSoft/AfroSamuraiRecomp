@@ -10,7 +10,7 @@
 
 namespace afrosetup {
 
-inline constexpr wchar_t kExpectedVersion[] = L"0.3.9";
+inline constexpr wchar_t kExpectedVersion[] = L"0.3.10";
 
 struct Request {
   std::wstring powershell_exe;
@@ -462,7 +462,7 @@ inline std::vector<std::wstring> Validate(const Request& in) {
   if (!in.accept_license && !in.license_recorded)
     errors.push_back(L"the Build Tools license checkbox is required");
   if (!LanguageOk(in.language)) errors.push_back(L"language must be en, es, fr, or it");
-  if (in.local_tree.empty()) errors.push_back(L"local 0.3.9 source is required");
+  if (in.local_tree.empty()) errors.push_back(L"local 0.3.10 source is required");
   for (const std::wstring* p : {&in.install_dir, &in.iso, &in.gamedata_dir, &in.local_tree, &in.script_path,
                                  &in.accept_unverified_iso}) {
     if (p->find(L'"') != std::wstring::npos) errors.push_back(L"paths cannot contain a double quote");
@@ -633,9 +633,25 @@ struct PayloadFile {
 };
 
 inline constexpr char kPayloadMagic[8] = {'A', 'F', 'S', 'T', 'P', '0', '0', '1'};
-// The setup carries its payload as RCDATA resource 101 (afrosetup.rc), not as
-// bytes appended after the PE image: an overlay is a classic dropper trait.
-inline constexpr int kPayloadResourceId = 101;
+// 0.3.10 and later: the setup exe carries no source files. Antivirus engines
+// read a small exe that holds a packed tree and starts PowerShell on it as a
+// "shell loader", whether the tree was an overlay (up to 0.3.7) or a resource
+// (0.3.8, 0.3.10). The tree is now the release asset FilesAssetName(), and the
+// setup takes it only when its SHA-256 equals the one compiled into the exe.
+inline std::wstring FilesAssetName() { return std::wstring(L"afrosetup-v") + kExpectedVersion + L"-files.bin"; }
+inline constexpr wchar_t kFilesHost[] = L"github.com";
+inline std::wstring FilesAssetUrlPath() {
+  return std::wstring(L"/LomoXSoft/AfroSamuraiRecomp/releases/download/v") + kExpectedVersion + L"/" +
+         FilesAssetName();
+}
+// The asset is a few MB; anything far larger is not it.
+inline constexpr size_t kFilesMaxBytes = 64u << 20;
+inline bool Sha256HexOk(const std::string& s) {
+  if (s.size() != 64) return false;
+  for (char c : s)
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+  return true;
+}
 
 inline bool PayloadPathOk(const std::string& path) {
   if (path.empty() || path[0] == '/' || path[0] == '\\') return false;

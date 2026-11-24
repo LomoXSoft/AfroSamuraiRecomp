@@ -11,6 +11,8 @@
 tools/afrosetup_header.inc
 tools/afrosetup_version.rc2
 tools/afrosetup_payload.bin
+tools/afrosetup_files.h
+tools/afrosetup-v*-files.bin
 assets/
 app/generated/default/
 app/afro_switch_tables.toml

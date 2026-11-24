@@ -5,7 +5,7 @@
 - Its LLVM download is the one install.ps1 pins (same URL and SHA-256).
 - It never changes a published release: the upload step is for drafts only.
 - tools/build_release_setup.ps1 keeps the release recipe (static CRT, GUI
-  subsystem, wWinMainCRTStartup, payload from a git archive export).
+  subsystem, wWinMainCRTStartup, source asset from a git archive export).
 """
 
 from __future__ import annotations
@@ -71,6 +71,9 @@ def main() -> None:
         fail("workflow does not run the build script and the packaging check")
     if "attest-build-provenance" not in wf:
         fail("build provenance attestation missing")
+    # 0.3.10 and later: the source files are a second asset the setup downloads.
+    if "dist/afrosetup-v*-files.bin" not in wf or "$env:EXE $env:FILES" not in wf or "files_path" not in wf:
+        fail("workflow does not build, keep and upload the -files.bin asset with the setup")
 
     for flag in (
         "'-fms-runtime-lib=static'",
@@ -78,6 +81,8 @@ def main() -> None:
         "'-Wl,/ENTRY:wWinMainCRTStartup'",
         "'-DWINVER=0x0A00'",
         "'-ladvapi32'",
+        "'-lwinhttp'",
+        "'-lbcrypt'",
     ):
         if flag not in ps:
             fail(f"build_release_setup.ps1 lost {flag}")

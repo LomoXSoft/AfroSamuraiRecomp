@@ -403,32 +403,48 @@ int main(int argc, char** argv) {
   files[0].path = "../app/VERSION";
   Expect(afrosetup::EncodePayload(files).empty(), "parent segments are rejected");
 
-  if (argc > 1) {
-    std::ifstream in(argv[1], std::ios::binary);
-    std::vector<uint8_t> exe((std::istreambuf_iterator<char>(in)), {});
-    std::vector<afrosetup::PayloadFile> packed;
-    std::string perr;
-    // 0.3.9 and later: the payload is RCDATA resource kPayloadResourceId, not an overlay.
+  Expect(afrosetup::FilesAssetName() == std::wstring(L"afrosetup-v") + afrosetup::kExpectedVersion + L"-files.bin",
+         "source asset name follows the setup name");
+  Expect(afrosetup::FilesAssetUrlPath() == std::wstring(L"/LomoXSoft/AfroSamuraiRecomp/releases/download/v") +
+                                               afrosetup::kExpectedVersion + L"/" + afrosetup::FilesAssetName(),
+         "source asset is downloaded from this version's release");
+  Expect(std::wstring(afrosetup::kFilesHost) == L"github.com", "source asset host is github.com");
+  Expect(afrosetup::Sha256HexOk(std::string(64, 'a')) && !afrosetup::Sha256HexOk(std::string(64, 'A')) &&
+             !afrosetup::Sha256HexOk(std::string(63, '0')),
+         "SHA-256 text is 64 lowercase hex digits");
+
+  // argv[1]: the built source asset afrosetup-v<version>-files.bin.
+  // argv[2] (optional): the built setup, which must carry no source files.
+  if (argc > 2) {
+    std::ifstream ein(argv[2], std::ios::binary);
+    std::vector<uint8_t> exe((std::istreambuf_iterator<char>(ein)), {});
     const uint8_t* res = nullptr;
     size_t res_size = 0;
-    Expect(afrosetup::FindPeResource(exe.data(), exe.size(), 10, afrosetup::kPayloadResourceId, res, res_size),
-           "built setup has the payload resource");
-    Expect(res && afrosetup::ParsePayloadBody(res, res_size, packed, perr), perr.c_str());
+    Expect(!exe.empty(), "built setup is readable");
+    Expect(!afrosetup::FindPeResource(exe.data(), exe.size(), 10, 101, res, res_size),
+           "built setup has no payload resource (0.3.10 and later)");
     std::vector<afrosetup::PayloadFile> overlay;
     std::string oerr;
     Expect(!afrosetup::ParsePayload(exe.data(), exe.size(), overlay, oerr), "built setup has no overlay payload");
+  }
+  if (argc > 1) {
+    std::ifstream in(argv[1], std::ios::binary);
+    std::vector<uint8_t> body((std::istreambuf_iterator<char>(in)), {});
+    std::vector<afrosetup::PayloadFile> packed;
+    std::string perr;
+    Expect(!body.empty() && afrosetup::ParsePayloadBody(body.data(), body.size(), packed, perr), perr.c_str());
     bool version_ok = false, ps1_ok = false, bat_ok = false, hooks_ok = false, manifest_lf = false;
     for (const auto& f : packed) {
       if (f.path == "app/VERSION") {
         std::string text(f.bytes.begin(), f.bytes.end());
         while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
           text.pop_back();
-        version_ok = text == "0.3.9";
+        version_ok = text == "0.3.10";
       }
       if (f.path == "tools/install.ps1") {
         std::string text(f.bytes.begin(), f.bytes.end());
         ps1_ok = text.find("LocalTree") != std::string::npos &&
-                 text.find("$LOCAL_TREE_VERSION = '0.3.9'") != std::string::npos &&
+                 text.find("$LOCAL_TREE_VERSION = '0.3.10'") != std::string::npos &&
                  text.find("Refusing -Ref main") != std::string::npos &&
                  text.find("AFROSTEP ") != std::string::npos &&
                  text.find("AFROPHASE compile") != std::string::npos &&
@@ -443,8 +459,8 @@ int main(int argc, char** argv) {
                    text.find("AfroPlayerMeterDeathGate") != std::string::npos;
       }
     }
-    Expect(version_ok, "bundled VERSION is 0.3.9");
-    Expect(ps1_ok, "bundled install.ps1 is the 0.3.9 local-tree script");
+    Expect(version_ok, "bundled VERSION is 0.3.10");
+    Expect(ps1_ok, "bundled install.ps1 is the 0.3.10 local-tree script");
     Expect(bat_ok, "bundled tree still contains install.bat");
     Expect(hooks_ok, "bundled hooks include the meter death gate");
     Expect(manifest_lf, "bundled codegen manifest has LF line ends, as rexglue writes it");
@@ -456,7 +472,7 @@ int main(int argc, char** argv) {
     return std::string(std::istreambuf_iterator<char>(in), {});
   };
   std::string script_text, window_cpp, build_bat;
-  for (const char* dir : {"/tmp/afro-0.3.9", "..", "."}) {
+  for (const char* dir : {"/tmp/afro-0.3.10", "..", "."}) {
     if (script_text.empty()) script_text = read_text(std::string(dir) + "/tools/install.ps1");
     if (window_cpp.empty()) window_cpp = read_text(std::string(dir) + "/tools/afrosetup.cpp");
     if (build_bat.empty()) build_bat = read_text(std::string(dir) + "/tools/build_win.bat");

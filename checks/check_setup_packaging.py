@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""Packaging checks for tools/afrosetup.exe. No Windows install is performed."""
+"""Packaging checks for tools/afrosetup-v<version>.exe and its source asset
+tools/afrosetup-v<version>-files.bin. No Windows install is performed.
+
+Since 0.3.10 the exe carries no source files (no resource, no overlay). It is
+bound to the asset by the SHA-256 compiled into it.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import pathlib
 import struct
 import sys
@@ -10,6 +16,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 VERSION = (ROOT / "app" / "VERSION").read_text(encoding="utf-8").strip()
 EXE = ROOT / "tools" / f"afrosetup-v{VERSION}.exe"
+FILES = ROOT / "tools" / f"afrosetup-v{VERSION}-files.bin"
 MAGIC = b"AFSTP001"
 
 
@@ -38,8 +45,8 @@ def rva_to_offset(secs: list[tuple[int, int, int, int]], rva: int) -> int:
     return 0
 
 
-def rcdata(blob: bytes, pe: int, res_id: int) -> tuple[int, int]:
-    """File offset and size of RT_RCDATA resource `res_id` (first language)."""
+def rcdata(blob: bytes, pe: int, res_id: int) -> tuple[int, int] | None:
+    """File offset and size of RT_RCDATA resource `res_id` (first language), or None."""
     rsrc_rva = struct.unpack_from("<I", blob, pe + 24 + 112 + 2 * 8)[0]
     if not rsrc_rva:
         fail("PE has no resource directory")
@@ -50,16 +57,21 @@ def rcdata(blob: bytes, pe: int, res_id: int) -> tuple[int, int]:
         named, ids = struct.unpack_from("<HH", blob, off + 12)
         return [struct.unpack_from("<II", blob, off + 16 + 8 * i) for i in range(named + ids)]
 
-    def child(off: int, want: int | None) -> int:
+    def child(off: int, want: int | None) -> int | None:
         for name, target in entries(off):
             if want is None or (not name & 0x80000000 and name == want):
                 return target
-        fail(f"resource {want} not found")
-        return 0
+        return None
 
     t = child(base, 10)  # RT_RCDATA
+    if t is None:
+        return None
     n = child(base + (t & 0x7FFFFFFF), res_id)
+    if n is None:
+        return None
     leaf = child(base + (n & 0x7FFFFFFF), None)
+    if leaf is None:
+        return None
     if leaf & 0x80000000:
         fail("resource leaf is a directory")
     data_rva, size = struct.unpack_from("<II", blob, base + leaf)[:2]
@@ -85,6 +97,8 @@ def payload_files(body: bytes) -> dict[str, bytes]:
 def main() -> None:
     if not EXE.is_file():
         fail(f"missing {EXE}")
+    if not FILES.is_file():
+        fail(f"missing {FILES} (the second release asset)")
     blob = EXE.read_bytes()
     if blob[:2] != b"MZ":
         fail("not an MZ executable")
@@ -100,7 +114,7 @@ def main() -> None:
     if subsystem != 2:
         fail(f"subsystem {subsystem}, expected Windows GUI (2)")
     # No overlay: the file ends with the last section (or with an Authenticode
-    # certificate, once the setup is signed). The payload is RCDATA 101.
+    # certificate, once the setup is signed).
     secs = sections(blob, pe)
     image_end = max(raw + raw_size for _, _, raw, raw_size in secs)
     cert_off, cert_size = struct.unpack_from("<II", blob, pe + 24 + 112 + 4 * 8)
@@ -108,13 +122,25 @@ def main() -> None:
         fail(f"{len(blob) - image_end} bytes follow the PE image (overlay)")
     if blob[-8:] == MAGIC:
         fail("old overlay footer present")
-    off, size = rcdata(blob, pe, 101)
-    files = payload_files(blob[off : off + size])
+    # No source files inside the exe: no RCDATA payload, and none of the
+    # tree's text (install.ps1 is the one PowerShell would run).
+    if rcdata(blob, pe, 101) is not None:
+        fail("the exe still carries RCDATA 101")
+    image = blob
+    for marker in (b"Set-PhasePlan", b"Expand-ZipCounted", b"$LOCAL_TREE_VERSION"):
+        if marker in image:
+            fail(f"the exe contains install.ps1 text ({marker.decode()})")
+    body = FILES.read_bytes()
+    files = payload_files(body)
     for need in ("app/VERSION", "tools/install.ps1", "tools/build_win.bat", "install.bat", "app/afro_hooks.toml"):
         if need not in files:
-            fail(f"payload is missing {need}")
-    # Search the program, not the payload (the payload holds this very check's text).
-    image = blob[:off] + blob[off + size :]
+            fail(f"source asset is missing {need}")
+    digest = hashlib.sha256(body).hexdigest()
+    if digest.encode("ascii") not in image:
+        fail("the exe was not compiled with this source asset's SHA-256")
+    for text in (f"/LomoXSoft/AfroSamuraiRecomp/releases/download/v", "-files.bin", "github.com"):
+        if text.encode("utf-16-le") not in image:
+            fail(f"the exe lost the asset location ({text})")
     if b"requireAdministrator" in image:
         fail("PE image requests administrator")
     if b"asInvoker" not in image:
@@ -136,7 +162,7 @@ def main() -> None:
         fail("cancel kills by image name")
     if "[string]$Ref = 'main'" not in ps1:
         fail("console default branch was removed")
-    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.9'" not in ps1:
+    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.10'" not in ps1:
         fail("local-tree guard missing")
     if "logwrite.ps1" not in ps1 or "Add-Content" in ps1:
         fail("install.ps1 still appends the log with Add-Content")
@@ -144,7 +170,7 @@ def main() -> None:
     if "FileShare]::ReadWrite" not in logwrite or "LogBusy" not in logwrite:
         fail("log writer is missing the share mode or the recursion guard")
     version = (ROOT / "app" / "VERSION").read_text(encoding="utf-8").strip()
-    if version != "0.3.9":
+    if version != "0.3.10":
         fail(f"VERSION is {version!r}")
     if b"Lomorsin Afro header 1200x240" not in image:
         fail("setup image is missing the header art marker")
@@ -160,16 +186,16 @@ def main() -> None:
     if "CREATE_SUSPENDED" in cpp or "ResumeThread" in cpp:
         fail("setup starts a process suspended")
     if files["app/VERSION"].decode("utf-8").strip() != version:
-        fail("payload app/VERSION differs from app/VERSION")
+        fail("source asset app/VERSION differs from app/VERSION")
     rc = (ROOT / "tools" / "afrosetup.rc").read_text(encoding="utf-8")
-    hdr = (ROOT / "tools" / "afrosetup_cmd.h").read_text(encoding="utf-8")
-    if '101 RCDATA "afrosetup_payload.bin"' not in rc or "kPayloadResourceId = 101;" not in hdr:
-        fail("payload resource id differs between afrosetup.rc and afrosetup_cmd.h")
-    if "FindResourceW(nullptr, MAKEINTRESOURCEW(afrosetup::kPayloadResourceId)" not in cpp or "_wfopen_s(&f, path, L\"rb\")" in cpp:
-        fail("setup does not read its payload from the resource")
+    if "RCDATA" in rc:
+        fail("afrosetup.rc embeds a data resource again")
+    if "FilesMatch(" not in cpp or "AFROSETUP_FILES_SHA256" not in cpp or "FindResourceW" in cpp:
+        fail("setup does not check the source asset against its compiled SHA-256")
     print("setup packaging checks: ok")
     print(f"  {EXE}  {len(blob)} bytes  amd64 GUI  asInvoker")
-    print(f"  payload: RCDATA 101 at {off}, {size} bytes, {len(files)} files, no overlay")
+    print(f"  {FILES.name}: {len(body)} bytes, {len(files)} files, SHA-256 {digest} (compiled into the exe)")
+    print("  no RCDATA payload, no overlay, no install.ps1 text in the exe")
     print("  no Windows install was run")
 
 

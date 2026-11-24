@@ -1,10 +1,11 @@
-# Builds the Windows setup (afrosetup-v<app/VERSION>.exe) on GitHub Actions.
+# Builds the Windows setup (afrosetup-v<app/VERSION>.exe) and its source asset
+# (afrosetup-v<app/VERSION>-files.bin, which the setup downloads) on GitHub Actions.
 # Started by hand only (Actions tab > Setup build > Run workflow, or
-# `gh workflow run setup.yml -f ref=v0.3.9`). It never runs on push.
+# `gh workflow run setup.yml -f ref=v0.3.10`). It never runs on push.
 #
-# Every run uploads the setup as a workflow artifact and records a build
-# provenance attestation for it (`gh attestation verify <exe> -R LomoXSoft/AfroSamuraiRecomp`).
-# With "upload" ticked it also attaches the setup to the GitHub release of that
+# Every run uploads both files as a workflow artifact and records a build
+# provenance attestation for them (`gh attestation verify <file> -R LomoXSoft/AfroSamuraiRecomp`).
+# With "upload" ticked it also attaches both to the GitHub release of that
 # tag, but only while the release is still a draft. A published release is never
 # changed by this workflow.
 name: Setup build
@@ -13,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Tag or commit to build (for example v0.3.9)
+        description: Tag or commit to build (for example v0.3.10)
         required: true
         type: string
       upload:
@@ -101,17 +102,22 @@ jobs:
           ./ci/tools/build_release_setup.ps1 -Repo src -Ref HEAD -OutDir $dist
           $exe = Get-ChildItem $dist -Filter 'afrosetup-v*.exe' | Select-Object -First 1
           if (-not $exe) { throw 'no setup was built' }
+          $files = Get-ChildItem $dist -Filter 'afrosetup-v*-files.bin' | Select-Object -First 1
+          if (-not $files) { throw 'no source asset was built' }
           $hash = (Get-FileHash -Algorithm SHA256 $exe.FullName).Hash.ToLowerInvariant()
-          "$hash *$($exe.Name)" | Set-Content -Encoding ascii (Join-Path $dist 'SHA256SUMS.txt')
+          $filesHash = (Get-FileHash -Algorithm SHA256 $files.FullName).Hash.ToLowerInvariant()
+          @("$hash *$($exe.Name)", "$filesHash *$($files.Name)") | Set-Content -Encoding ascii (Join-Path $dist 'SHA256SUMS.txt')
           "name=$($exe.Name)" | Add-Content -Path $env:GITHUB_OUTPUT
           "path=$($exe.FullName)" | Add-Content -Path $env:GITHUB_OUTPUT
+          "files_path=$($files.FullName)" | Add-Content -Path $env:GITHUB_OUTPUT
           $commit = git -C src rev-parse HEAD
           @(
             "### $($exe.Name)",
             '',
             "- Built from: ``$env:REF`` (commit ``$commit``)",
             "- Size: $($exe.Length) bytes",
-            "- SHA-256: ``$hash``"
+            "- SHA-256: ``$hash``",
+            "- $($files.Name): $($files.Length) bytes, SHA-256 ``$filesHash``"
           ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
         env:
           REF: ${{ inputs.ref }}
@@ -121,15 +127,19 @@ jobs:
         run: |
           # The check of the built ref, which knows that ref's version.
           Copy-Item -Force $env:EXE (Join-Path $env:GITHUB_WORKSPACE 'src/tools')
+          if ($env:FILES) { Copy-Item -Force $env:FILES (Join-Path $env:GITHUB_WORKSPACE 'src/tools') }
           python src/checks/check_setup_packaging.py
           if ($LASTEXITCODE -ne 0) { throw 'check_setup_packaging.py failed' }
         env:
           EXE: ${{ steps.build.outputs.path }}
+          FILES: ${{ steps.build.outputs.files_path }}
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ steps.build.outputs.path }}
+          subject-path: |
+            ${{ steps.build.outputs.path }}
+            ${{ steps.build.outputs.files_path }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -137,6 +147,7 @@ jobs:
           name: ${{ steps.build.outputs.name }}
           path: |
             dist/afrosetup-v*.exe
+            dist/afrosetup-v*-files.bin
             dist/SHA256SUMS.txt
           if-no-files-found: error
 
@@ -147,9 +158,10 @@ jobs:
           $draft = gh release view $env:REF -R $env:GITHUB_REPOSITORY --json isDraft --jq .isDraft
           if ($LASTEXITCODE -ne 0) { throw "no GitHub release for $env:REF" }
           if ($draft -ne 'true') { throw "release $env:REF is already published; this workflow only uploads to drafts" }
-          gh release upload $env:REF $env:EXE -R $env:GITHUB_REPOSITORY --clobber
+          gh release upload $env:REF $env:EXE $env:FILES -R $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { throw 'gh release upload failed' }
         env:
           GH_TOKEN: ${{ github.token }}
           REF: ${{ inputs.ref }}
           EXE: ${{ steps.build.outputs.path }}
+          FILES: ${{ steps.build.outputs.files_path }}
