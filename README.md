@@ -503,6 +503,16 @@ time the game starts. Move with the D-pad or the arrow keys, change with left an
 right, and close with B, Start, Back, Esc or F1 again (the game ignores that press).
 Key bindings stay in the launcher.
 
+### Achievements
+The game's 48 achievements work as on the Xbox 360: the game unlocks them and
+they are saved in `Documents\afrorecomp\achievements` (on this PC only, not on
+Xbox Live; RecompLauncher backs that folder up with the saves). To see them,
+choose **Achievements** at the bottom of the in-game options (F1, or hold L3 +
+R3): the list shows each one with the game's icon, name, description and
+gamerscore, unlocked ones in full colour, with the total at the top. Move with
+up and down (left and right jump five), and B or Esc goes back to the options.
+**F7** also opens the runtime's own achievement list, keyboard only.
+
 ### Launcher and options
 The launcher (shown on first run, after each update, or with Shift) has the
 language (English, Español, Français, Italiano) and three buttons: **Play**,

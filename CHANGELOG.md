@@ -2,6 +2,18 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## Next – Achievements page
+- In-game options (F1 / L3 + R3): a new **Achievements** row at the bottom shows
+  "unlocked / total" and the gamerscore, and opens a page with the runtime's
+  achievement list: the game's icons, names, descriptions and gamerscore,
+  unlocked ones in full colour, summary and progress bar at the top. Same data
+  as the runtime's F7 list, which is keyboard only, so controller and Steam Deck
+  players can see it too. The page only reads; it never unlocks or saves.
+- Options menu on the keyboard: Enter (also the game's Start in the default
+  bindings) now selects instead of closing the menu, and Esc (also the game's
+  Back) goes back from the Achievements page instead of closing the menu.
+- The menu fonts also cover Latin Extended-A and the trademark sign.
+
 ## 0.3.10 – Setup without embedded files
 - The setup exe no longer carries the project's source files. Antivirus
   engines read a small unsigned exe that holds a packed file tree and starts

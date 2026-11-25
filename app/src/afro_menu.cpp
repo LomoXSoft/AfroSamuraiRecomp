@@ -7,6 +7,11 @@
 // Navigation uses the game's own pad state (rexruntime's afro_pad_buttons), so the
 // keyboard works through its bindings (arrows, Space, E...) and every controller
 // through its remap.
+//
+// The Achievements row opens a page with the runtime's achievement list (the
+// game's own names, descriptions and icons, unlocks from
+// Documents\afrorecomp\achievements): the same data as the runtime's F7 list,
+// reachable with a controller. It only reads; unlocking stays with the game.
 
 #include "afro_menu.h"
 #include "upscale.h"
@@ -28,9 +33,13 @@
 #include <imgui.h>
 #include <rex/cvar.h>
 #include <rex/logging.h>
+#include <rex/runtime.h>
+#include <rex/system/achievement_manager.h>
+#include <rex/system/kernel_state.h>
 #include <rex/ui/imgui_dialog.h>
 #include <rex/ui/imgui_drawer.h>
 #include <rex/ui/immediate_drawer.h>
+#include <rex/ui/overlay/achievement_icon_cache.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -158,6 +167,16 @@ T4 kHintKeys = {"Key bindings: launcher (hold Shift at start)",
 T4 kStartHold = {"Hold", "Mant\xC3\xA9n", "Maintiens", "Tieni premuto"};
 T4 kStartOptions = {"Options", "Opciones", "Options", "Opzioni"};
 T4 kStartOr = {"or", "o", "ou", "o"};
+// Achievements row and page.
+T4 kAchRow = {"Achievements", "Logros", "Succ\xC3\xA8s", "Obiettivi"};
+T4 kAchTitle = {"ACHIEVEMENTS", "LOGROS", "SUCC\xC3\x88S", "OBIETTIVI"};
+T4 kAchUnlocked = {"unlocked", "desbloqueados", "d\xC3\xA9" "bloqu\xC3\xA9s", "sbloccati"};
+T4 kAchNone = {"The achievement list is not loaded yet.", "La lista de logros a\xC3\xBAn no est\xC3\xA1 cargada.",
+               "La liste des succ\xC3\xA8s n'est pas encore charg\xC3\xA9" "e.",
+               "L'elenco degli obiettivi non \xC3\xA8 ancora caricato."};
+T4 kAchLocal = {"Saved on this PC, not on Xbox Live", "Se guardan en este PC, no en Xbox Live",
+                "Enregistr\xC3\xA9s sur ce PC, pas sur Xbox Live", "Salvati su questo PC, non su Xbox Live"};
+T4 kHintReturn = {"Back", "Volver", "Retour", "Indietro"};
 
 // ---------------------------------------------------------------------- items
 struct Choice {
@@ -165,7 +184,7 @@ struct Choice {
   std::vector<std::pair<std::string, std::string>> cfg;  // keys this choice writes
 };
 struct Item {
-  enum Kind { kHeader, kChoice, kSlider, kResume } kind;
+  enum Kind { kHeader, kChoice, kSlider, kAchievements, kResume } kind;
   const char* const* label;  // T4
   std::vector<Choice> choices;
   std::vector<std::pair<std::string, std::string>> defaults;  // when the cfg lacks a key
@@ -363,6 +382,8 @@ std::vector<Item> MakeItems() {
   choice(lBloom, onoff("fx_bloom", "0", "1"), {{"fx_bloom", "0"}}, fx("afro_fx_bloom"));
   choice(lFocus, onoff("fx_focus", "0", "1"), {{"fx_focus", "0"}}, fx("afro_fx_focus"));
 
+  Item ach{Item::kAchievements, kAchRow};
+  v.push_back(ach);
   Item resume{Item::kResume, kResume};
   v.push_back(resume);
   return v;
@@ -467,6 +488,53 @@ void ButtonNames(const char** ok, const char** back) {
 // next to the exe (zzzz-afro-button-glyphs.patch), named by Xbox position.
 rex::ui::ImmediateDrawer* g_imm = nullptr;
 std::unordered_map<std::string, std::unique_ptr<rex::ui::ImmediateTexture>> g_glyphs;
+
+// --------------------------------------------------------------- achievements
+std::function<rex::Runtime*()> g_runtime;
+// Achievement icons (title XDBF images), created on the UI thread when the page
+// first opens, released in MenuShutdown before the immediate drawer goes.
+std::unique_ptr<rex::ui::AchievementIconCache> g_ach_icons;
+
+// The runtime's achievement manager, or nullptr while the game is still
+// starting (the kernel state does not exist yet).
+rex::system::AchievementManager* Achievements() {
+  rex::Runtime* rt = g_runtime ? g_runtime() : nullptr;
+  if (!rt || !rt->kernel_state()) return nullptr;
+  return &rt->kernel_state()->achievements();
+}
+
+struct AchRow {
+  rex::system::AchievementInfo info;
+  bool unlocked = false;
+};
+struct AchSummary {
+  int unlocked = 0, total = 0, score = 0, score_total = 0;
+};
+std::vector<AchRow> ReadAchievements(AchSummary* sum) {
+  std::vector<AchRow> rows;
+  AchSummary s;
+  if (auto* m = Achievements()) {
+    for (auto& a : m->ListAchievements()) {
+      AchRow r{std::move(a), false};
+      r.unlocked = m->IsUnlocked(r.info.id);
+      ++s.total;
+      s.score_total += int(r.info.gamerscore);
+      if (r.unlocked) ++s.unlocked, s.score += int(r.info.gamerscore);
+      rows.push_back(std::move(r));
+    }
+  }
+  if (sum) *sum = s;
+  return rows;
+}
+
+rex::ui::ImmediateTexture* AchIcon(const rex::system::AchievementInfo& a) {
+  if (!g_ach_icons) {
+    rex::Runtime* rt = g_runtime ? g_runtime() : nullptr;
+    if (!g_imm || !rt) return nullptr;
+    g_ach_icons = std::make_unique<rex::ui::AchievementIconCache>(g_imm, rt);
+  }
+  return g_ach_icons->GetIcon(a);
+}
 
 // Same choice as the GPU plugin's ResolvedFamily: afro_button_glyphs, else the
 // device last used. 1 Xbox, 2 PlayStation, 3 Nintendo, 4 Steam, 5 keyboard.
@@ -579,6 +647,7 @@ class MenuDialog : public rex::ui::ImGuiDialog {
     Load();
     sel_ = Next(-1, 1);
     opened_ = clk::now();
+    ReadAchievements(&ach_sum_);
   }
 
  protected:
@@ -586,6 +655,18 @@ class MenuDialog : public rex::ui::ImGuiDialog {
 
  private:
   void Load();
+  // Achievements page: a snapshot of the list, taken when it opens.
+  void OpenAchievements() {
+    ach_ = ReadAchievements(&ach_sum_);
+    ach_sel_ = 0;
+    ach_scroll_ = 0;
+    page_ = true;
+  }
+  void DrawAchievements(ImDrawList* dl, float x0, float x1, float top, float bottom, float s,
+                        const std::function<ImU32(ImU32, float)>& A);
+  bool IsSetting(int i) const {
+    return items_[i].kind == Item::kChoice || items_[i].kind == Item::kSlider;
+  }
   int Next(int from, int dir) const {
     int i = from;
     for (int n = 0; n < int(items_.size()); ++n) {
@@ -604,7 +685,84 @@ class MenuDialog : public rex::ui::ImGuiDialog {
   uint32_t prev_buttons_ = 0xFFFF;  // ignore what is held when the menu opens
   clk::time_point repeat_at_[16]{};
   clk::time_point opened_;
+  bool page_ = false;
+  std::vector<AchRow> ach_;
+  AchSummary ach_sum_;
+  int ach_sel_ = 0;
+  float ach_scroll_ = 0;
 };
+
+// The achievement list between top and bottom, from x0 to x1: summary line with
+// a progress bar, then one row per achievement (icon, name, gamerscore,
+// description). Locked ones are dimmed; the selected row scrolls into view.
+void MenuDialog::DrawAchievements(ImDrawList* dl, float x0, float x1, float top, float bottom,
+                                  float s, const std::function<ImU32(ImU32, float)>& A) {
+  ImFont* fI = g_font_item ? g_font_item : ImGui::GetFont();
+  ImFont* fS = g_font_small ? g_font_small : ImGui::GetFont();
+  if (ach_.empty()) {
+    dl->AddText(fS, 28 * s, {x0, top + 10 * s}, A(kGrey, 1), Tr(kAchNone));
+    return;
+  }
+  // Summary: "10 / 48 unlocked" and "65G / 1000G", progress bar below.
+  char left[96], right[48];
+  std::snprintf(left, sizeof(left), "%d / %d  %s", ach_sum_.unlocked, ach_sum_.total, Tr(kAchUnlocked));
+  std::snprintf(right, sizeof(right), "%dG / %dG", ach_sum_.score, ach_sum_.score_total);
+  dl->AddText(fS, 28 * s, {x0, top}, A(kWhite, 1), left);
+  const float rw = fS->CalcTextSizeA(28 * s, 1e9f, 0, right).x;
+  dl->AddText(fS, 28 * s, {x1 - rw, top}, A(kWhite, 1), right);
+  const float by = top + 46 * s;
+  const float f = ach_sum_.total ? float(ach_sum_.unlocked) / float(ach_sum_.total) : 0.0f;
+  dl->AddRectFilled({x0, by - 3 * s}, {x1, by + 3 * s}, A(IM_COL32(70, 66, 62, 255), 1));
+  dl->AddRectFilled({x0, by - 3 * s}, {x0 + (x1 - x0) * f, by + 3 * s}, A(kRed, 1));
+
+  // List.
+  const float ltop = by + 26 * s;
+  const float rowH = 104 * s, icon = 72 * s;
+  const float view = bottom - ltop;
+  const float y_sel = ach_sel_ * rowH;
+  if (y_sel + rowH * 2 - view > ach_scroll_) ach_scroll_ = y_sel + rowH * 2 - view;
+  if (y_sel - rowH < ach_scroll_) ach_scroll_ = std::max(0.0f, y_sel - rowH);
+  ach_scroll_ = std::clamp(ach_scroll_, 0.0f, std::max(0.0f, rowH * ach_.size() - view));
+  const float sx = x1 + 14 * s;  // scroll bar, right of the list
+  dl->PushClipRect({x0 - 40 * s, ltop - 4 * s}, {x1 + 24 * s, bottom + 4 * s}, true);
+  const float tx = x0 + icon + 22 * s;
+  for (size_t i = 0; i < ach_.size(); ++i) {
+    const float yy = ltop + i * rowH - ach_scroll_;
+    if (yy < ltop - rowH || yy > bottom) continue;
+    const AchRow& r = ach_[i];
+    const bool on = int(i) == ach_sel_;
+    if (on)
+      Brush(dl, {x0 - 30 * s, yy + rowH * 0.5f}, {x1 + 10 * s, yy + rowH * 0.47f}, rowH * 0.98f,
+            A(IM_COL32(120, 8, 12, 150), 1), 97 + unsigned(i));
+    if (r.unlocked) dl->AddRectFilled({x0 - 14 * s, yy + 14 * s}, {x0 - 8 * s, yy + rowH - 14 * s}, A(kRed, 1));
+    if (rex::ui::ImmediateTexture* t = AchIcon(r.info)) {
+      const ImU32 tint = r.unlocked ? IM_COL32(255, 255, 255, 255) : IM_COL32(150, 150, 150, 110);
+      dl->AddImage(reinterpret_cast<ImTextureID>(t), {x0, yy + (rowH - icon) * 0.5f},
+                   {x0 + icon, yy + (rowH + icon) * 0.5f}, {0, 0}, {1, 1}, A(tint, 1));
+    } else {
+      dl->AddRect({x0, yy + (rowH - icon) * 0.5f}, {x0 + icon, yy + (rowH + icon) * 0.5f},
+                  A(kDim, 1), 4 * s, 0, 2 * s);
+    }
+    char gs[16];
+    std::snprintf(gs, sizeof(gs), "%uG", r.info.gamerscore);
+    const float gw = fI->CalcTextSizeA(30 * s, 1e9f, 0, gs).x;
+    dl->AddText(fI, 30 * s, {x1 - gw, yy + 12 * s}, A(r.unlocked ? kWhite : kDim, 1), gs);
+    const ImU32 nc = r.unlocked || on ? kWhite : kGrey;
+    dl->AddText(fI, 30 * s, {tx, yy + 12 * s}, A(nc, 1), r.info.label.c_str(), nullptr);
+    const std::string& desc = r.unlocked ? r.info.description : r.info.unachieved_description;
+    dl->AddText(fS, 22 * s, {tx, yy + 52 * s}, A(r.unlocked ? kGrey : kDim, 1), desc.c_str(), nullptr,
+                x1 - tx - 10 * s);
+  }
+  dl->PopClipRect();
+  // Scroll bar.
+  const float content = rowH * ach_.size();
+  if (content > view) {
+    const float th = std::max(30 * s, view * view / content);
+    const float ty = ltop + (view - th) * (ach_scroll_ / (content - view));
+    dl->AddRectFilled({sx, ltop}, {sx + 4 * s, bottom}, A(IM_COL32(70, 66, 62, 255), 1));
+    dl->AddRectFilled({sx, ty}, {sx + 4 * s, ty + th}, A(kRed, 1));
+  }
+}
 
 void MenuDialog::Load() {
   const auto cfg = ReadCfg();
@@ -677,14 +835,36 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
   if (ImGui::IsKeyDown(ImGuiKey_Enter)) b |= kA;
   if (ImGui::IsKeyDown(ImGuiKey_Escape)) b |= kB;
   if (prev_buttons_ == 0xFFFF) prev_buttons_ = b;  // first frame
-  if (Pressed(b, kUp, true)) sel_ = Next(sel_, -1);
-  if (Pressed(b, kDown, true)) sel_ = Next(sel_, 1);
-  if (Pressed(b, kLeft, true)) Change(-1);
-  if (Pressed(b, kRight, true)) Change(1);
-  bool close = Pressed(b, kB, false) || Pressed(b, kStart, false) || Pressed(b, kBack, false);
-  if (Pressed(b, kA, false)) {
-    if (items_[sel_].kind == Item::kResume) close = true;
-    else Change(1);
+  // Enter is A here and, in the default key bindings, also the game's Start;
+  // Esc is B here and also the game's Back. When both come together it is A
+  // (select) or B (back), not Start or Back (close the menu).
+  const bool a = Pressed(b, kA, false);
+  const bool start = Pressed(b, kStart, false) && !(b & kA);
+  const bool back_btn = Pressed(b, kBack, false) && !(b & kB);
+  bool close = false;
+  if (page_) {
+    // Achievements page: up/down one row, left/right five; back returns to the
+    // options, Start/Back close the menu. Nothing here changes a setting.
+    const int n = int(ach_.size());
+    if (n > 0) {
+      if (Pressed(b, kUp, true)) ach_sel_ = std::max(0, ach_sel_ - 1);
+      if (Pressed(b, kDown, true)) ach_sel_ = std::min(n - 1, ach_sel_ + 1);
+      if (Pressed(b, kLeft, true)) ach_sel_ = std::max(0, ach_sel_ - 5);
+      if (Pressed(b, kRight, true)) ach_sel_ = std::min(n - 1, ach_sel_ + 5);
+    }
+    if (Pressed(b, kB, false)) page_ = false;
+    close = start || back_btn;
+  } else {
+    if (Pressed(b, kUp, true)) sel_ = Next(sel_, -1);
+    if (Pressed(b, kDown, true)) sel_ = Next(sel_, 1);
+    if (Pressed(b, kLeft, true)) Change(-1);
+    if (Pressed(b, kRight, true)) Change(1);
+    close = Pressed(b, kB, false) || start || back_btn;
+    if (a) {
+      if (items_[sel_].kind == Item::kResume) close = true;
+      else if (items_[sel_].kind == Item::kAchievements) OpenAchievements();
+      else Change(1);
+    }
   }
   prev_buttons_ = b;
   if (close) {
@@ -726,18 +906,38 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
 
   // Title with a brush underline.
   const float tx = px0 + 40 * s, ty = H * 0.07f;
-  dl->AddText(fT, 84 * s, {tx + 4 * s, ty + 4 * s}, A(IM_COL32(0, 0, 0, 200)), Tr(kTitle));
-  dl->AddText(fT, 84 * s, {tx, ty}, A(kWhite), Tr(kTitle));
+  const char* title = Tr(page_ ? kAchTitle : kTitle);
+  dl->AddText(fT, 84 * s, {tx + 4 * s, ty + 4 * s}, A(IM_COL32(0, 0, 0, 200)), title);
+  dl->AddText(fT, 84 * s, {tx, ty}, A(kWhite), title);
   Brush(dl, {tx - 10 * s, ty + 100 * s}, {tx + 520 * s, ty + 92 * s}, 16 * s, A(kRed), 3);
 
-  // List (scrolls to keep the selection in view).
+  const char *ok, *back;
+  ButtonNames(&ok, &back);
+  const float hs = 24 * s;
+  const float gs = 38 * s;  // icon height, centred on the hint text
+  const float hy = H - 78 * s;
+  const ImVec2 gp{0, hy + 2 * s + hs * 0.5f - gs * 0.5f};
+
   const float top = ty + 140 * s, bottom = H - 120 * s;
+  const float lx = tx, vx = std::min(px1 - 40 * s, lx + 980 * s);
+  if (page_) {
+    DrawAchievements(dl, lx, vx, top, bottom, s, A);
+    // Hints: [back] Back, and where the unlocks are kept.
+    float hx = px0 + 40 * s;
+    hx += Prompt(dl, fS, gs, {hx, gp.y}, ButtonGlyph("B", "keybind_b", nullptr), back) + 10 * s;
+    dl->AddText(fS, hs, {hx, hy + 2 * s}, A(kGrey), Tr(kHintReturn));
+    dl->AddText(fS, 20 * s, {px0 + 40 * s, H - 40 * s}, A(kDim), Tr(kAchLocal));
+    ImGui::End();
+    return;
+  }
+
+  // List (scrolls to keep the selection in view).
   const float rowH = 44 * s, headH = 58 * s;
   std::vector<float> ys(items_.size());
   float y = 0;
   for (size_t i = 0; i < items_.size(); ++i) {
     if (items_[i].kind == Item::kHeader) y += (i ? 14 * s : 0);
-    if (items_[i].kind == Item::kResume) y += 18 * s;
+    if (items_[i].kind == Item::kAchievements) y += 18 * s;  // with "Back to the game"
     ys[i] = y;
     y += items_[i].kind == Item::kHeader ? headH : rowH;
   }
@@ -746,7 +946,6 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
   if (want_hi > scroll_) scroll_ = want_hi;
   if (want_lo < scroll_) scroll_ = std::max(0.0f, want_lo);
   dl->PushClipRect({px0, top - 6 * s}, {W, bottom + 6 * s}, true);
-  const float lx = tx, vx = std::min(px1 - 40 * s, lx + 980 * s);
   for (size_t i = 0; i < items_.size(); ++i) {
     const Item& it = items_[i];
     const float yy = top + ys[i] - scroll_;
@@ -763,6 +962,16 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
     const ImU32 lc = on ? kWhite : kGrey;
     dl->AddText(fI, 34 * s, {lx, yy + 3 * s}, A(lc), Tr(it.label));
     if (it.kind == Item::kResume) continue;
+    if (it.kind == Item::kAchievements) {
+      // "10 / 48   65G" on the right; A opens the page.
+      if (ach_sum_.total > 0) {
+        char buf[48];
+        std::snprintf(buf, sizeof(buf), "%d / %d   %dG", ach_sum_.unlocked, ach_sum_.total, ach_sum_.score);
+        const float w = fI->CalcTextSizeA(32 * s, 1e9f, 0, buf).x;
+        dl->AddText(fI, 32 * s, {vx - w, yy + 4 * s}, A(on ? kWhite : kGrey), buf);
+      }
+      continue;
+    }
     std::string val;
     if (it.kind == Item::kChoice) {
       val = it.choices[value_[i]].label[Lang()];
@@ -804,16 +1013,10 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
 
   // Hints, bottom right like the game's. On a setting A steps to the next value
   // like right does, so both show as "Change": [<][>][ok] Change  [back] Back.
-  // On "Back to the game": [ok] Select  [back] Back.
-  const char *ok, *back;
-  ButtonNames(&ok, &back);
-  const float hs = 24 * s;
-  const float gs = 38 * s;  // icon height, centred on the hint text
+  // On "Achievements" and "Back to the game": [ok] Select  [back] Back.
   float hx = px0 + 40 * s;
-  const float hy = H - 78 * s;
-  const ImVec2 gp{0, hy + 2 * s + hs * 0.5f - gs * 0.5f};
   rex::ui::ImmediateTexture* ok_tex = ButtonGlyph("A", "keybind_a", nullptr);
-  if (items_[sel_].kind != Item::kResume) {
+  if (IsSetting(sel_)) {
     rex::ui::ImmediateTexture* left = ButtonGlyph("DPAD_LEFT", nullptr, "Left");
     rex::ui::ImmediateTexture* right = ButtonGlyph("DPAD_RIGHT", nullptr, "Right");
     if (left && right) {
@@ -934,7 +1137,10 @@ void HintDialog::OnDraw(ImGuiIO& io) {
 
 void MenuAddFonts(ImFontAtlas* atlas) {
 #ifdef _WIN32
-  static const ImWchar ranges[] = {0x0020, 0x00FF, 0x2010, 0x203A, 0x25A0, 0x25FF, 0};
+  // Latin-1 and Latin Extended-A (the game's achievement texts: œ...), dashes,
+  // quotes, the trademark sign and the ◄ ► hint arrows.
+  static const ImWchar ranges[] = {0x0020, 0x017F, 0x2010, 0x203A, 0x2122, 0x2122,
+                                   0x25A0, 0x25FF, 0};
   const char* bold = "C:\\Windows\\Fonts\\segoeuib.ttf";
   const char* semi = "C:\\Windows\\Fonts\\seguisb.ttf";
   std::error_code ec;
@@ -957,10 +1163,12 @@ void MenuAddFonts(ImFontAtlas* atlas) {
 }
 
 void MenuInit(rex::ui::ImGuiDrawer* drawer, rex::ui::ImmediateDrawer* immediate,
-              std::function<void(std::function<void()>)> post_ui) {
+              std::function<void(std::function<void()>)> post_ui,
+              std::function<rex::Runtime*()> runtime) {
   g_drawer = drawer;
   g_imm = immediate;
   g_post_ui = std::move(post_ui);
+  g_runtime = std::move(runtime);
 }
 
 void MenuToggle() {
@@ -1028,7 +1236,9 @@ void MenuShutdown() {
   g_dialog.reset();
   g_hint.reset();
   g_glyphs.clear();
+  g_ach_icons.reset();
   g_imm = nullptr;
+  g_runtime = nullptr;
 }
 
 void CfgStore(const char* key, const std::string& value) { CfgSet({{key, value}}); }
