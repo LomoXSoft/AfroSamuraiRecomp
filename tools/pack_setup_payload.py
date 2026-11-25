@@ -84,10 +84,10 @@ def main() -> None:
         if need not in names:
             raise SystemExit(f"snapshot missing {need}")
     version = dict(files)["app/VERSION"].decode("utf-8").strip()
-    if version != "0.3.10":
+    if version != "0.3.11":
         raise SystemExit(f"snapshot VERSION is {version!r}")
     ps1 = dict(files)["tools/install.ps1"].decode("utf-8")
-    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.10'" not in ps1:
+    if "Refusing -Ref main" not in ps1 or "$LOCAL_TREE_VERSION = '0.3.11'" not in ps1:
         raise SystemExit("snapshot install.ps1 is not the local-tree build")
     if args.out.name != f"afrosetup-v{version}-files.bin":
         raise SystemExit(f"--out must be named afrosetup-v{version}-files.bin (the setup downloads that name)")

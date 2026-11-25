@@ -2,7 +2,7 @@
 
 Newest first. Versions are in `app/VERSION`.
 
-## Next – Achievements page
+## 0.3.11 – Achievements page
 - In-game options (F1 / L3 + R3): a new **Achievements** row at the bottom shows
   "unlocked / total" and the gamerscore, and opens a page with the runtime's
   achievement list: the game's icons, names, descriptions and gamerscore,
