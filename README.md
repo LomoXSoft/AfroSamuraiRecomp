@@ -507,10 +507,11 @@ Key bindings stay in the launcher.
 The game's 48 achievements work as on the Xbox 360: the game unlocks them and
 they are saved in `Documents\afrorecomp\achievements` (on this PC only, not on
 Xbox Live; the RecompLauncher manifest lists that folder with the saves). To see them,
-choose **Achievements** at the bottom of the in-game options (F1, or hold L3 +
-R3): the list shows each one with the game's icon, name, description and
-gamerscore, unlocked ones in full colour, with the total at the top. Move with
-up and down (left and right jump five), and B or Esc goes back to the options.
+open the in-game options (F1, or hold L3 + R3) and press **LB** or **RB** (L1 / R1;
+keys 1 and 3 in the default key bindings) to switch to the **Achievements** tab.
+It shows each one with the game's icon, name, description and gamerscore,
+unlocked ones in full colour, with the total at the top. Move with up and down
+(left and right jump five); LB / RB, B or Esc go back to the options.
 **F7** also opens the runtime's own achievement list, keyboard only.
 
 ### Launcher and options

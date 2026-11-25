@@ -8,7 +8,8 @@
 // keyboard works through its bindings (arrows, Space, E...) and every controller
 // through its remap.
 //
-// The Achievements row opens a page with the runtime's achievement list (the
+// Two tabs, switched with LB / RB: Options and Achievements. The Achievements
+// tab shows the runtime's achievement list (the
 // game's own names, descriptions and icons, unlocks from
 // Documents\afrorecomp\achievements): the same data as the runtime's F7 list,
 // reachable with a controller. It only reads; unlocking stays with the game.
@@ -90,8 +91,8 @@ void BlockGuestInput(bool on) {
 }
 
 constexpr uint32_t kUp = 0x0001, kDown = 0x0002, kLeft = 0x0004, kRight = 0x0008,
-                   kStart = 0x0010, kBack = 0x0020, kL3 = 0x0040, kR3 = 0x0080, kA = 0x1000,
-                   kB = 0x2000;
+                   kStart = 0x0010, kBack = 0x0020, kL3 = 0x0040, kR3 = 0x0080, kLB = 0x0100,
+                   kRB = 0x0200, kA = 0x1000, kB = 0x2000;
 
 // ---------------------------------------------------------------- config file
 std::filesystem::path CfgPath() {
@@ -167,8 +168,7 @@ T4 kHintKeys = {"Key bindings: launcher (hold Shift at start)",
 T4 kStartHold = {"Hold", "Mant\xC3\xA9n", "Maintiens", "Tieni premuto"};
 T4 kStartOptions = {"Options", "Opciones", "Options", "Opzioni"};
 T4 kStartOr = {"or", "o", "ou", "o"};
-// Achievements row and page.
-T4 kAchRow = {"Achievements", "Logros", "Succ\xC3\xA8s", "Obiettivi"};
+// Achievements tab.
 T4 kAchTitle = {"ACHIEVEMENTS", "LOGROS", "SUCC\xC3\x88S", "OBIETTIVI"};
 T4 kAchUnlocked = {"unlocked", "desbloqueados", "d\xC3\xA9" "bloqu\xC3\xA9s", "sbloccati"};
 T4 kAchNone = {"The achievement list is not loaded yet.", "La lista de logros a\xC3\xBAn no est\xC3\xA1 cargada.",
@@ -184,7 +184,7 @@ struct Choice {
   std::vector<std::pair<std::string, std::string>> cfg;  // keys this choice writes
 };
 struct Item {
-  enum Kind { kHeader, kChoice, kSlider, kAchievements, kResume } kind;
+  enum Kind { kHeader, kChoice, kSlider, kResume } kind;
   const char* const* label;  // T4
   std::vector<Choice> choices;
   std::vector<std::pair<std::string, std::string>> defaults;  // when the cfg lacks a key
@@ -382,8 +382,6 @@ std::vector<Item> MakeItems() {
   choice(lBloom, onoff("fx_bloom", "0", "1"), {{"fx_bloom", "0"}}, fx("afro_fx_bloom"));
   choice(lFocus, onoff("fx_focus", "0", "1"), {{"fx_focus", "0"}}, fx("afro_fx_focus"));
 
-  Item ach{Item::kAchievements, kAchRow};
-  v.push_back(ach);
   Item resume{Item::kResume, kResume};
   v.push_back(resume);
   return v;
@@ -647,7 +645,6 @@ class MenuDialog : public rex::ui::ImGuiDialog {
     Load();
     sel_ = Next(-1, 1);
     opened_ = clk::now();
-    ReadAchievements(&ach_sum_);
   }
 
  protected:
@@ -655,7 +652,7 @@ class MenuDialog : public rex::ui::ImGuiDialog {
 
  private:
   void Load();
-  // Achievements page: a snapshot of the list, taken when it opens.
+  // Achievements tab: a snapshot of the list, taken when it opens.
   void OpenAchievements() {
     ach_ = ReadAchievements(&ach_sum_);
     ach_sel_ = 0;
@@ -664,6 +661,8 @@ class MenuDialog : public rex::ui::ImGuiDialog {
   }
   void DrawAchievements(ImDrawList* dl, float x0, float x1, float top, float bottom, float s,
                         const std::function<ImU32(ImU32, float)>& A);
+  void DrawTabs(ImDrawList* dl, float x, float y, float x_max, float s,
+                const std::function<ImU32(ImU32, float)>& A);
   bool IsSetting(int i) const {
     return items_[i].kind == Item::kChoice || items_[i].kind == Item::kSlider;
   }
@@ -685,7 +684,7 @@ class MenuDialog : public rex::ui::ImGuiDialog {
   uint32_t prev_buttons_ = 0xFFFF;  // ignore what is held when the menu opens
   clk::time_point repeat_at_[16]{};
   clk::time_point opened_;
-  bool page_ = false;
+  bool page_ = false;  // false: Options tab, true: Achievements tab
   std::vector<AchRow> ach_;
   AchSummary ach_sum_;
   int ach_sel_ = 0;
@@ -808,6 +807,45 @@ void MenuDialog::Change(int dir) {
   }
 }
 
+// The two tabs in the title font, with the LB and RB icons either side. The open
+// one is white with the brush underline, the other grey. Shrinks to fit x_max.
+void MenuDialog::DrawTabs(ImDrawList* dl, float x, float y, float x_max, float s,
+                          const std::function<ImU32(ImU32, float)>& A) {
+  ImFont* fT = g_font_title ? g_font_title : ImGui::GetFont();
+  ImFont* fS = g_font_small ? g_font_small : ImGui::GetFont();
+  rex::ui::ImmediateTexture* lb = ButtonGlyph("LB", "keybind_left_shoulder", nullptr);
+  rex::ui::ImmediateTexture* rb = ButtonGlyph("RB", "keybind_right_shoulder", nullptr);
+  const char* names[2] = {Tr(kTitle), Tr(kAchTitle)};
+  float size = 72 * s, gs = 46 * s, gap = 44 * s;
+  const auto glyph_w = [&](rex::ui::ImmediateTexture* t, const char* text) {
+    if (t) return gs * float(t->width) / float(std::max<uint32_t>(1, t->height));
+    return fS->CalcTextSizeA(gs * 0.62f, 1e9f, 0, text).x + gs * 0.62f;
+  };
+  const float total = glyph_w(lb, "LB") + glyph_w(rb, "RB") + 3 * gap +
+                      fT->CalcTextSizeA(size, 1e9f, 0, names[0]).x +
+                      fT->CalcTextSizeA(size, 1e9f, 0, names[1]).x;
+  if (total > x_max - x) {
+    const float k = (x_max - x) / total;
+    size *= k;
+    gs *= k;
+    gap *= k;
+  }
+  const float gy = y + size * 0.55f - gs * 0.5f;
+  x += Prompt(dl, fS, gs, {x, gy}, lb, "LB") + gap;
+  for (int i = 0; i < 2; ++i) {
+    const bool open = (i == 1) == page_;
+    const float w = fT->CalcTextSizeA(size, 1e9f, 0, names[i]).x;
+    if (open) {
+      dl->AddText(fT, size, {x + 4 * s, y + 4 * s}, A(IM_COL32(0, 0, 0, 200), 1), names[i]);
+      Brush(dl, {x - 10 * s, y + size * 1.2f}, {x + w + 20 * s, y + size * 1.1f}, 16 * s,
+            A(kRed, 1), 3);
+    }
+    dl->AddText(fT, size, {x, y}, A(open ? kWhite : kDim, 1), names[i]);
+    x += w + gap;
+  }
+  Prompt(dl, fS, gs, {x, gy}, rb, "RB");
+}
+
 bool MenuDialog::Pressed(uint32_t now, uint32_t mask, bool repeat) {
   int bit = 0;
   while (bit < 16 && !(mask & (1u << bit))) ++bit;
@@ -842,9 +880,14 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
   const bool start = Pressed(b, kStart, false) && !(b & kA);
   const bool back_btn = Pressed(b, kBack, false) && !(b & kB);
   bool close = false;
-  if (page_) {
-    // Achievements page: up/down one row, left/right five; back returns to the
-    // options, Start/Back close the menu. Nothing here changes a setting.
+  // LB / RB (L1 / R1; keys 1 / 3 in the default bindings) switch between the
+  // two tabs, Options and Achievements.
+  if (Pressed(b, kLB, false) || Pressed(b, kRB, false)) {
+    if (page_) page_ = false;
+    else OpenAchievements();
+  } else if (page_) {
+    // Achievements tab: up/down one row, left/right five; back returns to the
+    // Options tab, Start/Back close the menu. Nothing here changes a setting.
     const int n = int(ach_.size());
     if (n > 0) {
       if (Pressed(b, kUp, true)) ach_sel_ = std::max(0, ach_sel_ - 1);
@@ -862,7 +905,6 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
     close = Pressed(b, kB, false) || start || back_btn;
     if (a) {
       if (items_[sel_].kind == Item::kResume) close = true;
-      else if (items_[sel_].kind == Item::kAchievements) OpenAchievements();
       else Change(1);
     }
   }
@@ -875,7 +917,6 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
   // ---- drawing
   const float W = io.DisplaySize.x, H = io.DisplaySize.y;
   const float s = H / 1080.0f;
-  ImFont* fT = g_font_title ? g_font_title : ImGui::GetFont();
   ImFont* fI = g_font_item ? g_font_item : ImGui::GetFont();
   ImFont* fS = g_font_small ? g_font_small : ImGui::GetFont();
   ImGui::SetNextWindowPos({0, 0});
@@ -904,12 +945,9 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
                               A(IM_COL32(0, 0, 0, 0)));
   dl->AddRectFilled({px0, 0}, {W, H}, A(IM_COL32(0, 0, 0, 215)));
 
-  // Title with a brush underline.
+  // Tabs as the title: [LB] OPTIONS  ACHIEVEMENTS [RB], a brush under the open one.
   const float tx = px0 + 40 * s, ty = H * 0.07f;
-  const char* title = Tr(page_ ? kAchTitle : kTitle);
-  dl->AddText(fT, 84 * s, {tx + 4 * s, ty + 4 * s}, A(IM_COL32(0, 0, 0, 200)), title);
-  dl->AddText(fT, 84 * s, {tx, ty}, A(kWhite), title);
-  Brush(dl, {tx - 10 * s, ty + 100 * s}, {tx + 520 * s, ty + 92 * s}, 16 * s, A(kRed), 3);
+  DrawTabs(dl, tx, ty, px1 - 40 * s, s, A);
 
   const char *ok, *back;
   ButtonNames(&ok, &back);
@@ -937,7 +975,7 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
   float y = 0;
   for (size_t i = 0; i < items_.size(); ++i) {
     if (items_[i].kind == Item::kHeader) y += (i ? 14 * s : 0);
-    if (items_[i].kind == Item::kAchievements) y += 18 * s;  // with "Back to the game"
+    if (items_[i].kind == Item::kResume) y += 18 * s;
     ys[i] = y;
     y += items_[i].kind == Item::kHeader ? headH : rowH;
   }
@@ -962,16 +1000,6 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
     const ImU32 lc = on ? kWhite : kGrey;
     dl->AddText(fI, 34 * s, {lx, yy + 3 * s}, A(lc), Tr(it.label));
     if (it.kind == Item::kResume) continue;
-    if (it.kind == Item::kAchievements) {
-      // "10 / 48   65G" on the right; A opens the page.
-      if (ach_sum_.total > 0) {
-        char buf[48];
-        std::snprintf(buf, sizeof(buf), "%d / %d   %dG", ach_sum_.unlocked, ach_sum_.total, ach_sum_.score);
-        const float w = fI->CalcTextSizeA(32 * s, 1e9f, 0, buf).x;
-        dl->AddText(fI, 32 * s, {vx - w, yy + 4 * s}, A(on ? kWhite : kGrey), buf);
-      }
-      continue;
-    }
     std::string val;
     if (it.kind == Item::kChoice) {
       val = it.choices[value_[i]].label[Lang()];
@@ -1013,7 +1041,7 @@ void MenuDialog::OnDraw(ImGuiIO& io) {
 
   // Hints, bottom right like the game's. On a setting A steps to the next value
   // like right does, so both show as "Change": [<][>][ok] Change  [back] Back.
-  // On "Achievements" and "Back to the game": [ok] Select  [back] Back.
+  // On "Back to the game": [ok] Select  [back] Back.
   float hx = px0 + 40 * s;
   rex::ui::ImmediateTexture* ok_tex = ButtonGlyph("A", "keybind_a", nullptr);
   if (IsSetting(sel_)) {

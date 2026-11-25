@@ -3,15 +3,16 @@
 Newest first. Versions are in `app/VERSION`.
 
 ## 0.3.11 – Achievements page
-- In-game options (F1 / L3 + R3): a new **Achievements** row at the bottom shows
-  "unlocked / total" and the gamerscore, and opens a page with the runtime's
+- In-game options (F1 / L3 + R3): two tabs, **Options** and **Achievements**,
+  switched with LB / RB (L1 / R1; keys 1 / 3 in the default key bindings), with
+  the button icons beside the tab names. The Achievements tab shows the runtime's
   achievement list: the game's icons, names, descriptions and gamerscore,
   unlocked ones in full colour, summary and progress bar at the top. Same data
   as the runtime's F7 list, which is keyboard only, so controller and Steam Deck
-  players can see it too. The page only reads; it never unlocks or saves.
+  players can see it too. The tab only reads; it never unlocks or saves.
 - Options menu on the keyboard: Enter (also the game's Start in the default
   bindings) now selects instead of closing the menu, and Esc (also the game's
-  Back) goes back from the Achievements page instead of closing the menu.
+  Back) goes back from the Achievements tab instead of closing the menu.
 - The menu fonts also cover Latin Extended-A and the trademark sign.
 
 ## 0.3.10 – Setup without embedded files
