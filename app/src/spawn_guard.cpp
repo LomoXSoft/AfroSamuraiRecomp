@@ -44,8 +44,8 @@ REXCVAR_DEFINE_BOOL(afro_spawn_diag, false, "Afro",
                     "they spawned once a second");
 REXCVAR_DEFINE_BOOL(afro_spawn_guard, true, "Afro",
                     "Prologue fix: an enemy that fell off its path to the courtyard fight and "
-                    "can no longer reach its waypoint joins the fight (the original game "
-                    "soft-locks there)");
+                    "stands below a waypoint it can no longer reach joins the fight (the "
+                    "original game soft-locks there)");
 REXCVAR_DEFINE_INT32(afro_spawn_guard_s, 10, "Afro",
                      "Prologue fix: seconds an enemy stands still off its path before it joins the fight");
 
@@ -66,6 +66,7 @@ struct SpawnRec {
   // Guard: where the character stood when it last moved, and how long since.
   float ax = 0, ay = 0, az = 0;
   double still_s = 0;
+  bool noted_above = false;  // "left alone" logged once for this enemy
 };
 
 std::mutex g_mu;
@@ -235,6 +236,12 @@ constexpr float kStillDist = 0.25f;
 // fights, and the wave never ends. Such an enemy is told to stop following
 // its waypoints (AI+442 = 0), the state it is in after reaching its last one,
 // and fights normally.
+//
+// Only an enemy BELOW its waypoint is released. An enemy above its waypoint
+// is on a roof and its next move is to jump down to it; it may stand at the
+// roof edge first (the waypoint waits for Afro within its alert radius).
+// Released there it fights on the roof, cannot reach Afro and the wave never
+// ends either (issue #7, v0.3.11). It is left alone and logged once.
 void GuardTick(double dt) {
   if (g_level.find("combatintro") == std::string::npos) return;
   for (SpawnRec& r : g_spawns) {
@@ -257,10 +264,21 @@ void GuardTick(double dt) {
     r.still_s += dt;
     if (r.still_s < REXCVAR_GET(afro_spawn_guard_s)) continue;
     r.still_s = 0;
+    const uint32_t afro = U32(kAfroEntity);
+    if (dy > 0) {
+      if (!r.noted_above)
+        REXLOG_INFO("afro spawn guard: enemy 0x{:08X} at ({:.1f},{:.1f},{:.1f}) stands {:.1f} above its waypoint "
+                    "0x{:08X} at ({:.1f},{:.1f},{:.1f}), Afro at ({:.1f},{:.1f},{:.1f}); left alone (it jumps down)",
+                    ch, x, y, z, dy, wp, F32(wp + 0x70), F32(wp + 0x74), F32(wp + 0x78), F32(afro + 0x260),
+                    F32(afro + 0x264), F32(afro + 0x268));
+      r.noted_above = true;
+      continue;
+    }
     if (auto* p = Host(ai + 442)) *p = 0;
-    REXLOG_INFO("afro spawn guard: enemy 0x{:08X} was {:.1f} off the height of its waypoint 0x{:08X} for {} s; "
-                "it joins the fight",
-                ch, std::fabs(dy), wp, REXCVAR_GET(afro_spawn_guard_s));
+    REXLOG_INFO("afro spawn guard: enemy 0x{:08X} at ({:.1f},{:.1f},{:.1f}) was {:.1f} below its waypoint 0x{:08X} "
+                "at ({:.1f},{:.1f},{:.1f}) for {} s, Afro at ({:.1f},{:.1f},{:.1f}); it joins the fight",
+                ch, x, y, z, -dy, wp, F32(wp + 0x70), F32(wp + 0x74), F32(wp + 0x78),
+                REXCVAR_GET(afro_spawn_guard_s), F32(afro + 0x260), F32(afro + 0x264), F32(afro + 0x268));
   }
 }
 
