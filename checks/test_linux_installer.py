@@ -40,14 +40,28 @@ def check_script():
     if not raw.startswith(b"#!/usr/bin/env bash\n"):
         fail("install.sh must start with #!/usr/bin/env bash")
     text = raw.decode("utf-8")
-    entries = re.findall(r'^\s*"([a-z-]+)\|((?:https://|\$NIGHTLY/)[^|"]+)\|([^|"]*)\|([^|"]+)"$', text, re.M)
+    entries = re.findall(
+        r'^\s*"([a-z-]+)\|((?:https://|\$NIGHTLY/)[^|"]+)\|([^|"]*)\|([^|"]+)(?:\|((?:https://|\$SDK_MIRROR/)[^|"]+))?"$',
+        text, re.M)
     names = {e[0] for e in entries}
     for need in ("llvm", "cmake", "ninja", "xwin", "pycryptodome", "sdk-linux", "sdk-win"):
         if need not in names:
             fail("install.sh has no pinned download named " + need)
-    for name, url, sha, _ in entries:
+    for name, url, sha, _, _ in entries:
         if not re.fullmatch(r"[0-9a-f]{64}", sha):
             fail("download %s has no SHA-256 pin" % name)
+    # ReXGlue deletes old nightlies: both SDK zips need the project's own copy,
+    # tried first, with the same file name.
+    m = re.search(r"^SDK_MIRROR=(https://github\.com/LomoXSoft/AfroSamuraiRecomp/releases/download/[\w.-]+)$", text, re.M)
+    if not m:
+        fail("install.sh needs SDK_MIRROR on this repository's releases")
+    for name, url, _, file, mirror in entries:
+        if name.startswith("sdk-") and mirror != "$SDK_MIRROR/" + file:
+            fail("download %s must have the mirror $SDK_MIRROR/%s" % (name, file))
+    ps1_text = (ROOT / "tools" / "install.ps1").read_text(encoding="utf-8", errors="ignore")
+    rex = re.search(r"^\s*rexsdk = @\{ mirror = '([^']+)'; url = '([^']+)'; sha = '([0-9a-f]{64})'; file = '([^']+)' \}", ps1_text, re.M)
+    if not rex or rex.group(1) != m.group(1) + "/" + rex.group(4):
+        fail("install.ps1 rexsdk must try the same mirror as install.sh first")
     m = re.search(r"^XWIN_CRT=14\.(\d+)\.", text, re.M)
     if not m or int(m.group(1)) >= 52:
         fail("XWIN_CRT must pin an MSVC CRT below 14.52 (Clang 20)")
