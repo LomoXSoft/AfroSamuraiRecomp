@@ -374,8 +374,11 @@ Folder layout (`<root>` = e.g. `C:\afro`; avoid spaces and non-ASCII characters 
        git clone https://github.com/LomoXSoft/AfroSamuraiRecomp.git afrorecomp
 
 3. Download `rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip` from
-   <https://github.com/rexglue/rexglue-sdk/releases/tag/nightly-20261002-bd833a2a>
+   <https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/tag/rexglue-sdk-bd833a2>
    and extract it so that `C:\afro\sdk\win-amd64\bin\rexglue.exe` exists.
+   ReXGlue keeps only its last ten nightly builds, so its own page for this
+   one (`nightly-20261002-bd833a2a`) is gone; that release holds the same file
+   (SHA-256 `1e19d7ec9be0d9d7e1a0088a34a33b068d4dea520181e81318528ef3b37627e7`).
 4. Clone the ReXGlue source at the same commit (a few GB with submodules):
 
        git clone https://github.com/rexglue/rexglue-sdk.git rexglue-sdk

@@ -31,6 +31,9 @@ umask 022
 REXGLUE_COMMIT=bd833a2
 REXGLUE_GIT=https://github.com/rexglue/rexglue-sdk.git
 NIGHTLY=https://github.com/rexglue/rexglue-sdk/releases/download/nightly-20261002-bd833a2a
+# ReXGlue keeps only its last ten nightlies, so this one is gone there; the
+# project keeps the same files (BSD-3-Clause) on its own release.
+SDK_MIRROR=https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/download/rexglue-sdk-bd833a2
 XWIN_CRT=14.44.17.14    # MSVC 14.52 and later refuse Clang 20 (see tools/install.ps1)
 XWIN_SDK=10.0.26100
 ISO_SHA1=29394db1854dfc59c767d768c8d35e0a08acb73d   # Europe ISO; USA is checked by default.xex
@@ -38,15 +41,15 @@ XEX_EUROPE=5e831c64173b4a24805bc9c0c0eb860b3d7f53c6
 XEX_USA=873fff7191be2b687eb55f8564f9b9f5c5842b40
 MSVC_LICENSE=https://go.microsoft.com/fwlink/?LinkId=2327714
 NEED_GB=20
-# name|url|sha256|file
+# name|url|sha256|file[|mirror url, tried first]
 DOWNLOADS=(
   "llvm|https://github.com/mstorsjo/llvm-mingw/releases/download/20250709/llvm-mingw-20250709-ucrt-ubuntu-22.04-x86_64.tar.xz|60cafae6474c7411174cff1d4ba21a8e46cadbaeb05a1bace306add301628337|llvm-mingw-20250709-ucrt-ubuntu-22.04-x86_64.tar.xz"
   "cmake|https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-linux-x86_64.tar.gz|ed85135c5a5135b45e50423cb406dea04ca3338da0b8ef3c9ede963559680be0|cmake-4.4.5-linux-x86_64.tar.gz"
   "ninja|https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip|5749cbc4e668273514150a80e387a957f933c6ed3f5f11e03fb30955e2bbead6|ninja-linux-1.13.2.zip"
   "xwin|https://github.com/Jake-Shadle/xwin/releases/download/0.10.0/xwin-0.10.0-x86_64-unknown-linux-musl.tar.gz|d870eb4b2f390878af6da1ccd3cf321d22fcb72720984853b4be732ae597fc88|xwin-0.10.0-x86_64-unknown-linux-musl.tar.gz"
   "pycryptodome|https://files.pythonhosted.org/packages/af/1b/b0f5f020bd43351932df9d16857330d3304715c4b1f7f783dc6e58cb7919/pycryptodome-4.3.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl|96bf142ef25544a221a2b4a8f5d449cb07c1736be71b4ea057749318a2cd402c|pycryptodome-4.3.0-cp39-abi3-manylinux2014_x86_64.whl"
-  "sdk-linux|$NIGHTLY/rexglue-sdk-0.10.0.24-dev.gbd833a2-linux-amd64.zip|0a56565221a4e75f91fc71f787d9299a0d0298127b970c8a88a292f8d3a3befe|rexglue-sdk-0.10.0.24-dev.gbd833a2-linux-amd64.zip"
-  "sdk-win|$NIGHTLY/rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip|1e19d7ec9be0d9d7e1a0088a34a33b068d4dea520181e81318528ef3b37627e7|rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip"
+  "sdk-linux|$NIGHTLY/rexglue-sdk-0.10.0.24-dev.gbd833a2-linux-amd64.zip|0a56565221a4e75f91fc71f787d9299a0d0298127b970c8a88a292f8d3a3befe|rexglue-sdk-0.10.0.24-dev.gbd833a2-linux-amd64.zip|$SDK_MIRROR/rexglue-sdk-0.10.0.24-dev.gbd833a2-linux-amd64.zip"
+  "sdk-win|$NIGHTLY/rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip|1e19d7ec9be0d9d7e1a0088a34a33b068d4dea520181e81318528ef3b37627e7|rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip|$SDK_MIRROR/rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip"
 )
 # Changing any of these makes the next run compile from scratch.
 TOOL_KEY="llvm-mingw-20250709 cmake-4.4.5 ninja-1.13.2 xwin-$XWIN_CRT-$XWIN_SDK rexglue-$REXGLUE_COMMIT"
@@ -176,16 +179,26 @@ fi
 
 # ------------------------------------------------------------ downloads ---
 fetch() {  # fetch <name> -> path of the verified file on stdout
-  local entry name url sha file out got
+  local entry name url sha file mirror out got src
   for entry in "${DOWNLOADS[@]}"; do
-    IFS='|' read -r name url sha file <<< "$entry"
+    IFS='|' read -r name url sha file mirror <<< "$entry"
     [ "$name" = "$1" ] || continue
     out=$DL/$file
     if [ -f "$out" ] && [ "$(sha256sum "$out" | cut -d' ' -f1)" = "$sha" ]; then echo "$out"; return; fi
-    echo "    downloading $file" >&2
-    curl -fsSL --retry 3 --retry-delay 2 -C - -o "$out.part" "$url" >&2 || { rm -f "$out.part"; curl -fsSL --retry 3 -o "$out.part" "$url" >&2; }
-    got=$(sha256sum "$out.part" | cut -d' ' -f1)
-    [ "$got" = "$sha" ] || { rm -f "$out.part"; die "SHA-256 mismatch for $file (got $got, expected $sha)"; }
+    got=''
+    for src in $mirror $url; do
+      echo "    downloading $file ($src)" >&2
+      if curl -fsSL --retry 3 --retry-delay 2 -C - -o "$out.part" "$src" >&2 \
+         || { rm -f "$out.part"; curl -fsSL --retry 3 -o "$out.part" "$src" >&2; }; then
+        got=$(sha256sum "$out.part" | cut -d' ' -f1)
+        [ "$got" = "$sha" ] && break
+        echo "    SHA-256 mismatch for $file from $src (got $got, expected $sha)" >&2
+      else
+        echo "    download failed from $src" >&2
+      fi
+      rm -f "$out.part"; got=''
+    done
+    [ -n "$got" ] || die "could not download $file (SHA-256 $sha)"
     mv -f "$out.part" "$out"
     echo "    ok, $(( $(stat -c %s "$out") / 1048576 )) MB, SHA-256 verified" >&2
     echo "$out"; return

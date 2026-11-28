@@ -70,7 +70,9 @@ $DL = @{
   # portable-msvc.py by Martins Mozeiko (public domain): downloads MSVC + Windows SDK
   # directly from Microsoft's official Visual Studio manifests.
   pmsvc  = @{ url = 'https://gist.githubusercontent.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977/raw/49b58850aa5e5c1e65f090d4651ee76607883e11/portable-msvc.py'; sha = '1791cccca594ff083ce8d3e0a139e6156d2c312e24332a909e608010f0230a51'; file = 'portable-msvc.py' }
-  rexsdk = @{ url = 'https://github.com/rexglue/rexglue-sdk/releases/download/nightly-20261002-bd833a2a/rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip'; sha = '1e19d7ec9be0d9d7e1a0088a34a33b068d4dea520181e81318528ef3b37627e7'; file = 'rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip' }
+  # ReXGlue keeps only its last ten nightlies, so this one (2026-10-02) is gone
+  # there; the project keeps the same file (BSD-3-Clause) on its own release.
+  rexsdk = @{ mirror = 'https://github.com/LomoXSoft/AfroSamuraiRecomp/releases/download/rexglue-sdk-bd833a2/rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip'; url = 'https://github.com/rexglue/rexglue-sdk/releases/download/nightly-20261002-bd833a2a/rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip'; sha = '1e19d7ec9be0d9d7e1a0088a34a33b068d4dea520181e81318528ef3b37627e7'; file = 'rexglue-sdk-0.10.0.24-dev.gbd833a2-win-amd64.zip' }
 }
 # portable-msvc.py otherwise takes the newest; MSVC 14.52's C++ library needs Clang 22.
 $MSVC_VERSION = '14.51'
@@ -141,6 +143,7 @@ $TR = @{
   'done_in' = @('    done in {0:n0} s', '    hecho en {0:n0} s', '    fait en {0:n0} s', '    fatto in {0:n0} s')
   'step' = @('Step', 'Paso', 'Etape', 'Passo')
   'dl' = @('    downloading {0}', '    descargando {0}', '    telechargement {0}', '    download {0}')
+  'dl_next' = @('    that failed ({0}); trying the next source', '    fallo ({0}); se prueba la siguiente fuente', '    echec ({0}) ; essai de la source suivante', '    non riuscito ({0}); si prova la fonte successiva')
   'dl_prog' = @('downloading {0}: {1:n0}/{2:n0} MB', 'descargando {0}: {1:n0}/{2:n0} MB', 'telechargement {0} : {1:n0}/{2:n0} Mo', 'download {0}: {1:n0}/{2:n0} MB')
   'sha_bad' = @('SHA-256 mismatch for {0} (got {1}, expected {2})', 'SHA-256 incorrecto para {0} (es {1}, se esperaba {2})', 'SHA-256 incorrect pour {0} ({1}, attendu {2})', 'SHA-256 errato per {0} ({1}, atteso {2})')
   'sha_ok' = @('    ok, {0:n1} MB, SHA-256 verified', '    ok, {0:n1} MB, SHA-256 verificado', '    ok, {0:n1} Mo, SHA-256 verifie', '    ok, {0:n1} MB, SHA-256 verificato')
@@ -308,9 +311,21 @@ function Step($n, $title, [scriptblock]$body) {
 function Fetch($key) {
   $d = $DL[$key]; $out = Join-Path $DLDIR $d.file
   if ((Test-Path -LiteralPath $out) -and (Same-Sha256 (Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash $d.sha)) { return $out }
-  Say (T 'dl' $d.url)
+  # The project's own copy first (when there is one), then the original source.
+  $urls = @(@($d.mirror, $d.url) | Where-Object { $_ })
+  for ($i = 0; $i -lt $urls.Count; $i++) {
+    try { $null = Fetch-From $key $d $urls[$i] $out; return $out }
+    catch {
+      Remove-Item -LiteralPath "$out.part" -Force -ErrorAction SilentlyContinue
+      if ($i -eq $urls.Count - 1) { throw }
+      Say (T 'dl_next' $_.Exception.Message) Yellow
+    }
+  }
+}
+function Fetch-From($key, $d, $url, $out) {
+  Say (T 'dl' $url)
   $nested = [bool]($script:PhaseKey -and $script:PhaseKey -ne $key)
-  $req = [Net.HttpWebRequest]::Create($d.url); $req.UserAgent = 'AfroSamuraiRecomp-installer'
+  $req = [Net.HttpWebRequest]::Create($url); $req.UserAgent = 'AfroSamuraiRecomp-installer'
   $resp = $req.GetResponse(); $len = $resp.ContentLength; $in = $resp.GetResponseStream()
   $fs = [IO.File]::Create("$out.part"); $buf = New-Object byte[] 1048576; $got = 0
   try {
@@ -335,7 +350,6 @@ function Fetch($key) {
   if (-not (Same-Sha256 $h $d.sha)) { Remove-Item -LiteralPath "$out.part" -Force; throw (T 'sha_bad' $d.file $h $d.sha) }
   Move-Item -LiteralPath "$out.part" $out -Force
   Say (T 'sha_ok' ((Get-Item -LiteralPath $out).Length / 1MB))
-  return $out
 }
 $TAR = Join-Path $env:SystemRoot 'System32\tar.exe'
 function Expand-ZipCounted($arc, $dest, [int]$strip, [string]$activity = 'extract') {
