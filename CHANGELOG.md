@@ -2,6 +2,22 @@
 
 Newest first. Versions are in `app/VERSION`.
 
+## 0.3.12 – Installs work again, prologue fight fix
+- Fresh installs failed with a 404 at the ReXGlue SDK step on Windows and
+  Linux: ReXGlue keeps only its last ten nightly builds and deleted
+  `nightly-20261002-bd833a2a`, the one the installers pin. The same two zips
+  (same SHA-256, BSD-3-Clause) are now kept on this repository's release
+  `rexglue-sdk-bd833a2`. `tools/install.ps1` and `install.sh` try that copy
+  first and the original URL second. Updating an existing install was not
+  affected.
+- Prologue courtyard fight (issue #7): the 0.3.9 spawn guard also released the
+  enemy that waits on the roof and then jumps down to its waypoint. Released
+  while it stood at the roof edge waiting for Afro, it fought on the roof, could
+  not reach Afro and the fight never ended. The guard now releases only enemies
+  below their waypoint (the 0.3.9 case). One above its waypoint is left alone
+  and logged once. The guard's log lines now give the signed height and the
+  enemy, waypoint and Afro positions.
+
 ## 0.3.11 – Achievements page
 - In-game options (F1 / L3 + R3): two tabs, **Options** and **Achievements**,
   switched with LB / RB (L1 / R1; keys 1 / 3 in the default key bindings), with

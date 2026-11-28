@@ -1,4 +1,4 @@
-// Graphical installer for AfroSamuraiRecomp 0.3.11 development.
+// Graphical installer for AfroSamuraiRecomp 0.3.12 development.
 // The source files come from the release asset afrosetup-v<version>-files.bin
 // (next to the setup, or downloaded from the GitHub release), checked against
 // the SHA-256 compiled in. Closing the window never terminates a running build.
